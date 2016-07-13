@@ -1,0 +1,4 @@
+
+
+class SoftwareNotFound(Exception):
+    pass
