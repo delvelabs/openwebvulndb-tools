@@ -1,7 +1,9 @@
 import asyncio
 import os
+import aiohttp
 
-from .errors import RepositoryUnreachable
+from .parser import PluginParser
+from .errors import RepositoryUnreachable, PluginNotFound
 from ...common.config import DEFAULT_PATH
 
 
@@ -10,6 +12,8 @@ class WordPressRepository:
     def __init__(self, loop, path=DEFAULT_PATH):
         self.loop = loop
         self.path = path
+        self.session = aiohttp.ClientSession(loop=loop)
+        self.parser = PluginParser()
 
     async def enumerate_plugins(self):
         command = self.get_enumerate_command()
@@ -33,6 +37,19 @@ class WordPressRepository:
         else:
             raise RepositoryUnreachable()
 
+    async def fetch_plugin(self, plugin_name):
+        try:
+            url = 'https://api.wordpress.org/plugins/info/1.0/{slug}.json'.format(slug=plugin_name)
+            response = await self.session.get(url)
+            data = await response.text()
+            response.close()
+
+            return self.parser.parse(data)
+        except PluginNotFound:
+            raise
+        except:
+            raise RepositoryUnreachable('Failed to obtain the plugin information')
+
     def current_plugins(self):
         return {entry.name for entry in os.scandir(self.path) if entry.is_dir()}
 
@@ -45,4 +62,9 @@ class WordPressRepository:
         new = repository - current
 
         for plugin in new:
-            meta = await self.fetch_plugin(plugin)
+            try:
+                meta = await self.fetch_plugin(plugin)
+            except RepositoryUnreachable:
+                pass
+            except PluginNotFound:
+                pass
