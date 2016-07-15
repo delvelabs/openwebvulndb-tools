@@ -1,7 +1,7 @@
 from unittest import TestCase
-from openwebvulndb.tools.wordpress.parser import PluginParser
-from openwebvulndb.tools.wordpress.errors import PluginNotFound
-from openwebvulndb.models import Meta, Repository
+from openwebvulndb.wordpress.parser import PluginParser
+from openwebvulndb.wordpress.errors import PluginNotFound
+from openwebvulndb.common import Meta, Repository
 
 from fixtures import read_file
 

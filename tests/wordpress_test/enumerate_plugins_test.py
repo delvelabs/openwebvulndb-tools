@@ -3,9 +3,9 @@ from aiohttp import ClientResponse, ClientTimeoutError
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from fixtures import read_file, file_path, async_test, fake_future
-from openwebvulndb.tools.wordpress.repository import WordPressRepository, RepositoryUnreachable
-from openwebvulndb.tools.wordpress.errors import PluginNotFound
-from openwebvulndb.models import Meta
+from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
+from openwebvulndb.wordpress.errors import PluginNotFound
+from openwebvulndb.common import Meta
 
 
 class EnumeratePluginsTest(TestCase):

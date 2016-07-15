@@ -1,4 +1,4 @@
-from ...common.errors import SoftwareNotFound, NetworkError
+from ..common.errors import SoftwareNotFound, NetworkError
 
 
 class PluginNotFound(SoftwareNotFound):

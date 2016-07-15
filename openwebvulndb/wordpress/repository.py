@@ -4,7 +4,7 @@ import aiohttp
 
 from .parser import PluginParser
 from .errors import RepositoryUnreachable, PluginNotFound
-from ...common.config import DEFAULT_PATH
+from ..common.config import DEFAULT_PATH
 
 
 class WordPressRepository:

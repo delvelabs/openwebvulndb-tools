@@ -1,7 +1,7 @@
 import json
 from .errors import PluginNotFound
-from ...common.logs import logger
-from ...models import Meta, Repository
+from ..common.logs import logger
+from ..common import Meta, Repository
 
 
 class PluginParser:
