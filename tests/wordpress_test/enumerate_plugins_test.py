@@ -35,17 +35,18 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_read_path_empty(self, loop):
-        empty = file_path(__file__, '')
+        handler = WordPressRepository(loop=loop, storage=MagicMock())
+        handler.storage.list_directories.return_value = set()
 
-        handler = WordPressRepository(loop=loop, path=empty)
-        self.assertEqual(handler.current_plugins() - {'__pycache__'}, set())
+        self.assertEqual(handler.current_plugins(), set())
+        handler.storage.list_directories.assert_called_with('plugins')
 
     @async_test()
     async def test_read_path_with_data(self, loop):
-        with_data = file_path(__file__, '..')
-
-        handler = WordPressRepository(loop=loop, path=with_data)
+        handler = WordPressRepository(loop=loop, storage=MagicMock())
+        handler.storage.list_directories.return_value = {"wordpress_test"}
         self.assertIn("wordpress_test", handler.current_plugins())
+        handler.storage.list_directories.assert_called_with('plugins')
 
     @async_test()
     async def test_no_calls_made_when_nothing_new(self, loop):
@@ -59,7 +60,7 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_calls_made_when_new_plugins_arrive(self, loop):
-        handler = WordPressRepository(loop=loop)
+        handler = WordPressRepository(loop=loop, storage=MagicMock())
         handler.current_plugins = lambda: {'hello-world', 'unknown-plugin'}
         handler.enumerate_plugins = lambda: fake_future({'hello-world', 'a', 'b'}, loop)
 
@@ -71,6 +72,7 @@ class EnumeratePluginsTest(TestCase):
             call('a'),
             call('b'),
         ], any_order=True)
+        handler.storage.write_meta.assert_called_with(Meta(key="a", name="A"))
 
     @async_test()
     async def test_when_fetch_fails(self, loop):
