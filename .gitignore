@@ -10,6 +10,7 @@ __pycache__
 .pydevproject
 #output
 output/
+data/
 bin/
 include/
 lib/

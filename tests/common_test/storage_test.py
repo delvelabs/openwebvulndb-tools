@@ -37,7 +37,7 @@ class StorageTest(TestCase):
         storage = Storage(empty)
         self.assertIn('common_test', storage.list_directories('..'))
 
-    def test_read_path_with_data(self):
+    def test_read_path_does_not_exist(self):
         empty = file_path(__file__, '')
 
         storage = Storage(empty)
