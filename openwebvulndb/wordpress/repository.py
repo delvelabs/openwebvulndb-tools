@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 
 from ..common.logs import logger
+from ..common.parallel import ParallelWorker
 from .parser import PluginParser, ThemeParser
 from .errors import RepositoryUnreachable, SoftwareNotFound
 
@@ -98,14 +99,7 @@ class WordPressRepository:
 
         logger.info("Found {total} entries, processing {new} new ones.".format(total=len(repository), new=len(new)))
 
-        async def consume(n):
-            while True:
-                coroutine, arg = await work_queue.get()
-
-                logger.info("Worker %s Picked up %s, %s" % (n, coroutine, arg))
-                await coroutine(arg)
-
-                work_queue.task_done()
+        worker = ParallelWorker(5, loop=self.loop)
 
         async def do_check_content(meta):
             for repo in meta.repositories:
@@ -122,20 +116,9 @@ class WordPressRepository:
             except SoftwareNotFound as e:
                 logger.debug("Entry not found for {item}: {e}".format(item=item, e=e))
                 meta = default(slug=item)
-                await work_queue.put((do_check_content, meta))
-
-        work_queue = asyncio.Queue(loop=self.loop)
+                await worker.request(do_check_content, meta)
 
         for item in new:
-            await work_queue.put((do_fetch, item))
+            await worker.request(do_fetch, item)
 
-        tasks = [self.loop.create_task(consume(i)) for i in range(5)]
-
-        try:
-            await work_queue.join()
-        finally:
-            for task in tasks:
-                try:
-                    task.cancel()
-                except:
-                    pass
+        await worker.wait()
