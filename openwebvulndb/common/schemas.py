@@ -21,7 +21,7 @@ class MetaSchema(Schema):
         ordered = True
 
     key = fields.String(required=True)
-    name = fields.String(required=True)
+    name = fields.String(required=False, allow_none=True)
     url = fields.Url(required=False, allow_none=True)
     repositories = fields.Nested(RepositorySchema, many=True, required=False)
 

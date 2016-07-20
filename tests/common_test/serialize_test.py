@@ -6,16 +6,16 @@ from openwebvulndb.common.schemas import MetaSchema, serialize
 class SerializeTest(TestCase):
 
     def test_read_and_write_minimal(self):
-        plugin = Meta(key="plugins/test-plugin",
-                      name="Test Plugin")
+        plugin = Meta(key="plugins/test-plugin")
 
         schema = MetaSchema()
         as_string, _ = serialize(schema, plugin)
 
-        self.assertIn("Test Plugin", as_string)
+        self.assertIn("test-plugin", as_string)
 
         self.assertNotIn("url", as_string)
         self.assertNotIn("repositories", as_string)
+        self.assertNotIn("name", as_string)
 
         found_back, _ = schema.loads(as_string)
 
@@ -42,8 +42,8 @@ class SerializeTest(TestCase):
         self.assertEqual(plugin, found_back)
 
     def test_load_missing_fields(self):
-        string = '{"key": "a-plugin"}'
+        string = '{"name": "A Plugin"}'
         schema = MetaSchema()
         value, errors = schema.loads(string)
 
-        self.assertEqual(errors["name"], ['Missing data for required field.'])
+        self.assertEqual(errors["key"], ['Missing data for required field.'])

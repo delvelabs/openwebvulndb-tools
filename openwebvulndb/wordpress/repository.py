@@ -8,9 +8,10 @@ from .errors import RepositoryUnreachable, SoftwareNotFound
 
 class WordPressRepository:
 
-    def __init__(self, loop, storage=None, httpsession=None):
+    def __init__(self, loop, storage=None, aiohttp_session=None, repository_checker=None):
         self.loop = loop
-        self.session = httpsession
+        self.session = aiohttp_session
+        self.checker = repository_checker
         self.plugin_parser = PluginParser()
         self.theme_parser = ThemeParser()
         self.storage = storage
@@ -81,14 +82,16 @@ class WordPressRepository:
     async def perform_plugin_lookup(self):
         return await self.perform_lookup(self.current_plugins,
                                          self.enumerate_plugins,
-                                         self.fetch_plugin)
+                                         self.fetch_plugin,
+                                         self.plugin_parser.create_meta)
 
     async def perform_theme_lookup(self):
         return await self.perform_lookup(self.current_themes,
                                          self.enumerate_themes,
-                                         self.fetch_theme)
+                                         self.fetch_theme,
+                                         self.theme_parser.create_meta)
 
-    async def perform_lookup(self, current, obtain, fetch):
+    async def perform_lookup(self, current, obtain, fetch, default):
         current = current()
         repository = await obtain()
         new = repository - current
@@ -102,4 +105,9 @@ class WordPressRepository:
             except RepositoryUnreachable as e:
                 logger.warn("Unable to reach repository for {item}: {e}".format(item=item, e=e))
             except SoftwareNotFound as e:
-                logger.info("Entry not found for {item}: {e}".format(item=item, e=e))
+                logger.debug("Entry not found for {item}: {e}".format(item=item, e=e))
+                meta = default(slug=item)
+                for repo in meta.repositories:
+                    if await self.checker.has_content(repo):
+                        self.storage.write_meta(meta)
+                        break

@@ -15,7 +15,7 @@ class Model:
 
 class Meta(Model):
 
-    def __init__(self, *, key, name, url=None, repositories=None):
+    def __init__(self, *, key, name=None, url=None, repositories=None):
         self.key = key
         self.name = name
         self.url = url

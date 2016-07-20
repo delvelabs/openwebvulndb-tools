@@ -43,6 +43,17 @@ class PluginApiParseTest(TestCase):
                                                    location="https://plugins.svn.wordpress.org/better-wp-security/"),
                                     ]))
 
+    def test_manual_creation(self):
+        info = self.parser.create_meta(slug="better-wp-security")
+
+        self.assertEqual(info, Meta(key="plugins/better-wp-security",
+                                    url="https://wordpress.org/plugins/better-wp-security/",
+                                    repositories=[
+                                        Repository(type="subversion",
+                                                   location="https://plugins.svn.wordpress.org/better-wp-security/"),
+                                    ]))
+
+
 
 class ThemeApiParseTest(TestCase):
 
@@ -79,6 +90,16 @@ class ThemeApiParseTest(TestCase):
 
         self.assertEqual(info, Meta(key="themes/twentyeleven",
                                     name="Twenty Eleven",
+                                    url="https://wordpress.org/themes/twentyeleven/",
+                                    repositories=[
+                                        Repository(type="subversion",
+                                                   location="https://themes.svn.wordpress.org/twentyeleven/"),
+                                    ]))
+
+    def test_create_manually(self):
+        info = self.parser.create_meta(slug="twentyeleven")
+
+        self.assertEqual(info, Meta(key="themes/twentyeleven",
                                     url="https://wordpress.org/themes/twentyeleven/",
                                     repositories=[
                                         Repository(type="subversion",

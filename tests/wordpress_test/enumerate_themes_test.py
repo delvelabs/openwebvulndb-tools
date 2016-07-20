@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call
 from fixtures import read_file, file_path, async_test, fake_future
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
-from openwebvulndb.common import Meta
+from openwebvulndb.common import Meta, Repository
 
 
 class EnumeratePluginsTest(TestCase):
@@ -75,17 +75,47 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_when_fetch_fails(self, loop):
-        handler = WordPressRepository(loop=loop)
+        handler = WordPressRepository(loop=loop, storage=MagicMock(), repository_checker=MagicMock())
         handler.current_themes = lambda: {'hello-world', 'unknown-theme'}
         handler.enumerate_themes = lambda: fake_future({'hello-world', 'a', 'b'}, loop)
 
         handler.fetch_theme = MagicMock()
         handler.fetch_theme.side_effect = PluginNotFound('A side effect!')
+        handler.checker.has_content.return_value = fake_future(True, loop)
         await handler.perform_theme_lookup()
 
         handler.fetch_theme.assert_has_calls([
             call('a'),
             call('b'),
+        ], any_order=True)
+        handler.storage.write_meta.assert_has_calls([
+            call(handler.theme_parser.create_meta(slug="a")),
+            call(handler.theme_parser.create_meta(slug="b")),
+        ], any_order=True)
+        handler.checker.has_content.assert_has_calls([
+            call(Repository(type="subversion", location="https://themes.svn.wordpress.org/a/")),
+            call(Repository(type="subversion", location="https://themes.svn.wordpress.org/b/")),
+        ], any_order=True)
+
+    @async_test()
+    async def test_when_fetch_fails_bad_repo(self, loop):
+        handler = WordPressRepository(loop=loop, storage=MagicMock(), repository_checker=MagicMock())
+        handler.current_themes = lambda: {'hello-world', 'unknown-theme'}
+        handler.enumerate_themes = lambda: fake_future({'hello-world', 'a', 'b'}, loop)
+
+        handler.fetch_theme = MagicMock()
+        handler.fetch_theme.side_effect = PluginNotFound('A side effect!')
+        handler.checker.has_content.return_value = fake_future(False, loop)
+        await handler.perform_theme_lookup()
+
+        handler.fetch_theme.assert_has_calls([
+            call('a'),
+            call('b'),
+        ], any_order=True)
+        handler.storage.write_meta.assert_not_called()
+        handler.checker.has_content.assert_has_calls([
+            call(Repository(type="subversion", location="https://themes.svn.wordpress.org/a/")),
+            call(Repository(type="subversion", location="https://themes.svn.wordpress.org/b/")),
         ], any_order=True)
 
     @async_test()
@@ -95,7 +125,7 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'twentyeleven.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop, httpsession=MagicMock())
+        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock())
         handler.session.get.return_value = fake_future(my_response, loop)
 
         theme = await handler.fetch_theme('twentyeleven')
@@ -106,7 +136,7 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_fetch_theme_fails_to_request(self, loop):
-        handler = WordPressRepository(loop=loop, httpsession=MagicMock())
+        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock())
         handler.session.get.side_effect = ClientTimeoutError()
 
         with self.assertRaises(RepositoryUnreachable):

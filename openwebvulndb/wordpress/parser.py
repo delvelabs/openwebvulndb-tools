@@ -6,22 +6,36 @@ from ..common import Meta, Repository
 
 class Parser:
 
+    def create_meta(self, reraise=False, **kwargs):
+        name = self.apply(self.name_pattern, reraise=reraise, **kwargs)
+
+        key = self.apply(self.key_pattern, reraise=reraise, **kwargs)
+        url = self.apply(self.url_pattern, reraise=reraise, **kwargs)
+        svn = self.apply(self.repository_pattern, reraise=reraise, **kwargs)
+
+        repositories = [
+            Repository(type=self.repository_type, location=svn),
+        ] if svn is not None else []
+
+        return Meta(key=key,
+                    name=name,
+                    url=url,
+                    repositories=repositories)
+
+    def apply(self, pattern, *, reraise, **kwargs):
+        try:
+            return pattern.format(**kwargs)
+        except:
+            if reraise:
+                raise
+            else:
+                return None
+
     def parse(self, response):
         try:
             data = json.loads(response)
 
-            key = self.key_pattern.format(**data)
-            name = self.name_pattern.format(**data)
-            url = self.url_pattern.format(**data)
-            svn = self.repository_pattern.format(**data)
-            repositories = [
-                Repository(type=self.repository_type, location=svn),
-            ]
-
-            return Meta(key=key,
-                        name=name,
-                        url=url,
-                        repositories=repositories)
+            return self.create_meta(reraise=True, **data)
         except TypeError:
             raise self.exception('Expected string input, got {data}'.format(data=response))
         except json.decoder.JSONDecodeError:

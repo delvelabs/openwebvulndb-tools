@@ -1,7 +1,8 @@
 import asyncio
 import aiohttp
-from .common import Injector, Storage
+from .common import Injector, Storage, RepositoryChecker
 
 app = Injector(storage=Storage,
                loop=asyncio.get_event_loop,
-               httpsession=aiohttp.ClientSession)
+               repository_checker=RepositoryChecker,
+               aiohttp_session=aiohttp.ClientSession)
