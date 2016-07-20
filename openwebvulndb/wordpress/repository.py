@@ -98,7 +98,22 @@ class WordPressRepository:
 
         logger.info("Found {total} entries, processing {new} new ones.".format(total=len(repository), new=len(new)))
 
-        for item in new:
+        async def consume(n):
+            while True:
+                coroutine, arg = await work_queue.get()
+
+                logger.info("Worker %s Picked up %s, %s" % (n, coroutine, arg))
+                await coroutine(arg)
+
+                work_queue.task_done()
+
+        async def do_check_content(meta):
+            for repo in meta.repositories:
+                if await self.checker.has_content(repo):
+                    self.storage.write_meta(meta)
+                    return
+
+        async def do_fetch(item):
             try:
                 meta = await fetch(item)
                 self.storage.write_meta(meta)
@@ -107,7 +122,20 @@ class WordPressRepository:
             except SoftwareNotFound as e:
                 logger.debug("Entry not found for {item}: {e}".format(item=item, e=e))
                 meta = default(slug=item)
-                for repo in meta.repositories:
-                    if await self.checker.has_content(repo):
-                        self.storage.write_meta(meta)
-                        break
+                await work_queue.put((do_check_content, meta))
+
+        work_queue = asyncio.Queue(loop=self.loop)
+
+        for item in new:
+            await work_queue.put((do_fetch, item))
+
+        tasks = [self.loop.create_task(consume(i)) for i in range(5)]
+
+        try:
+            await work_queue.join()
+        finally:
+            for task in tasks:
+                try:
+                    task.cancel()
+                except:
+                    pass

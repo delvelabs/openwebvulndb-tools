@@ -20,6 +20,8 @@ parser.add_argument("action", choices=operations.keys())
 args = parser.parse_args()
 
 
-app = app.sub(repository=WordPressRepository)
-app.call(operations[args.action])
-app.close()
+try:
+    app = app.sub(repository=WordPressRepository)
+    app.call(operations[args.action])
+except KeyboardInterrupt:
+    app.close()
