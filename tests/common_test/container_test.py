@@ -78,3 +78,63 @@ class ContainerTest(TestCase):
 
         with self.assertRaises(RecursionError):
             injector.test
+
+
+class InjectorCloseTest(TestCase):
+    def setUp(test):
+        test.call_list = []
+
+        class Closer:
+            def __init__(self, value='Default'):
+                self.value = value
+
+            def close(self):
+                test.call_list.append(self.value)
+
+        test.closer = Closer
+
+    def test_close_does_nothing_by_default(self):
+        injector = Injector()
+        injector.close()
+
+    def test_close_propagates_to_initial_child(self):
+        injector = Injector(a=self.closer('A'), b=lambda: self.closer('B'))
+        injector.close()
+
+        self.assertEqual(['A'], self.call_list)
+
+    def test_close_propagates_to_created_child_as_well(self):
+        injector = Injector(a=self.closer('A'), b=lambda: self.closer('B'))
+        injector.b
+        injector.close()
+
+        self.assertEqual(['A', 'B'], self.call_list)
+
+    def test_close_made_in_sequence(self):
+        injector = Injector(a=lambda b: self.closer('A'), b=lambda: self.closer('B'))
+        injector.a
+        injector.close()
+
+        self.assertEqual(['B', 'A'], self.call_list)
+
+    def test_close_shared_among_subinjectors(self):
+        injector = Injector(a=lambda: self.closer('A'))
+        sub = injector.sub(b=lambda: self.closer('B'))
+        sub.b
+        injector.a
+        injector.close()
+
+        self.assertEqual(['B', 'A'], self.call_list)
+
+    def test_do_not_call_on_class_level(self):
+        injector = Injector(a=self.closer)
+        injector.close()
+
+        self.assertEqual([], self.call_list)
+
+    def test_call_on_instance(self):
+        injector = Injector(a=self.closer)
+        injector.a
+        injector.close()
+
+        self.assertEqual(['Default'], self.call_list)

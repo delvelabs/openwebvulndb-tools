@@ -7,6 +7,10 @@ class Injector:
     def __init__(self, parent=None, **kwargs):
         self.___parent = parent
         self.___args = kwargs
+        self.___close_list = [] if parent is None else parent.___close_list
+
+        for item in kwargs.values():
+            self.record_closeable(item)
 
     def sub(self, **kwargs):
         return Injector(self, **kwargs)
@@ -37,6 +41,8 @@ class Injector:
                 value = self.create(value)
                 self.___args[arg] = value
 
+                self.record_closeable(value)
+
             return value
         except KeyError:
             if self.___parent:
@@ -53,6 +59,14 @@ class Injector:
 
     def create(self, *args, **kwargs):
         return self.call(*args, **kwargs)
+
+    def record_closeable(self, value):
+        if not inspect.isclass(value) and hasattr(value, 'close') and inspect.isroutine(value.close):
+            self.___close_list.append(value.close)
+
+    def close(self):
+        for call in self.___close_list:
+            call()
 
     def __getattr__(self, name):
         try:

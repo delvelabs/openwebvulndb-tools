@@ -96,9 +96,7 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'better-wp-security.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop)
-        handler.session.close()  # We replace the implementation
-        handler.session = MagicMock()
+        handler = WordPressRepository(loop=loop, httpsession=MagicMock())
         handler.session.get.return_value = fake_future(my_response, loop)
 
         plugin = await handler.fetch_plugin('better-wp-security')
@@ -108,9 +106,7 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_fetch_plugin_fails_to_request(self, loop):
-        handler = WordPressRepository(loop=loop)
-        handler.session.close()  # We replace the implementation
-        handler.session = MagicMock()
+        handler = WordPressRepository(loop=loop, httpsession=MagicMock())
         handler.session.get.side_effect = ClientTimeoutError()
 
         with self.assertRaises(RepositoryUnreachable):

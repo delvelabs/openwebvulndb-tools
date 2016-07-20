@@ -23,7 +23,7 @@ class Parser:
                         url=url,
                         repositories=repositories)
         except TypeError:
-            raise self.exception('Expected string input')
+            raise self.exception('Expected string input, got {data}'.format(data=response))
         except json.decoder.JSONDecodeError:
             raise self.exception('Invalid JSON received')
         except KeyError as e:

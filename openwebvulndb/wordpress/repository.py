@@ -1,15 +1,16 @@
 import asyncio
 import aiohttp
 
+from ..common.logs import logger
 from .parser import PluginParser, ThemeParser
 from .errors import RepositoryUnreachable, SoftwareNotFound
 
 
 class WordPressRepository:
 
-    def __init__(self, loop, storage=None):
+    def __init__(self, loop, storage=None, httpsession=None):
         self.loop = loop
-        self.session = aiohttp.ClientSession(loop=loop)
+        self.session = httpsession
         self.plugin_parser = PluginParser()
         self.theme_parser = ThemeParser()
         self.storage = storage
@@ -92,11 +93,13 @@ class WordPressRepository:
         repository = await obtain()
         new = repository - current
 
+        logger.info("Found {total} entries, processing {new} new ones.".format(total=len(repository), new=len(new)))
+
         for item in new:
             try:
                 meta = await fetch(item)
                 self.storage.write_meta(meta)
-            except RepositoryUnreachable:
-                pass
-            except SoftwareNotFound:
-                pass
+            except RepositoryUnreachable as e:
+                logger.warn("Unable to reach repository for {item}: {e}".format(item=item, e=e))
+            except SoftwareNotFound as e:
+                logger.info("Entry not found for {item}: {e}".format(item=item, e=e))

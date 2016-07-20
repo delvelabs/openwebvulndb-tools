@@ -1,3 +1,7 @@
-from logging import Logger
+import logging
 
-logger = Logger('openwebvulndb')
+# create logger
+logger = logging.getLogger('openwebvulndb')
+
+logging.basicConfig(format='%(asctime)s ' + logging.BASIC_FORMAT,
+                    level=logging.INFO)
