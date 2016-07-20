@@ -1,9 +1,8 @@
 import asyncio
-import os
 import aiohttp
 
-from .parser import PluginParser
-from .errors import RepositoryUnreachable, PluginNotFound
+from .parser import PluginParser, ThemeParser
+from .errors import RepositoryUnreachable, SoftwareNotFound
 
 
 class WordPressRepository:
@@ -11,11 +10,19 @@ class WordPressRepository:
     def __init__(self, loop, storage=None):
         self.loop = loop
         self.session = aiohttp.ClientSession(loop=loop)
-        self.parser = PluginParser()
+        self.plugin_parser = PluginParser()
+        self.theme_parser = ThemeParser()
         self.storage = storage
 
     async def enumerate_plugins(self):
-        command = self.get_enumerate_command()
+        command = self.get_enumerate_plugins_command()
+        return await self.enumerate_subversion(command)
+
+    async def enumerate_themes(self):
+        command = self.get_enumerate_themes_command()
+        return await self.enumerate_subversion(command)
+
+    async def enumerate_subversion(self, command):
         process = await asyncio.create_subprocess_exec(
             *command,
             loop=self.loop,
@@ -37,14 +44,23 @@ class WordPressRepository:
             raise RepositoryUnreachable()
 
     async def fetch_plugin(self, plugin_name):
+        url = 'https://api.wordpress.org/plugins/info/1.0/{slug}.json'.format(slug=plugin_name)
+        return await self.fetch(url, self.plugin_parser)
+
+    async def fetch_theme(self, plugin_name):
+        url = 'https://api.wordpress.org/themes/info/1.1/?action=theme_information&request[slug]={slug}'.format(
+            slug=plugin_name)
+
+        return await self.fetch(url, self.theme_parser)
+
+    async def fetch(self, url, parser):
         try:
-            url = 'https://api.wordpress.org/plugins/info/1.0/{slug}.json'.format(slug=plugin_name)
             response = await self.session.get(url)
             data = await response.text()
             response.close()
 
-            return self.parser.parse(data)
-        except PluginNotFound:
+            return parser.parse(data)
+        except SoftwareNotFound:
             raise
         except:
             raise RepositoryUnreachable('Failed to obtain the plugin information')
@@ -52,19 +68,35 @@ class WordPressRepository:
     def current_plugins(self):
         return self.storage.list_directories("plugins")
 
-    def get_enumerate_command(self):
+    def current_themes(self):
+        return self.storage.list_directories("themes")
+
+    def get_enumerate_plugins_command(self):
         return ["svn", "ls", "https://plugins.svn.wordpress.org/"]
 
-    async def perform_lookup(self):
-        current = self.current_plugins()
-        repository = await self.enumerate_plugins()
+    def get_enumerate_themes_command(self):
+        return ["svn", "ls", "https://themes.svn.wordpress.org/"]
+
+    async def perform_plugin_lookup(self):
+        return await self.perform_lookup(self.current_plugins,
+                                         self.enumerate_plugins,
+                                         self.fetch_plugin)
+
+    async def perform_theme_lookup(self):
+        return await self.perform_lookup(self.current_themes,
+                                         self.enumerate_themes,
+                                         self.fetch_theme)
+
+    async def perform_lookup(self, current, obtain, fetch):
+        current = current()
+        repository = await obtain()
         new = repository - current
 
-        for plugin in new:
+        for item in new:
             try:
-                meta = await self.fetch_plugin(plugin)
+                meta = await fetch(item)
                 self.storage.write_meta(meta)
             except RepositoryUnreachable:
                 pass
-            except PluginNotFound:
+            except SoftwareNotFound:
                 pass

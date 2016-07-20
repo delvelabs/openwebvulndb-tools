@@ -1,31 +1,53 @@
 import json
-from .errors import PluginNotFound
+from .errors import PluginNotFound, ThemeNotFound
 from ..common.logs import logger
 from ..common import Meta, Repository
 
 
-class PluginParser:
+class Parser:
 
     def parse(self, response):
         try:
             data = json.loads(response)
-            key = "plugins/{slug}".format(slug=data['slug'])
-            url = "https://wordpress.org/plugins/{slug}/".format(slug=data['slug'])
-            svn = "https://plugins.svn.wordpress.org/{slug}/".format(slug=data['slug'])
+
+            key = self.key_pattern.format(**data)
+            name = self.name_pattern.format(**data)
+            url = self.url_pattern.format(**data)
+            svn = self.repository_pattern.format(**data)
             repositories = [
-                Repository(type="subversion", location=svn),
+                Repository(type=self.repository_type, location=svn),
             ]
 
             return Meta(key=key,
-                        name=data["name"],
+                        name=name,
                         url=url,
                         repositories=repositories)
         except TypeError:
-            raise PluginNotFound('Expected string input')
+            raise self.exception('Expected string input')
         except json.decoder.JSONDecodeError:
-            raise PluginNotFound('Invalid JSON received')
+            raise self.exception('Invalid JSON received')
         except KeyError as e:
-            raise PluginNotFound('Required data missing')
+            raise self.exception('Required data missing')
         except Exception as e:
             logger.exception(e)
-            raise PluginNotFound()
+            raise self.exception()
+
+
+class PluginParser(Parser):
+
+    exception = PluginNotFound
+    name_pattern = "{name}"
+    key_pattern = "plugins/{slug}"
+    url_pattern = "https://wordpress.org/plugins/{slug}/"
+    repository_type = "subversion"
+    repository_pattern = "https://plugins.svn.wordpress.org/{slug}/"
+
+
+class ThemeParser(Parser):
+
+    exception = ThemeNotFound
+    name_pattern = "{name}"
+    key_pattern = "themes/{slug}"
+    url_pattern = "https://wordpress.org/themes/{slug}/"
+    repository_type = "subversion"
+    repository_pattern = "https://themes.svn.wordpress.org/{slug}/"

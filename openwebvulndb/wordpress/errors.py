@@ -5,5 +5,9 @@ class PluginNotFound(SoftwareNotFound):
     pass
 
 
+class ThemeNotFound(SoftwareNotFound):
+    pass
+
+
 class RepositoryUnreachable(NetworkError):
     pass

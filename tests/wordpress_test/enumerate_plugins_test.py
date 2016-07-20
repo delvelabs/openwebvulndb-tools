@@ -13,13 +13,13 @@ class EnumeratePluginsTest(TestCase):
     @async_test()
     async def test_default_command(self, loop):
         handler = WordPressRepository(loop=loop)
-        self.assertEqual(handler.get_enumerate_command(), ["svn", "ls", "https://plugins.svn.wordpress.org/"])
+        self.assertEqual(handler.get_enumerate_plugins_command(), ["svn", "ls", "https://plugins.svn.wordpress.org/"])
 
     @async_test()
     async def test_obtain_list(self, loop):
         handler = WordPressRepository(loop=loop)
 
-        handler.get_enumerate_command = lambda: ["cat", file_path(__file__, "plugins.svn.txt")]
+        handler.get_enumerate_plugins_command = lambda: ["cat", file_path(__file__, "plugins.svn.txt")]
         plugins = await handler.enumerate_plugins()
 
         self.assertEqual(plugins, {'aioseo-fix', 'easy-book-reviews', 'isd-wordpress-rss-feed-plugin', 'picashow',
@@ -29,7 +29,7 @@ class EnumeratePluginsTest(TestCase):
     async def test_failure_to_list(self, loop):
         handler = WordPressRepository(loop=loop)
 
-        handler.get_enumerate_command = lambda: ["svn", "ls", "https://localhost:1234/"]
+        handler.get_enumerate_plugins_command = lambda: ["svn", "ls", "https://localhost:1234/"]
         with self.assertRaises(RepositoryUnreachable):
             await handler.enumerate_plugins()
 
@@ -56,7 +56,7 @@ class EnumeratePluginsTest(TestCase):
 
         handler.fetch_plugin = MagicMock()
         handler.fetch_plugin.assert_not_called()
-        await handler.perform_lookup()
+        await handler.perform_plugin_lookup()
 
     @async_test()
     async def test_calls_made_when_new_plugins_arrive(self, loop):
@@ -66,7 +66,7 @@ class EnumeratePluginsTest(TestCase):
 
         handler.fetch_plugin = MagicMock()
         handler.fetch_plugin.return_value = fake_future(Meta(key="a", name="A"), loop)
-        await handler.perform_lookup()
+        await handler.perform_plugin_lookup()
 
         handler.fetch_plugin.assert_has_calls([
             call('a'),
@@ -82,7 +82,7 @@ class EnumeratePluginsTest(TestCase):
 
         handler.fetch_plugin = MagicMock()
         handler.fetch_plugin.side_effect = PluginNotFound('A side effect!')
-        await handler.perform_lookup()
+        await handler.perform_plugin_lookup()
 
         handler.fetch_plugin.assert_has_calls([
             call('a'),
