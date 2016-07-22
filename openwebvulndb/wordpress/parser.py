@@ -52,7 +52,7 @@ class PluginParser(Parser):
     exception = PluginNotFound
     name_pattern = "{name}"
     key_pattern = "plugins/{slug}"
-    url_pattern = "https://wordpress.org/plugins/{slug}/"
+    url_pattern = "{homepage}"
     repository_type = "subversion"
     repository_pattern = "https://plugins.svn.wordpress.org/{slug}/"
 
@@ -62,6 +62,6 @@ class ThemeParser(Parser):
     exception = ThemeNotFound
     name_pattern = "{name}"
     key_pattern = "themes/{slug}"
-    url_pattern = "https://wordpress.org/themes/{slug}/"
+    url_pattern = "{homepage}"
     repository_type = "subversion"
     repository_pattern = "https://themes.svn.wordpress.org/{slug}/"

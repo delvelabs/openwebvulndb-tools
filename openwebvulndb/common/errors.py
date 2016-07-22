@@ -6,3 +6,7 @@ class NetworkError(Exception):
 
 class SoftwareNotFound(Exception):
     pass
+
+
+class ExecutionFailure(Exception):
+    pass

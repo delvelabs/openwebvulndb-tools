@@ -37,7 +37,7 @@ class PluginApiParseTest(TestCase):
 
         self.assertEqual(info, Meta(key="plugins/better-wp-security",
                                     name="iThemes Security (formerly Better WP Security)",
-                                    url="https://wordpress.org/plugins/better-wp-security/",
+                                    url="https://ithemes.com/security",
                                     repositories=[
                                         Repository(type="subversion",
                                                    location="https://plugins.svn.wordpress.org/better-wp-security/"),
@@ -47,7 +47,6 @@ class PluginApiParseTest(TestCase):
         info = self.parser.create_meta(slug="better-wp-security")
 
         self.assertEqual(info, Meta(key="plugins/better-wp-security",
-                                    url="https://wordpress.org/plugins/better-wp-security/",
                                     repositories=[
                                         Repository(type="subversion",
                                                    location="https://plugins.svn.wordpress.org/better-wp-security/"),
@@ -100,7 +99,6 @@ class ThemeApiParseTest(TestCase):
         info = self.parser.create_meta(slug="twentyeleven")
 
         self.assertEqual(info, Meta(key="themes/twentyeleven",
-                                    url="https://wordpress.org/themes/twentyeleven/",
                                     repositories=[
                                         Repository(type="subversion",
                                                    location="https://themes.svn.wordpress.org/twentyeleven/"),

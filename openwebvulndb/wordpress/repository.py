@@ -5,45 +5,31 @@ from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from .parser import PluginParser, ThemeParser
 from .errors import RepositoryUnreachable, SoftwareNotFound
+from ..common.errors import ExecutionFailure
 
 
 class WordPressRepository:
 
-    def __init__(self, loop, storage=None, aiohttp_session=None, repository_checker=None):
+    def __init__(self, loop, storage=None, aiohttp_session=None, repository_checker=None, subversion=None):
         self.loop = loop
         self.session = aiohttp_session
         self.checker = repository_checker
         self.plugin_parser = PluginParser()
         self.theme_parser = ThemeParser()
         self.storage = storage
+        self.subversion = subversion
 
     async def enumerate_plugins(self):
-        command = self.get_enumerate_plugins_command()
-        return await self.enumerate_subversion(command)
+        return await self.enumerate_subversion("https://plugins.svn.wordpress.org/")
 
     async def enumerate_themes(self):
-        command = self.get_enumerate_themes_command()
-        return await self.enumerate_subversion(command)
+        return await self.enumerate_subversion("https://themes.svn.wordpress.org/")
 
-    async def enumerate_subversion(self, command):
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            loop=self.loop,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-            stdin=asyncio.subprocess.DEVNULL
-        )
-
-        out = set()
-        while not process.stdout.at_eof():
-            line = await process.stdout.readline()
-            if line != b'':
-                out.add(line.decode('utf8').strip("\n/"))
-
-        code = await process.wait()
-        if code == 0:
-            return out
-        else:
+    async def enumerate_subversion(self, url):
+        try:
+            lines = await self.subversion.ls(url)
+            return {line.strip("/") for line in lines}
+        except ExecutionFailure:
             raise RepositoryUnreachable()
 
     async def fetch_plugin(self, plugin_name):
@@ -69,16 +55,10 @@ class WordPressRepository:
             raise RepositoryUnreachable('Failed to obtain the plugin information')
 
     def current_plugins(self):
-        return self.storage.list_directories("plugins")
+        return self.storage.list_directories("plugins") | set(self.storage.read('plugins-ignore.txt'))
 
     def current_themes(self):
-        return self.storage.list_directories("themes")
-
-    def get_enumerate_plugins_command(self):
-        return ["svn", "ls", "https://plugins.svn.wordpress.org/"]
-
-    def get_enumerate_themes_command(self):
-        return ["svn", "ls", "https://themes.svn.wordpress.org/"]
+        return self.storage.list_directories("themes") | set(self.storage.read('themes-ignore.txt'))
 
     async def perform_plugin_lookup(self):
         return await self.perform_lookup(self.current_plugins,
@@ -99,26 +79,31 @@ class WordPressRepository:
 
         logger.info("Found {total} entries, processing {new} new ones.".format(total=len(repository), new=len(new)))
 
-        worker = ParallelWorker(5, loop=self.loop)
+        fetch_worker = ParallelWorker(5, loop=self.loop)
+        check_worker = ParallelWorker(5, loop=self.loop)
 
-        async def do_check_content(meta):
+        async def do_check_content(slug, meta):
             for repo in meta.repositories:
                 if await self.checker.has_content(repo):
                     self.storage.write_meta(meta)
                     return
 
-        async def do_fetch(item):
+            group = meta.key.partition("/")[0]
+            self.storage.append("{}-ignore.txt".format(group), slug)
+
+        async def do_fetch(slug):
             try:
-                meta = await fetch(item)
+                meta = await fetch(slug)
                 self.storage.write_meta(meta)
             except RepositoryUnreachable as e:
-                logger.warn("Unable to reach repository for {item}: {e}".format(item=item, e=e))
+                logger.warn("Unable to reach repository for {slug}: {e}".format(slug=slug, e=e))
             except SoftwareNotFound as e:
-                logger.debug("Entry not found for {item}: {e}".format(item=item, e=e))
-                meta = default(slug=item)
-                await worker.request(do_check_content, meta)
+                logger.debug("Entry not found for {slug}: {e}".format(slug=slug, e=e))
+                meta = default(slug=slug)
+                await check_worker.request(do_check_content, slug, meta)
 
-        for item in new:
-            await worker.request(do_fetch, item)
+        for slug in new:
+            await fetch_worker.request(do_fetch, slug)
 
-        await worker.wait()
+        await fetch_worker.wait()
+        await check_worker.wait()

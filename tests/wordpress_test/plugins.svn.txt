@@ -1,5 +1,0 @@
-aioseo-fix/
-easy-book-reviews/
-isd-wordpress-rss-feed-plugin/
-picashow/
-wp-auto-hotel-finder/

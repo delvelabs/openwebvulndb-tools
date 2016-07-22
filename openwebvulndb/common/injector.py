@@ -6,11 +6,19 @@ class Injector:
 
     def __init__(self, parent=None, **kwargs):
         self.___parent = parent
+        self.___subs = []
         self.___args = kwargs
-        self.___close_list = [] if parent is None else parent.___close_list
+        self.___close_list = []
+        self.___closed = False
 
         for item in kwargs.values():
             self.record_closeable(item)
+
+        if parent:
+            parent.___subs.append(self)
+
+    def __del__(self):
+        self.close()
 
     def sub(self, **kwargs):
         return Injector(self, **kwargs)
@@ -65,8 +73,14 @@ class Injector:
             self.___close_list.append(value.close)
 
     def close(self):
-        for call in self.___close_list:
-            call()
+        if not self.___closed:
+            for sub in self.___subs:
+                sub.close()
+
+            for call in self.___close_list:
+                call()
+
+            self.___closed = True
 
     def __getattr__(self, name):
         try:

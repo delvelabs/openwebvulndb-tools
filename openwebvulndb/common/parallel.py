@@ -4,8 +4,9 @@ from .logs import logger
 
 class ParallelWorker:
 
-    def __init__(self, worker_count, *, loop):
+    def __init__(self, worker_count, *, loop, name="Worker"):
         self.loop = loop
+        self.name = name
         self.queue = asyncio.Queue(loop=loop)
         self.workers = [loop.create_task(self.consume(i)) for i in range(worker_count)]
 
@@ -17,10 +18,12 @@ class ParallelWorker:
             coroutine, args, kwargs = await self.queue.get()
 
             try:
-                logger.debug("Worker {} picked up a task.".format(n))
+                logger.debug("{} {} picked up a task.".format(self.name, n))
                 await coroutine(*args, **kwargs)
             finally:
                 self.queue.task_done()
+
+        logger.info("Consumer left.")
 
     async def wait(self):
         try:

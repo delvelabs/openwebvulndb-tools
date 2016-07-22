@@ -2,34 +2,37 @@ from aiohttp import ClientResponse, ClientTimeoutError
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file, file_path, async_test, fake_future
+from fixtures import read_file, async_test, fake_future
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
 from openwebvulndb.common import Meta, Repository
+from openwebvulndb.common.errors import ExecutionFailure
 
 
 class EnumeratePluginsTest(TestCase):
 
     @async_test()
-    async def test_default_command(self, loop):
-        handler = WordPressRepository(loop=loop)
-        self.assertEqual(handler.get_enumerate_plugins_command(), ["svn", "ls", "https://plugins.svn.wordpress.org/"])
-
-    @async_test()
     async def test_obtain_list(self, loop):
-        handler = WordPressRepository(loop=loop)
+        handler = WordPressRepository(loop=loop, subversion=MagicMock())
+        handler.subversion.ls.return_value = fake_future([
+            'aioseo-fix/',
+            'easy-book-reviews/',
+            'isd-wordpress-rss-feed-plugin/',
+            'picashow/',
+            'wp-auto-hotel-finder/',
+        ], loop)
 
-        handler.get_enumerate_plugins_command = lambda: ["cat", file_path(__file__, "plugins.svn.txt")]
         plugins = await handler.enumerate_plugins()
+        handler.subversion.ls.assert_called_with("https://plugins.svn.wordpress.org/")
 
         self.assertEqual(plugins, {'aioseo-fix', 'easy-book-reviews', 'isd-wordpress-rss-feed-plugin', 'picashow',
                                    'wp-auto-hotel-finder'})
 
     @async_test()
     async def test_failure_to_list(self, loop):
-        handler = WordPressRepository(loop=loop)
+        handler = WordPressRepository(loop=loop, subversion=MagicMock())
+        handler.subversion.ls.side_effect = ExecutionFailure()
 
-        handler.get_enumerate_plugins_command = lambda: ["svn", "ls", "https://localhost:1234/"]
         with self.assertRaises(RepositoryUnreachable):
             await handler.enumerate_plugins()
 
@@ -37,14 +40,17 @@ class EnumeratePluginsTest(TestCase):
     async def test_read_path_empty(self, loop):
         handler = WordPressRepository(loop=loop, storage=MagicMock())
         handler.storage.list_directories.return_value = set()
+        handler.storage.read.return_value = []
 
         self.assertEqual(handler.current_plugins(), set())
         handler.storage.list_directories.assert_called_with('plugins')
+        handler.storage.read.assert_called_with('plugins-ignore.txt')
 
     @async_test()
     async def test_read_path_with_data(self, loop):
         handler = WordPressRepository(loop=loop, storage=MagicMock())
         handler.storage.list_directories.return_value = {"wordpress_test"}
+        handler.storage.read.return_value = []
         self.assertIn("wordpress_test", handler.current_plugins())
         handler.storage.list_directories.assert_called_with('plugins')
 
@@ -117,6 +123,10 @@ class EnumeratePluginsTest(TestCase):
         handler.checker.has_content.assert_has_calls([
             call(Repository(type="subversion", location="https://plugins.svn.wordpress.org/a/")),
             call(Repository(type="subversion", location="https://plugins.svn.wordpress.org/b/")),
+        ], any_order=True)
+        handler.storage.append.assert_has_calls([
+            call("plugins-ignore.txt", "a"),
+            call("plugins-ignore.txt", "b"),
         ], any_order=True)
 
     @async_test()

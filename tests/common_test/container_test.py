@@ -126,6 +126,32 @@ class InjectorCloseTest(TestCase):
 
         self.assertEqual(['B', 'A'], self.call_list)
 
+    def test_close_limited_to_scope(self):
+        injector = Injector(a=lambda: self.closer('A'))
+        sub = injector.sub(b=lambda: self.closer('B'))
+        sub.b
+        injector.a
+        sub.close()
+
+        self.assertEqual(['B'], self.call_list)
+
+    def test_close_only_called_once(self):
+        injector = Injector(a=lambda: self.closer('A'))
+        sub = injector.sub(b=lambda: self.closer('B'))
+        sub.b
+        injector.a
+        sub.close()
+        injector.close()
+        self.assertEqual(['B', 'A'], self.call_list)
+
+    def test_delete_calls_close(self):
+        injector = Injector(a=lambda: self.closer('A'))
+        injector.a
+
+        del injector
+
+        self.assertEqual(['A'], self.call_list)
+
     def test_do_not_call_on_class_level(self):
         injector = Injector(a=self.closer)
         injector.close()

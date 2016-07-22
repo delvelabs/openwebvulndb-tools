@@ -1,5 +1,6 @@
+import uuid
 from unittest import TestCase
-from unittest.mock import mock_open, patch
+from unittest.mock import mock_open, patch, call
 from fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta
@@ -42,3 +43,21 @@ class StorageTest(TestCase):
 
         storage = Storage(empty)
         self.assertEqual(storage.list_directories('plugins') - {'__pycache__'}, set())
+
+    def test_append(self):
+        m = mock_open()
+        with \
+                patch('openwebvulndb.common.storage.open', m, create=True), \
+                patch('openwebvulndb.common.storage.makedirs') as makedirs:
+
+            storage = Storage("/some/path")
+            storage.append('subdir/a_file.txt', 'hello')
+            storage.append('subdir/a_file.txt', 'world\n\n')
+
+            makedirs.assert_called_once_with('/some/path/subdir', mode=0o755, exist_ok=True)
+            m.assert_called_with('/some/path/subdir/a_file.txt', 'a+')
+            fp = m()
+            fp.write.assert_has_calls([
+                call("hello\n"),
+                call("world\n"),
+            ])

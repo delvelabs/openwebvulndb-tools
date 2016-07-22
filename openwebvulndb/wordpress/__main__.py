@@ -8,7 +8,7 @@ def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
 
 def list_themes(loop, repository):
-    loop.run_until_complete(repository.perform_plugin_lookup())
+    loop.run_until_complete(repository.perform_theme_lookup())
 
 
 operations = dict(list_themes=list_themes,
@@ -24,4 +24,6 @@ try:
     app = app.sub(repository=WordPressRepository)
     app.call(operations[args.action])
 except KeyboardInterrupt:
+    pass
+finally:
     app.close()
