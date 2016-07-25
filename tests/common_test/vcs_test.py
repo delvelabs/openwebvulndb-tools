@@ -64,13 +64,14 @@ class VersionControlTest(TestCase):
 
 class SubversionTest(TestCase):
 
-    def test_build_command(self):
-        svn = Subversion()
+    @async_test()
+    async def test_build_command(self, loop):
+        svn = Subversion(loop=loop)
         self.assertEqual(["svn", "ls", "http://example.com"], svn.build_ls("http://example.com"))
 
     @async_test()
     async def test_execute_ls(self, loop):
-        svn = Subversion()
+        svn = Subversion(loop=loop)
         svn.build_ls = MagicMock()
         svn.build_ls.return_value = ["cat", file_path(__file__, "svn.ls.empty.txt")]
 
@@ -81,7 +82,7 @@ class SubversionTest(TestCase):
 
     @async_test()
     async def test_execute_ls(self, loop):
-        svn = Subversion()
+        svn = Subversion(loop=loop)
         svn.build_ls = MagicMock()
         svn.build_ls.return_value = ["cat", file_path(__file__, "svn.ls.standard.txt")]
 

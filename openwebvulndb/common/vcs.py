@@ -47,7 +47,7 @@ class Subversion:
             command = self.build_ls(url)
             return await asyncio.wait_for(self.read_lines(command), 30.0, loop=self.loop)
         except asyncio.TimeoutError:
-            raise ExecutionFailed('Timeout reached')
+            raise ExecutionFailure('Timeout reached')
 
     async def read_lines(self, command):
         process = await asyncio.create_subprocess_exec(
@@ -64,8 +64,11 @@ class Subversion:
             if line != b'':
                 out.append(line.decode('utf8').strip("\n"))
 
-        code = await process.wait()
-        if code == 0:
+        try:
+            code = await asyncio.wait_for(process.wait(), timeout=1.0, loop=self.loop)
+            if code == 0:
+                return out
+        except asyncio.TimeoutError:
             return out
 
         raise ExecutionFailure()
