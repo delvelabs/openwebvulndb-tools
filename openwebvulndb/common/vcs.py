@@ -35,7 +35,7 @@ class RepositoryChecker:
 
 
 class Subversion:
-    def __init__(self, loop=None):
+    def __init__(self, *, loop):
         self.loop = loop
 
     @staticmethod
@@ -65,7 +65,8 @@ class Subversion:
                 out.append(line.decode('utf8').strip("\n"))
 
         try:
-            code = await asyncio.wait_for(process.wait(), timeout=1.0, loop=self.loop)
+            # No need to wait for a long time, we're at EOF
+            code = await asyncio.wait_for(process.wait(), timeout=0.1, loop=self.loop)
             if code == 0:
                 return out
         except asyncio.TimeoutError:
