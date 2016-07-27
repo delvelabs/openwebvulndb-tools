@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
-from .common import Injector, Storage, RepositoryChecker, Subversion
+from easyinject import Injector
+from .common import Storage, RepositoryChecker, Subversion
 
 app = Injector(storage=Storage,
                loop=asyncio.get_event_loop,

@@ -21,8 +21,8 @@ args = parser.parse_args()
 
 
 try:
-    app = app.sub(repository=WordPressRepository)
-    app.call(operations[args.action])
+    local = app.sub(repository=WordPressRepository)
+    local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
 finally:
