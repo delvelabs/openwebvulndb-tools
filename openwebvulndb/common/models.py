@@ -1,3 +1,4 @@
+from .errors import VulnerabilityNotFound
 
 
 class Model:
@@ -27,3 +28,32 @@ class Repository(Model):
     def __init__(self, *, type, location):
         self.type = type
         self.location = location
+
+
+class VulnerabilityList(Model):
+
+    def __init__(self, *, producer, key):
+        self.producer = producer
+        self.key = key
+        self.vulnerabilities = []
+
+    def get_vulnerability(self, id, *, create_missing=False):
+        id = str(id)
+
+        for v in self.vulnerabilities:
+            if v.id == id:
+                return v
+
+        if not create_missing:
+            raise VulnerabilityNotFound(id)
+
+        vuln = Vulnerability(id=id)
+        self.vulnerabilities.append(vuln)
+        return vuln
+
+
+class Vulnerability(Model):
+
+    def __init__(self, *, id, title=None):
+        self.id = id
+        self.title = title
