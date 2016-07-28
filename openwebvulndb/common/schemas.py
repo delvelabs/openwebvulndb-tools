@@ -1,7 +1,7 @@
 import json
 
 from marshmallow import Schema, fields, validate, post_load
-from .models import Meta, Repository
+from .models import Meta, Repository, Vulnerability, VulnerabilityList
 
 
 class RepositorySchema(Schema):
@@ -28,6 +28,31 @@ class MetaSchema(Schema):
     @post_load
     def make(self, data):
         return Meta(**data)
+
+
+class VulnerabilitySchema(Schema):
+    class Meta:
+        ordered = True
+
+    id = fields.String(required=True)
+    title = fields.String(required=True)
+
+    @post_load
+    def make(self, data):
+        return Vulnerability(**data)
+
+
+class VulnerabilityListSchema(Schema):
+    class Meta:
+        ordered = True
+
+    key = fields.String(required=True)
+    producer = fields.String(required=True)
+    vulnerabilities = fields.Nested(VulnerabilitySchema, many=True, required=True)
+
+    @post_load
+    def make(self, data):
+        return VulnerabilityList(**data)
 
 
 def serialize(schema, data):

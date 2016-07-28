@@ -1,7 +1,8 @@
 from os.path import join, dirname
 from os import makedirs, scandir
+from contextlib import contextmanager
 
-from .schemas import MetaSchema, serialize
+from .schemas import MetaSchema, VulnerabilityListSchema, serialize
 from .config import DEFAULT_PATH
 
 
@@ -12,15 +13,16 @@ class Storage:
         self.known = set()
 
     def write_meta(self, meta):
-        data, errors = serialize(MetaSchema(), meta)
-        self.prepare_path(meta.key)
-        with open(join(self.base_path, meta.key, 'META.json'), 'w') as fp:
-            fp.write(data)
+        self._write(MetaSchema(), meta, 'META.json')
 
-    def prepare_path(self, relative):
-        if relative not in self.known:
-            makedirs(join(self.base_path, relative), mode=0o755, exist_ok=True)
-            self.known.add(relative)
+    def read_meta(self, key):
+        return self._read(MetaSchema(), key, 'META.json')
+
+    def write_vulnerabilities(self, vlist):
+        self._write(VulnerabilityListSchema(), vlist, 'vuln-%s.json' % vlist.producer.lower())
+
+    def read_vulnerabilities(self, key, producer):
+        return self._read(VulnerabilityListSchema(), key, 'vuln-%s.json' % producer.lower())
 
     def list_directories(self, path):
         try:
@@ -30,14 +32,35 @@ class Storage:
 
     def append(self, relative, content):
         path = dirname(relative)
-        self.prepare_path(path)
-        with open(join(self.base_path, relative), 'a+') as fp:
+        self._prepare_path(path)
+        with self._open('a+', relative) as fp:
             fp.write(content.strip("\n") + "\n")
 
-    def read(self, relative):
+    def read_lines(self, relative):
         try:
-            with open(join(self.base_path, relative), 'r') as fp:
+            with self._open('r', relative) as fp:
                 for line in fp.readlines():
                     yield line.strip("\n")
         except FileNotFoundError:
             pass
+
+    def _write(self, schema, item, *args):
+        data, errors = serialize(schema, item)
+        self._prepare_path(item.key)
+        with self._open('w', item.key, *args) as fp:
+            fp.write(data)
+
+    def _read(self, schema, *args):
+        with self._open('r', *args) as fp:
+            data, errors = schema.loads(fp.read())
+            return data
+
+    @contextmanager
+    def _open(self, mode, *args):
+        with open(join(self.base_path, *args), mode) as fp:
+            yield fp
+
+    def _prepare_path(self, relative):
+        if relative not in self.known:
+            makedirs(join(self.base_path, relative), mode=0o755, exist_ok=True)
+            self.known.add(relative)

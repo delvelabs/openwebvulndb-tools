@@ -55,10 +55,10 @@ class WordPressRepository:
             raise RepositoryUnreachable('Failed to obtain the plugin information')
 
     def current_plugins(self):
-        return self.storage.list_directories("plugins") | set(self.storage.read('plugins-ignore.txt'))
+        return self.storage.list_directories("plugins") | set(self.storage.read_lines('plugins-ignore.txt'))
 
     def current_themes(self):
-        return self.storage.list_directories("themes") | set(self.storage.read('themes-ignore.txt'))
+        return self.storage.list_directories("themes") | set(self.storage.read_lines('themes-ignore.txt'))
 
     async def perform_plugin_lookup(self):
         return await self.perform_lookup(self.current_plugins,

@@ -32,10 +32,10 @@ class Repository(Model):
 
 class VulnerabilityList(Model):
 
-    def __init__(self, *, producer, key):
+    def __init__(self, *, producer, key, vulnerabilities=None):
         self.producer = producer
         self.key = key
-        self.vulnerabilities = []
+        self.vulnerabilities = vulnerabilities or []
 
     def get_vulnerability(self, id, *, create_missing=False):
         id = str(id)

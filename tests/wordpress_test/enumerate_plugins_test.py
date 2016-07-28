@@ -40,17 +40,17 @@ class EnumeratePluginsTest(TestCase):
     async def test_read_path_empty(self, loop):
         handler = WordPressRepository(loop=loop, storage=MagicMock())
         handler.storage.list_directories.return_value = set()
-        handler.storage.read.return_value = []
+        handler.storage.read_lines.return_value = []
 
         self.assertEqual(handler.current_plugins(), set())
         handler.storage.list_directories.assert_called_with('plugins')
-        handler.storage.read.assert_called_with('plugins-ignore.txt')
+        handler.storage.read_lines.assert_called_with('plugins-ignore.txt')
 
     @async_test()
     async def test_read_path_with_data(self, loop):
         handler = WordPressRepository(loop=loop, storage=MagicMock())
         handler.storage.list_directories.return_value = {"wordpress_test"}
-        handler.storage.read.return_value = []
+        handler.storage.read_lines.return_value = []
         self.assertIn("wordpress_test", handler.current_plugins())
         handler.storage.list_directories.assert_called_with('plugins')
 

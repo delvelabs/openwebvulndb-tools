@@ -3,7 +3,26 @@ from unittest import TestCase
 from unittest.mock import mock_open, patch, call
 from fixtures import file_path
 
-from openwebvulndb.common import Storage, Meta
+from openwebvulndb.common import Storage, Meta, VulnerabilityList
+
+
+META_FILE_DATA = """
+{
+    "key": "plugins/better-wp-security",
+    "name": "iThemes Security"
+}""".strip()
+
+VULNERABILITIES_FILE_DATA = """
+{
+    "key": "plugins/better-wp-security",
+    "producer": "VaneImporter",
+    "vulnerabilities": [
+        {
+            "id": "12345",
+            "title": "Multiple XSS"
+        }
+    ]
+}""".strip()
 
 
 class StorageTest(TestCase):
@@ -20,11 +39,61 @@ class StorageTest(TestCase):
             makedirs.assert_called_once_with('/some/path/plugins/better-wp-security', mode=0o755, exist_ok=True)
             m.assert_called_once_with('/some/path/plugins/better-wp-security/META.json', 'w')
             handle = m()
-            handle.write.assert_called_once_with("""
-{
-    "key": "plugins/better-wp-security",
-    "name": "iThemes Security"
-}""".strip())
+            handle.write.assert_called_once_with(META_FILE_DATA)
+
+    def test_read_meta_but_not_found(self):
+        m = mock_open()
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            m.side_effect = FileNotFoundError()
+
+            storage = Storage('/some/path')
+
+            with self.assertRaises(FileNotFoundError):
+                storage.read_meta("plugins/better-wp-security")
+
+            m.assert_called_with('/some/path/plugins/better-wp-security/META.json', 'r')
+
+    def test_read_is_found(self):
+        m = mock_open(read_data=META_FILE_DATA)
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+
+            meta = storage.read_meta("plugins/better-wp-security")
+            self.assertIsInstance(meta, Meta)
+            self.assertEqual(meta.name, "iThemes Security")
+
+            m.assert_called_with('/some/path/plugins/better-wp-security/META.json', 'r')
+
+    def test_read_vulnerabilities(self):
+        m = mock_open(read_data=VULNERABILITIES_FILE_DATA)
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+
+            vlist = storage.read_vulnerabilities("plugins/better-wp-security", "Vaneimporter")
+            self.assertIsInstance(vlist, VulnerabilityList)
+            self.assertEqual(vlist.producer, "VaneImporter")
+
+            m.assert_called_with('/some/path/plugins/better-wp-security/vuln-vaneimporter.json', 'r')
+
+    def test_write_vulnerabilities(self):
+        m = mock_open()
+
+        with \
+                patch('openwebvulndb.common.storage.open', m, create=True), \
+                patch('openwebvulndb.common.storage.makedirs') as makedirs:
+            storage = Storage('/some/path')
+
+            vlist = VulnerabilityList(key="plugins/better-wp-security",
+                                      producer="VaneImporter")
+            vlist.get_vulnerability("12345", create_missing=True).title = "Multiple XSS"
+            storage.write_vulnerabilities(vlist)
+
+            makedirs.assert_called_once_with('/some/path/plugins/better-wp-security', mode=0o755, exist_ok=True)
+            m.assert_called_with('/some/path/plugins/better-wp-security/vuln-vaneimporter.json', 'w')
+
+            handle = m()
+            handle.write.assert_called_once_with(VULNERABILITIES_FILE_DATA)
 
     def test_read_path_empty(self):
         empty = file_path(__file__, '')
@@ -61,3 +130,14 @@ class StorageTest(TestCase):
                 call("hello\n"),
                 call("world\n"),
             ])
+
+    def test_read_lines(self):
+        m = mock_open(read_data="hello\nworld\ntest")
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+
+            lines = storage.read_lines("test.txt")
+
+            self.assertEqual(["hello", "world", "test"], list(lines))
+            m.assert_called_with('/some/path/test.txt', 'r')
