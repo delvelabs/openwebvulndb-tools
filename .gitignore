@@ -9,6 +9,8 @@ __pycache__
 .project
 .pydevproject
 #output
+.coverage
+cover/
 output/
 data/
 bin/

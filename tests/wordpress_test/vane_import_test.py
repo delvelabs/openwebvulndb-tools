@@ -10,7 +10,7 @@ class VaneImportTest(TestCase):
 
     def setUp(self):
         self.manager = VulnerabilityManager(storage=MagicMock())
-        self.manager.storage.read_vulnerabilities.return_value = None
+        self.manager.storage.read_vulnerabilities.side_effect = FileNotFoundError()
 
     def test_import_plugins_sample_file(self):
         importer = VaneImporter(vulnerability_manager=self.manager)

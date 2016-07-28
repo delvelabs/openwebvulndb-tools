@@ -13,6 +13,12 @@ class VulnerabilityManager:
         key = "/".join(args)
 
         if key not in self.files[producer]:
-            self.files[producer][key] = VulnerabilityList(producer=producer, key=key)
+            self.files[producer][key] = self._create_producer_list(key, producer)
 
         return self.files[producer][key]
+
+    def _create_producer_list(self, key, producer):
+        try:
+            return self.storage.read_vulnerabilities(key=key, producer=producer)
+        except FileNotFoundError:
+            return VulnerabilityList(producer=producer, key=key)
