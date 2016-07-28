@@ -90,9 +90,11 @@ class VulnerabilityList(Model):
 
 class Vulnerability(Model):
 
-    def init(self, *, id, title=None, references=None):
+    def init(self, *, id, title=None, references=None, updated_at=None, created_at=None):
         self.id = id
         self.title = title
+        self.updated_at = updated_at
+        self.created_at = created_at
         self.references = references or []
 
     @property

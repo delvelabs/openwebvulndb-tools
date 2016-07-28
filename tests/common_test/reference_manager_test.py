@@ -7,8 +7,8 @@ class ReferenceManagerTest(TestCase):
     def test_references_only_exist_once(self):
         my_list = []
         manager = ReferenceManager.for_list(my_list)
-        manager.include_cve("2014-1234")
-        manager.include_cve("2014-1234")
+        manager.include_normalized("cve", "2014-1234")
+        manager.include_normalized("cve", "2014-1234")
 
         self.assertEqual(len(my_list), 1)
 

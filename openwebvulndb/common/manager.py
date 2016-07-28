@@ -33,6 +33,8 @@ class VulnerabilityManager:
 
 class ReferenceManager:
 
+    normalized_sources = ["cve", "exploitdb", "secunia", "metasploit", "osvdb"]
+
     def __init__(self):
         self.references = None
 
@@ -42,24 +44,17 @@ class ReferenceManager:
         manager.references = references
         return manager
 
-    def include_cve(self, cve):
+    def include_normalized(self, type, id):
+        id = str(id)
         try:
-            return next(x for x in self.references if x.type == "cve" and x.id == cve)
+            return next(x for x in self.references if x.type == type and x.id == id)
         except StopIteration:
             ref = Reference()
-            ref.type = "cve"
-            ref.id = cve
-            ref.url = "https://web.nvd.nist.gov/view/vuln/detail?vulnId=CVE-%s" % id
-            self.references.append(ref)
-            return ref
+            ref.type = type
+            ref.id = id
+            if type == "cve":
+                ref.url = "https://web.nvd.nist.gov/view/vuln/detail?vulnId=CVE-%s" % id
 
-    def include_osvdb(self, osvdb_id):
-        try:
-            return next(x for x in self.references if x.type == "osvdb" and x.id == osvdb_id)
-        except StopIteration:
-            ref = Reference()
-            ref.type = "osvdb"
-            ref.id = osvdb_id
             self.references.append(ref)
             return ref
 
