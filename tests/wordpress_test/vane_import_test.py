@@ -21,4 +21,19 @@ class VaneImportTest(TestCase):
 
         self.assertEqual(theme_my_login.vulnerabilities[0].id, "6043")
         self.assertEqual(theme_my_login.vulnerabilities[0].title, "Theme My Login 6.3.9 - Local File Inclusion")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[0].url,
+                         "http://packetstormsecurity.com/files/127302/")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[1].url,
+                         "http://seclists.org/fulldisclosure/2014/Jun/172")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[2].url,
+                         "http://www.securityfocus.com/bid/68254")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[3].url,
+                         "https://security.dxw.com/advisories/lfi-in-theme-my-login/")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[4].url, None)
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[4].type, "osvdb")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[4].id, "108517")
+
+
         self.assertEqual(login_rebuilder.vulnerabilities[0].id, "6044")
+        self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].type, "cve")
+        self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].id, "2014-3882")
