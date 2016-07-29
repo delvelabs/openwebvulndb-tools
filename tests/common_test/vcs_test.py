@@ -8,6 +8,7 @@ from openwebvulndb.common.vcs import Subversion
 
 class VersionControlTest(TestCase):
     svnrepo = Repository(type="subversion", location="http://example.com/")
+    badrepo = Repository(type="cvs", location="http://example.com/")
 
     @async_test()
     async def test_check_repository_content_empty_svn(self, loop):
@@ -20,6 +21,12 @@ class VersionControlTest(TestCase):
         checker.subversion.ls.assert_has_calls([
             call("http://example.com/"),
         ])
+
+    @async_test()
+    async def test_check_unsupported_repository(self, loop):
+        checker = RepositoryChecker(subversion=MagicMock())
+
+        self.assertFalse(await checker.has_content(self.badrepo))
 
     @async_test()
     async def test_check_repository_has_classic_structure_but_empty_tags(self, loop):

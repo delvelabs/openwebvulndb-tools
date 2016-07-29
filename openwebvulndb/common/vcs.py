@@ -64,12 +64,9 @@ class Subversion:
             if line != b'':
                 out.append(line.decode('utf8').strip("\n"))
 
-        try:
-            # No need to wait for a long time, we're at EOF
-            code = await asyncio.wait_for(process.wait(), timeout=0.1, loop=self.loop)
-            if code == 0:
-                return out
-        except asyncio.TimeoutError:
+        # No need to wait for a long time, we're at EOF
+        code = await process.wait()
+        if code == 0:
             return out
 
         raise ExecutionFailure()

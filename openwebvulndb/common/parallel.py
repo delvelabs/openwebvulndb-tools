@@ -23,8 +23,6 @@ class ParallelWorker:
             finally:
                 self.queue.task_done()
 
-        logger.info("Consumer left.")
-
     async def wait(self):
         try:
             await self.queue.join()
