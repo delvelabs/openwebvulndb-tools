@@ -1,9 +1,14 @@
-from openwebvulndb.common.manager import ReferenceManager
 from datetime import datetime
 import json
+import re
+
+from openwebvulndb.common import VersionRange
+from openwebvulndb.common.manager import ReferenceManager
 
 
 class VaneImporter:
+
+    version_match = re.compile(r'\d+(\.\d+)+')
 
     def __init__(self, *, vulnerability_manager):
         self.manager = vulnerability_manager
@@ -31,6 +36,12 @@ class VaneImporter:
     def apply_data(self, vuln, vuln_data):
         if "title" in vuln_data:
             vuln.title = vuln_data["title"]
+        if "vuln_type" in vuln_data:
+            vuln.reported_type = vuln_data["vuln_type"]
+
+        range = self.find_range(vuln_data.get("title") or "", vuln_data.get("fixed_in"))
+        if range is not None:
+            vuln.add_affected_versions(range)
 
         if "updated_at" in vuln_data:
             vuln.updated_at = self.parse_date(vuln_data["updated_at"])
@@ -51,6 +62,18 @@ class VaneImporter:
         if key in vuln_data:
             for v in vuln_data[key]:
                 yield v
+
+    def find_range(self, title, fixed_in):
+        range = VersionRange()
+
+        match = self.version_match.search(title)
+        if match:
+            range.introduced_in = match.group(0)
+
+        if fixed_in is not None:
+            range.fixed_in = fixed_in
+
+        return range
 
     def parse_date(self, data):
         return datetime.strptime(data, "%Y-%m-%dT%H:%M:%S.%fZ")

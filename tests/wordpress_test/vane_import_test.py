@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from fixtures import file_path
 from datetime import datetime, timezone
 
-from openwebvulndb.common import VulnerabilityManager, Vulnerability
+from openwebvulndb.common import VulnerabilityManager, Vulnerability, VersionRange
 from openwebvulndb.wordpress import VaneImporter
 
 
@@ -34,7 +34,6 @@ class VaneImportTest(TestCase):
         self.assertEqual(theme_my_login.vulnerabilities[0].references[0].type, "osvdb")
         self.assertEqual(theme_my_login.vulnerabilities[0].references[0].id, "108517")
 
-
         self.assertEqual(login_rebuilder.vulnerabilities[0].id, "6044")
         self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].type, "cve")
         self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].id, "2014-3882")
@@ -55,6 +54,7 @@ class VaneImportTest(TestCase):
         })
         self.assertEqual(vuln.references[0].type, "metasploit")
         self.assertEqual(vuln.references[0].id, "exploit/unix/webapp/php_wordpress_optimizepress")
+        self.assertTrue(vuln.dirty)
 
     def test_apply_dates(self):
         vuln = Vulnerability(id=1)
@@ -67,3 +67,71 @@ class VaneImportTest(TestCase):
                                                    hour=10, minute=58, second=35, microsecond=0))
         self.assertEqual(vuln.updated_at, datetime(year=2014, month=8, day=1,
                                                    hour=11, minute=58, second=35, microsecond=0))
+        self.assertTrue(vuln.dirty)
+
+    def test_vuln_type(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "vuln_type": "LFI",
+        })
+
+        self.assertEqual(vuln.reported_type, 'LFI')
+        self.assertTrue(vuln.dirty)
+
+    def test_vulnerability_only_has_fixed_fixed_in(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "fixed_in": "1.2.3.4",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(fixed_in="1.2.3.4"),
+        ])
+
+    def test_title_contains_introduction_date(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.2.0 - XSS",
+            "fixed_in": "1.2.3.4",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.2.0", fixed_in="1.2.3.4"),
+        ])
+
+    def test_no_menttion_of_fixed_in(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.2.0.1 - XSS",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.2.0.1"),
+        ])
+
+    def test_version_was_already_present(self):
+        vuln = Vulnerability(id=1)
+        vuln.affected_versions.append(VersionRange(introduced_in="1.2"))
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.2 - XSS",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.2"),
+        ])
+
+    def test_no_mention_of_fixed_in_but_data_was_already_present(self):
+        vuln = Vulnerability(id=1)
+        vuln.affected_versions.append(VersionRange(introduced_in="1.2", fixed_in="1.3.2"))
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.2 - XSS",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.2", fixed_in="1.3.2"),
+        ])

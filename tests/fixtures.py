@@ -21,6 +21,7 @@ def async_test():
         @wraps(f)
         def wrapper(*args, **kwargs):
             with loop_context() as loop:
+                asyncio.get_child_watcher().attach_loop(loop)
                 loop.run_until_complete(f(*args, loop=loop, **kwargs))
         return wrapper
     return setup

@@ -1,4 +1,9 @@
 from .errors import VulnerabilityNotFound
+from itertools import chain
+
+
+def _clean(item):
+    return {key: value for key, value in item.__dict__.items() if key[0] != "_"}
 
 
 class Model:
@@ -8,14 +13,16 @@ class Model:
         self._dirty = False
 
     def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+        # Skip internal properties (such as _dirty) on equality checks
+
+        return _clean(self) == _clean(other)
 
     def __repr__(self):
         return str(self)
 
     def __str__(self):
         return "{name}({content})".format(name=self.__class__.__name__,
-                                          content=str(self.__dict__)[1:-1])
+                                          content=str(_clean(self))[1:-1])
 
     def __setattr__(self, attr, value):
         # Not fully initalized yet, let anything happen
@@ -90,16 +97,25 @@ class VulnerabilityList(Model):
 
 class Vulnerability(Model):
 
-    def init(self, *, id, title=None, references=None, updated_at=None, created_at=None):
+    def init(self, *, id, title=None, reported_type=None, updated_at=None, created_at=None,
+             references=None, affected_versions=None):
         self.id = id
         self.title = title
+        self.reported_type = reported_type
         self.updated_at = updated_at
         self.created_at = created_at
         self.references = references or []
+        self.affected_versions = affected_versions or []
+
+    def add_affected_versions(self, range):
+        if any(v.fixed_in == range.fixed_in or v.introduced_in == range.introduced_in for v in self.affected_versions):
+            return
+
+        self.affected_versions.append(range)
 
     @property
     def children(self):
-        return self.references
+        return chain(self.references, self.affected_versions)
 
 
 class Reference(Model):
@@ -108,3 +124,9 @@ class Reference(Model):
         self.type = type
         self.id = id
         self.url = url
+
+
+class VersionRange(Model):
+    def init(self, *, introduced_in=None, fixed_in=None):
+        self.introduced_in = introduced_in
+        self.fixed_in = fixed_in
