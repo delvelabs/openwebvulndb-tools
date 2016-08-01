@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import re
+from os.path import join
 
 from openwebvulndb.common import VersionRange
 from openwebvulndb.common.manager import ReferenceManager
@@ -18,9 +19,19 @@ class VaneImporter:
     def get_list(self, *args):
         return self.manager.get_producer_list("VaneImporter", *args)
 
+    def load(self, input_path):
+        self.load_plugins(join(input_path, 'plugin_vulns.json'))
+        self.load_themes(join(input_path, 'theme_vulns.json'))
+        
     def load_plugins(self, data_file_path):
+        self.load_vulnerabilities(data_file_path, "plugins")
+        
+    def load_themes(self, data_file_path):
+        self.load_vulnerabilities(data_file_path, "themes")
+
+    def load_vulnerabilities(self, data_file_path, base):
         for key, data in self.iterate(data_file_path):
-            vl = self.get_list("plugins", key)
+            vl = self.get_list(base, key)
 
             for vuln_data in data["vulnerabilities"]:
                 vuln = vl.get_vulnerability(vuln_data["id"], create_missing=True)

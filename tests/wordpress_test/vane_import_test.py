@@ -135,3 +135,29 @@ class VaneImportTest(TestCase):
         self.assertEqual(vuln.affected_versions, [
             VersionRange(introduced_in="1.2", fixed_in="1.3.2"),
         ])
+
+    def test_import_themes_sample_file(self):
+        # Same sample file as plugins, same format
+        self.importer.load_themes(file_path(__file__, 'vane-plugin-vulnerability-sample.json'))
+
+        theme_my_login = self.manager.files["VaneImporter"]["themes/theme-my-login"]
+        login_rebuilder = self.manager.files["VaneImporter"]["themes/login-rebuilder"]
+
+        self.assertEqual(theme_my_login.vulnerabilities[0].id, "6043")
+
+    def test_apply_check_exploitdb(self):
+        vuln = Vulnerability(id=1)
+
+
+class VaneImportGlobalTest(TestCase):
+
+    def setUp(self):
+        self.importer = VaneImporter(vulnerability_manager=MagicMock())
+
+    def test_includes_plugin_vulnerabilities(self):
+        self.importer.load_plugins = MagicMock()
+        self.importer.load_themes = MagicMock()
+
+        self.importer.load("/My/Path")
+        self.importer.load_plugins.assert_called_with("/My/Path/plugin_vulns.json")
+        self.importer.load_themes.assert_called_with("/My/Path/theme_vulns.json")
