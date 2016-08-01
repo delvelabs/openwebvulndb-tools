@@ -41,7 +41,7 @@ class VaneImporter:
 
         range = self.find_range(vuln_data.get("title") or "", vuln_data.get("fixed_in"))
         if range is not None:
-            vuln.add_affected_versions(range)
+            vuln.add_affected_version(range)
 
         if "updated_at" in vuln_data:
             vuln.updated_at = self.parse_date(vuln_data["updated_at"])

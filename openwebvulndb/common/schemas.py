@@ -1,7 +1,6 @@
-import json
-
-from marshmallow import Schema, fields, validate, post_load
+from marshmallow import Schema, fields, validate, post_load, validates_schema, ValidationError
 from .models import Meta, Repository, Vulnerability, VulnerabilityList
+from .serialize import serialize
 
 
 class RepositorySchema(Schema):
@@ -30,12 +29,46 @@ class MetaSchema(Schema):
         return Meta(**data)
 
 
+class ReferenceSchema(Schema):
+    class Meta:
+        ordered = True
+
+    type = fields.String(required=True)
+    id = fields.String(required=False)
+    url = fields.String(required=False)
+
+    @validates_schema
+    def check_required_fields(self, data):
+        if not data.get("id") and not data.get("url"):
+            raise ValidationError("Either id or url is required.")
+
+
+class VersionRangeSchema(Schema):
+    class Meta:
+        ordered = True
+
+    introduced_in = fields.String(required=False)
+    fixed_in = fields.String(required=False)
+
+    @validates_schema
+    def check_required_fields(self, data):
+        if not data.get("introduced_in") and not data.get("fixed_in"):
+            raise ValidationError("Either introduced_in or fixed_in is required.")
+
+
 class VulnerabilitySchema(Schema):
     class Meta:
         ordered = True
 
     id = fields.String(required=True)
     title = fields.String(required=True)
+
+    reported_type = fields.String(required=False)
+    created_at = fields.DateTime(required=False)
+    updated_at = fields.DateTime(required=False)
+
+    affected_versions = fields.Nested(VersionRangeSchema, many=True, required=False)
+    references = fields.Nested(ReferenceSchema, many=True, required=False)
 
     @post_load
     def make(self, data):
@@ -53,25 +86,3 @@ class VulnerabilityListSchema(Schema):
     @post_load
     def make(self, data):
         return VulnerabilityList(**data)
-
-
-def serialize(schema, data):
-    data, errors = schema.dump(data)
-    clean_walk(data)
-    return json.dumps(data, indent=4), errors
-
-
-def clean_walk(data):
-    if isinstance(data, list):
-        for item in data:
-            clean_walk(item)
-    elif isinstance(data, dict):
-        to_remove = set()
-        for key, val in data.items():
-            if val is None or val == []:
-                to_remove.add(key)
-            else:
-                clean_walk(val)
-
-        for key in to_remove:
-            del data[key]
