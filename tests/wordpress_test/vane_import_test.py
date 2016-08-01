@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 from fixtures import file_path
-from datetime import datetime, timezone
+from datetime import datetime
 
 from openwebvulndb.common import VulnerabilityManager, Vulnerability, VersionRange
 from openwebvulndb.wordpress import VaneImporter
@@ -37,7 +37,8 @@ class VaneImportTest(TestCase):
         self.assertEqual(login_rebuilder.vulnerabilities[0].id, "6044")
         self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].type, "cve")
         self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].id, "2014-3882")
-        self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].url, "https://web.nvd.nist.gov/view/vuln/detail?vulnId=CVE-2014-3882")
+        self.assertEqual(login_rebuilder.vulnerabilities[0].references[0].url,
+                         "https://web.nvd.nist.gov/view/vuln/detail?vulnId=CVE-2014-3882")
 
     def test_apply_check_exploitdb(self):
         vuln = Vulnerability(id=1)
@@ -47,10 +48,27 @@ class VaneImportTest(TestCase):
         self.assertEqual(vuln.references[0].type, "exploitdb")
         self.assertEqual(vuln.references[0].id, "12345")
 
+    def test_apply_check_exploitdb_as_int(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "exploitdb": 12345,
+        })
+        self.assertEqual(vuln.references[0].type, "exploitdb")
+        self.assertEqual(vuln.references[0].id, "12345")
+
     def test_apply_check_metaspoit(self):
         vuln = Vulnerability(id=1)
         self.importer.apply_data(vuln, {
             "metasploit": ["exploit/unix/webapp/php_wordpress_optimizepress"],
+        })
+        self.assertEqual(vuln.references[0].type, "metasploit")
+        self.assertEqual(vuln.references[0].id, "exploit/unix/webapp/php_wordpress_optimizepress")
+        self.assertTrue(vuln.dirty)
+
+    def test_apply_check_metaspoit_as_string(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "metasploit": "exploit/unix/webapp/php_wordpress_optimizepress",
         })
         self.assertEqual(vuln.references[0].type, "metasploit")
         self.assertEqual(vuln.references[0].id, "exploit/unix/webapp/php_wordpress_optimizepress")
@@ -136,17 +154,40 @@ class VaneImportTest(TestCase):
             VersionRange(introduced_in="1.2", fixed_in="1.3.2"),
         ])
 
+    def test_confusing_ranges(self):
+        vuln = Vulnerability(id=1)
+        vuln.affected_versions.append(VersionRange(introduced_in="1.2"))
+        vuln.affected_versions.append(VersionRange(fixed_in="1.3"))
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.5 - XSS",
+        })
+
+        self.assertTrue(vuln.dirty)
+        self.assertEqual(vuln.affected_versions[-1], VersionRange(introduced_in="1.5"))
+
+    def test_no_version_data_is_no_data(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin - XSS",
+        })
+
+        self.assertEqual(vuln.affected_versions, [])
+
     def test_import_themes_sample_file(self):
         # Same sample file as plugins, same format
         self.importer.load_themes(file_path(__file__, 'vane-plugin-vulnerability-sample.json'))
 
         theme_my_login = self.manager.files["VaneImporter"]["themes/theme-my-login"]
-        login_rebuilder = self.manager.files["VaneImporter"]["themes/login-rebuilder"]
 
         self.assertEqual(theme_my_login.vulnerabilities[0].id, "6043")
 
-    def test_apply_check_exploitdb(self):
-        vuln = Vulnerability(id=1)
+    def test_import_wp_vulnerabilities(self):
+        self.importer.load_wordpress(file_path(__file__, 'vane-vulnerability-sample.json'))
+
+        wordpress = self.manager.files["VaneImporter"]["wordpress"]
+
+        self.assertEqual(wordpress.vulnerabilities[0].id, "5963")
+        self.assertEqual(wordpress.vulnerabilities[-1].id, "5967")
 
 
 class VaneImportGlobalTest(TestCase):
@@ -157,7 +198,9 @@ class VaneImportGlobalTest(TestCase):
     def test_includes_plugin_vulnerabilities(self):
         self.importer.load_plugins = MagicMock()
         self.importer.load_themes = MagicMock()
+        self.importer.load_wordpress = MagicMock()
 
         self.importer.load("/My/Path")
         self.importer.load_plugins.assert_called_with("/My/Path/plugin_vulns.json")
         self.importer.load_themes.assert_called_with("/My/Path/theme_vulns.json")
+        self.importer.load_wordpress.assert_called_with("/My/Path/wp_vulns.json")

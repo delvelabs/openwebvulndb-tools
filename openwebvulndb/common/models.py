@@ -58,7 +58,14 @@ class Vulnerability(Model):
         self.affected_versions = affected_versions or []
 
     def add_affected_version(self, range):
-        if any(v.fixed_in == range.fixed_in or v.introduced_in == range.introduced_in for v in self.affected_versions):
+        if range.fixed_in is None and range.introduced_in is None:
+            return
+
+        if range.fixed_in is not None \
+           and any(v.fixed_in == range.fixed_in for v in self.affected_versions):
+            return
+        if range.introduced_in is not None \
+           and any(v.introduced_in == range.introduced_in for v in self.affected_versions):
             return
 
         self.affected_versions.append(range)

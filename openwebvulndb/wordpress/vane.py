@@ -22,10 +22,19 @@ class VaneImporter:
     def load(self, input_path):
         self.load_plugins(join(input_path, 'plugin_vulns.json'))
         self.load_themes(join(input_path, 'theme_vulns.json'))
-        
+        self.load_wordpress(join(input_path, 'wp_vulns.json'))
+
+    def load_wordpress(self, data_file_path):
+        vl = self.get_list("wordpress")
+
+        for key, data in self.iterate(data_file_path):
+            for vuln_data in data["vulnerabilities"]:
+                vuln = vl.get_vulnerability(vuln_data["id"], create_missing=True)
+                self.apply_data(vuln, vuln_data)
+
     def load_plugins(self, data_file_path):
         self.load_vulnerabilities(data_file_path, "plugins")
-        
+
     def load_themes(self, data_file_path):
         self.load_vulnerabilities(data_file_path, "themes")
 
@@ -71,8 +80,12 @@ class VaneImporter:
     @staticmethod
     def values_for(vuln_data, key):
         if key in vuln_data:
-            for v in vuln_data[key]:
-                yield v
+            value = vuln_data[key]
+            if isinstance(value, str) or isinstance(value, int):
+                yield value
+            else:
+                for v in vuln_data[key]:
+                    yield v
 
     def find_range(self, title, fixed_in):
         range = VersionRange()

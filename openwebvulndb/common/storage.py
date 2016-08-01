@@ -1,9 +1,11 @@
+from json.decoder import JSONDecodeError
 from os.path import join, dirname
 from os import makedirs, scandir
 from contextlib import contextmanager
 
 from .schemas import MetaSchema, VulnerabilityListSchema, serialize
 from .config import DEFAULT_PATH
+from .logs import logger
 
 
 class Storage:
@@ -51,9 +53,14 @@ class Storage:
             fp.write(data)
 
     def _read(self, schema, *args):
-        with self._open('r', *args) as fp:
-            data, errors = schema.loads(fp.read())
-            return data
+        try:
+            with self._open('r', *args) as fp:
+                data, errors = schema.loads(fp.read())
+                if errors:
+                    raise Exception(*args, errors)
+                return data
+        except JSONDecodeError:
+            logger.critical("JSON Decode error in %s", args)
 
     @contextmanager
     def _open(self, mode, *args):

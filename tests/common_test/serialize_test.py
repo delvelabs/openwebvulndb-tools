@@ -111,6 +111,10 @@ class SerializeTest(TestCase):
         self.assertIn('1.3', data)
         self.assertIn('example.com', data)
 
+        out, errors = schema.loads(data)
+        self.assertEqual("1.3", out.affected_versions[0].fixed_in)
+        self.assertEqual("other", out.references[0].type)
+
     def test_serialize_vunlerability_list(self):
         schema = VulnerabilityListSchema()
 
@@ -124,3 +128,6 @@ class SerializeTest(TestCase):
         self.assertIn('"producer": "Test Provider"', data)
         self.assertIn('"key": "plugins/test-plugin"', data)
         self.assertIn('Multiple XSS', data)
+
+        out, errors = schema.loads(data)
+        self.assertEqual("1234", out.vulnerabilities[0].id)

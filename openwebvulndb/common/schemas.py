@@ -1,5 +1,5 @@
 from marshmallow import Schema, fields, validate, post_load, validates_schema, ValidationError
-from .models import Meta, Repository, Vulnerability, VulnerabilityList
+from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference
 from .serialize import serialize
 
 
@@ -42,6 +42,10 @@ class ReferenceSchema(Schema):
         if not data.get("id") and not data.get("url"):
             raise ValidationError("Either id or url is required.")
 
+    @post_load
+    def make(self, data):
+        return Reference(**data)
+
 
 class VersionRangeSchema(Schema):
     class Meta:
@@ -54,6 +58,10 @@ class VersionRangeSchema(Schema):
     def check_required_fields(self, data):
         if not data.get("introduced_in") and not data.get("fixed_in"):
             raise ValidationError("Either introduced_in or fixed_in is required.")
+
+    @post_load
+    def make(self, data):
+        return VersionRange(**data)
 
 
 class VulnerabilitySchema(Schema):
