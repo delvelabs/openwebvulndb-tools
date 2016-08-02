@@ -20,3 +20,13 @@ class VersionCompareTest(TestCase):
         expect = ["4.0rc1", "4.0", "4.1a1", "4.1b1", "4.1"]
 
         self.assertEqual(expect, VersionCompare.sorted(versions))
+
+
+class NextMinorTest(TestCase):
+
+    def test_next_minor(self):
+        self.assertEqual("3.5", VersionCompare.next_minor("3.4"))
+        self.assertEqual("3.6", VersionCompare.next_minor("3.5.4"))
+        self.assertEqual("3.6", VersionCompare.next_minor("3.5.4.1"))
+        self.assertEqual("3.1", VersionCompare.next_minor("3"))
+        self.assertEqual("3.5", VersionCompare.next_minor("3.4.1alpha2"))

@@ -4,6 +4,7 @@ import re
 from os.path import join
 
 from openwebvulndb.common import VersionRange
+from openwebvulndb.common.version import VersionCompare
 from openwebvulndb.common.manager import ReferenceManager
 
 
@@ -30,7 +31,7 @@ class VaneImporter:
         for key, data in self.iterate(data_file_path):
             for vuln_data in data["vulnerabilities"]:
                 vuln = vl.get_vulnerability(vuln_data["id"], create_missing=True)
-                self.apply_data(vuln, vuln_data)
+                self.apply_data(vuln, vuln_data, key=key)
 
     def load_plugins(self, data_file_path):
         self.load_vulnerabilities(data_file_path, "plugins")
@@ -53,13 +54,13 @@ class VaneImporter:
                 for key, vuln_data in entry.items():
                     yield key, vuln_data
 
-    def apply_data(self, vuln, vuln_data):
+    def apply_data(self, vuln, vuln_data, key=None):
         if "title" in vuln_data:
             vuln.title = vuln_data["title"]
         if "vuln_type" in vuln_data:
             vuln.reported_type = vuln_data["vuln_type"]
 
-        range = self.find_range(vuln_data.get("title") or "", vuln_data.get("fixed_in"))
+        range = self.find_range(vuln_data.get("title") or "", vuln_data.get("fixed_in"), key=key)
         if range is not None:
             vuln.add_affected_version(range)
 
@@ -87,12 +88,16 @@ class VaneImporter:
                 for v in vuln_data[key]:
                     yield v
 
-    def find_range(self, title, fixed_in):
+    def find_range(self, title, fixed_in, key=None):
         range = VersionRange()
 
-        match = self.version_match.search(title)
-        if match:
-            range.introduced_in = match.group(0)
+        if key is None:
+            match = self.version_match.search(title)
+            if match:
+                range.introduced_in = match.group(0)
+        else:
+            range.introduced_in = key
+            range.fixed_in = VersionCompare.next_minor(key)
 
         if fixed_in is not None:
             range.fixed_in = fixed_in

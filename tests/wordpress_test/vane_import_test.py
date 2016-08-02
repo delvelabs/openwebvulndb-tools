@@ -165,6 +165,27 @@ class VaneImportTest(TestCase):
         self.assertTrue(vuln.dirty)
         self.assertEqual(vuln.affected_versions[-1], VersionRange(introduced_in="1.5"))
 
+    def test_consider_key_as_convention(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin - XSS",
+        }, key="1.4")
+
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.4", fixed_in="1.5"),
+        ])
+
+    def test_fixed_in_has_precedence(self):
+        vuln = Vulnerability(id=1)
+        self.importer.apply_data(vuln, {
+            "title": "Some Plugin 1.4.1 - XSS",
+            "fixed_in": "1.4.2"
+        }, key="1.4")
+
+        self.assertEqual(vuln.affected_versions, [
+            VersionRange(introduced_in="1.4", fixed_in="1.4.2"),
+        ])
+
     def test_no_version_data_is_no_data(self):
         vuln = Vulnerability(id=1)
         self.importer.apply_data(vuln, {
