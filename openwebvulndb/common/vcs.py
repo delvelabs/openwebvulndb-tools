@@ -1,5 +1,10 @@
 import asyncio
+from asyncio import create_subprocess_exec
+from uuid import uuid4
 from os.path import join
+from os import mkdir, walk, rmdir, remove
+from contextlib import contextmanager
+
 from .errors import ExecutionFailure
 
 
@@ -35,8 +40,9 @@ class RepositoryChecker:
 
 
 class Subversion:
-    def __init__(self, *, loop):
+    def __init__(self, *, loop, svn_base_dir="/tmp"):
         self.loop = loop
+        self.svn_base_dir = svn_base_dir
 
     @staticmethod
     def build_ls(url):
@@ -50,7 +56,7 @@ class Subversion:
             raise ExecutionFailure('Timeout reached')
 
     async def read_lines(self, command):
-        process = await asyncio.create_subprocess_exec(
+        process = await create_subprocess_exec(
             *command,
             loop=self.loop,
             stdout=asyncio.subprocess.PIPE,
@@ -70,3 +76,69 @@ class Subversion:
             return out
 
         raise ExecutionFailure()
+
+    async def checkout(self, path, *, workdir):
+        process = await create_subprocess_exec(
+            "svn", "checkout", path, ".",
+            cwd=workdir,
+            loop=self.loop,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            stdin=asyncio.subprocess.DEVNULL
+        )
+        await process.communicate()
+
+    async def switch(self, path, *, workdir):
+        process = await create_subprocess_exec(
+            "svn", "switch", path,
+            cwd=workdir,
+            loop=self.loop,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            stdin=asyncio.subprocess.DEVNULL
+        )
+        await process.communicate()
+
+    @contextmanager
+    def workspace(self, *, repository):
+        try:
+            workspace = SubversionWorkspace(subversion=self,
+                                            repository=repository,
+                                            workdir=join(self.svn_base_dir, str(uuid4())))
+            workspace.create()
+            yield workspace
+        finally:
+            workspace.destroy()
+
+
+class SubversionWorkspace:
+    def __init__(self, *, workdir, subversion, repository):
+        self.workdir = workdir
+        self.subversion = subversion
+        self.repository = repository
+        self.is_empty = True
+
+    @staticmethod
+    def dirname():
+        return str(uuid4())
+
+    def create(self):
+        mkdir(self.workdir, mode=0o755)
+
+    async def prepare(self):
+        content = await self.subversion.ls(self.repository)
+        if "tags/" in content:
+            self.repository = join(self.repository, "tags/")
+
+    async def to_version(self, version):
+        if self.is_empty:
+            self.subversion.checkout(join(self.repository, version), workdir=self.workdir)
+            self.is_empty = False
+        else:
+            self.subversion.switch(join(self.repository, version), workdir=self.workdir)
+
+    def destroy(self):
+        for path, dirs, files in walk(self.workdir, topdown=False):
+            for f in files:
+                remove(join(path, f))
+            rmdir(path)
