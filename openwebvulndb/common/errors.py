@@ -4,6 +4,10 @@ class NetworkError(Exception):
     pass
 
 
+class VersionNotFound(Exception):
+    pass
+
+
 class VulnerabilityNotFound(Exception):
     pass
 

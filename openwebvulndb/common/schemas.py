@@ -1,5 +1,6 @@
 from marshmallow import Schema, fields, validate, post_load, validates_schema, ValidationError
 from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference
+from .models import VersionList, VersionDefinition
 from .serialize import serialize
 
 
@@ -94,3 +95,28 @@ class VulnerabilityListSchema(Schema):
     @post_load
     def make(self, data):
         return VulnerabilityList(**data)
+
+
+class VersionDefinitionSchema(Schema):
+    class Meta:
+        ordered = True
+
+    version = fields.String(required=True)
+    signatures = fields.Dict(required=False)
+
+    @post_load
+    def make(self, data):
+        return VersionDefinition(**data)
+
+
+class VersionListSchema(Schema):
+    class Meta:
+        ordered = True
+
+    key = fields.String(required=True)
+    producer = fields.String(required=True)
+    versions = fields.Nested(VersionDefinitionSchema, many=True, required=True)
+
+    @post_load
+    def make(self, data):
+        return VersionList(**data)

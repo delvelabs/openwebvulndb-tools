@@ -1,4 +1,4 @@
-from .errors import VulnerabilityNotFound
+from .errors import VulnerabilityNotFound, VersionNotFound
 from .basemodel import Model
 from itertools import chain
 
@@ -87,3 +87,30 @@ class VersionRange(Model):
     def init(self, *, introduced_in=None, fixed_in=None):
         self.introduced_in = introduced_in
         self.fixed_in = fixed_in
+
+
+class VersionList(Model):
+
+    def init(self, *, producer, key, versions=None):
+        self.producer = producer
+        self.key = key
+        self.versions = versions or []
+
+    def get_version(self, version, *, create_missing=False):
+        for v in self.versions:
+            if v.version == version:
+                return v
+
+        if not create_missing:
+            raise VersionNotFound(version)
+
+        version = VersionDefinition(version=version)
+        self.versions.append(version)
+        return version
+
+
+class VersionDefinition(Model):
+
+    def init(self, *, version, signatures=None):
+        self.version = version
+        self.signatures = signatures or {}

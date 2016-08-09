@@ -8,6 +8,15 @@ from contextlib import contextmanager
 from .errors import ExecutionFailure
 
 
+class Workspace:
+
+    async def to_version(self, version):
+        raise NotImplemented()
+
+    async def list_versions(self):
+        raise NotImplemented()
+
+
 class RepositoryChecker:
 
     def __init__(self, subversion=None):
@@ -111,7 +120,7 @@ class Subversion:
             workspace.destroy()
 
 
-class SubversionWorkspace:
+class SubversionWorkspace(Workspace):
     def __init__(self, *, workdir, subversion, repository):
         self.workdir = workdir
         self.subversion = subversion
@@ -136,6 +145,10 @@ class SubversionWorkspace:
             self.is_empty = False
         else:
             self.subversion.switch(join(self.repository, version), workdir=self.workdir)
+
+    async def list_versions(self):
+        versions = await self.subversion.ls(self.repository)
+        return [v.strip("/") for v in versions]
 
     def destroy(self):
         for path, dirs, files in walk(self.workdir, topdown=False):

@@ -175,7 +175,9 @@ class SubversionWorkspaceTest(TestCase):
 
         await workspace.prepare()
 
+        svn.ls = lambda p: fake_future(['1.2/', '2.0/', '2.1/'], loop=loop)
         self.assertEqual(workspace.repository, "https://svn.example.com/tags/")
+        self.assertEqual(["1.2", "2.0", "2.1"], await workspace.list_versions())
 
     @async_test()
     async def test_flat_structure(self, loop):
@@ -189,6 +191,8 @@ class SubversionWorkspaceTest(TestCase):
         await workspace.prepare()
 
         self.assertEqual(workspace.repository, "https://svn.example.com/")
+
+        self.assertEqual(["1.0", "1.1"], await workspace.list_versions())
 
     @async_test()
     async def test_flat_structure(self, loop):

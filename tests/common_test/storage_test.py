@@ -1,9 +1,10 @@
 import uuid
+from collections import OrderedDict
 from unittest import TestCase
 from unittest.mock import mock_open, patch, call
 from fixtures import file_path
 
-from openwebvulndb.common import Storage, Meta, VulnerabilityList
+from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
 
 
 META_FILE_DATA = """
@@ -20,6 +21,21 @@ VULNERABILITIES_FILE_DATA = """
         {
             "id": "12345",
             "title": "Multiple XSS"
+        }
+    ]
+}""".strip()
+
+VERSIONS_FILE_DATA = """
+{
+    "key": "plugins/better-wp-security",
+    "producer": "SubversionFetcher",
+    "versions": [
+        {
+            "version": "1.0",
+            "signatures": {
+                "wp-content/plugins/better-wp-security/readme.txt": "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "wp-content/plugins/better-wp-security/readme.html": "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
         }
     ]
 }""".strip()
@@ -94,6 +110,42 @@ class StorageTest(TestCase):
 
             handle = m()
             handle.write.assert_called_once_with(VULNERABILITIES_FILE_DATA)
+
+    def test_read_versions(self):
+        m = mock_open(read_data=VERSIONS_FILE_DATA)
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+
+            vlist = storage.read_versions("plugins/better-wp-security")
+            self.assertIsInstance(vlist, VersionList)
+            self.assertEqual(vlist.producer, "SubversionFetcher")
+
+            m.assert_called_with('/some/path/plugins/better-wp-security/versions.json', 'r')
+
+    def test_write_versions(self):
+        m = mock_open()
+
+        with \
+                patch('openwebvulndb.common.storage.open', m, create=True), \
+                patch('openwebvulndb.common.storage.makedirs') as makedirs:
+            storage = Storage('/some/path')
+
+            vlist = VersionList(key="plugins/better-wp-security",
+                                producer="SubversionFetcher")
+            vlist.get_version("1.0", create_missing=True).signatures = OrderedDict([
+                ("wp-content/plugins/better-wp-security/readme.txt",
+                 "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+                ("wp-content/plugins/better-wp-security/readme.html",
+                 "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+            ])
+            storage.write_versions(vlist)
+
+            makedirs.assert_called_once_with('/some/path/plugins/better-wp-security', mode=0o755, exist_ok=True)
+            m.assert_called_with('/some/path/plugins/better-wp-security/versions.json', 'w')
+
+            handle = m()
+            handle.write.assert_called_once_with(VERSIONS_FILE_DATA)
 
     def test_read_path_empty(self):
         empty = file_path(__file__, '')
