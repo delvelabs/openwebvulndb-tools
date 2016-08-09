@@ -32,10 +32,19 @@ VERSIONS_FILE_DATA = """
     "versions": [
         {
             "version": "1.0",
-            "signatures": {
-                "wp-content/plugins/better-wp-security/readme.txt": "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                "wp-content/plugins/better-wp-security/readme.html": "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            }
+            "signatures": [
+                {
+                    "path": "wp-content/plugins/better-wp-security/readme.txt",
+                    "algo": "SHA256",
+                    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "contains_version": true
+                },
+                {
+                    "path": "wp-content/plugins/better-wp-security/scripts/helper.js",
+                    "algo": "SHA256",
+                    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                }
+            ]
         }
     ]
 }""".strip()
@@ -133,12 +142,9 @@ class StorageTest(TestCase):
 
             vlist = VersionList(key="plugins/better-wp-security",
                                 producer="SubversionFetcher")
-            vlist.get_version("1.0", create_missing=True).signatures = OrderedDict([
-                ("wp-content/plugins/better-wp-security/readme.txt",
-                 "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
-                ("wp-content/plugins/better-wp-security/readme.html",
-                 "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
-            ])
+            v = vlist.get_version("1.0", create_missing=True)
+            v.add_signature("wp-content/plugins/better-wp-security/readme.txt", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", contains_version=True),
+            v.add_signature("wp-content/plugins/better-wp-security/scripts/helper.js", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
             storage.write_versions(vlist)
 
             makedirs.assert_called_once_with('/some/path/plugins/better-wp-security', mode=0o755, exist_ok=True)
