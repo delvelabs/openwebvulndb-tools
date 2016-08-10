@@ -1,9 +1,9 @@
-import contextlib
 import asyncio
 from functools import wraps
 from os.path import join, dirname
 from aiohttp.test_utils import loop_context
-import gc
+
+from easyinject import Injector
 
 
 def file_path(relative, file):
@@ -21,8 +21,10 @@ def async_test():
         @wraps(f)
         def wrapper(*args, **kwargs):
             with loop_context() as loop:
+                injector = Injector(loop=loop,
+                                    fake_future=lambda: fake_future)
                 asyncio.get_child_watcher().attach_loop(loop)
-                loop.run_until_complete(f(*args, loop=loop, **kwargs))
+                loop.run_until_complete(injector.call(f, *args, **kwargs))
         return wrapper
     return setup
 

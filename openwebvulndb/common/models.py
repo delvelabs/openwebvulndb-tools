@@ -108,6 +108,10 @@ class VersionList(Model):
         self.versions.append(version)
         return version
 
+    @property
+    def children(self):
+        return self.versions
+
 
 class VersionDefinition(Model):
 
@@ -118,10 +122,14 @@ class VersionDefinition(Model):
     def add_signature(self, path, hash, *, algo="SHA256", contains_version=None):
         self.signatures.append(Signature(path=path, hash=hash, algo=algo, contains_version=contains_version))
 
+    @property
+    def children(self):
+        return self.signatures
+
 
 class Signature(Model):
 
-    def init(self, *, path, hash, algo="SHA256", contains_version=None):
+    def init(self, *, path, hash=None, algo="SHA256", contains_version=None):
         self.path = path
         self.algo = algo
         self.hash = hash
