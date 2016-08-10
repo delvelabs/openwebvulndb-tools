@@ -20,9 +20,14 @@ def vane_import(vane_importer, input_path):
     vane_importer.manager.flush()
 
 
+def populate_versions(loop, repository_hasher, storage):
+    meta = storage.read_meta("wordpress")
+    loop.run_until_complete(repository_hasher.collect_from_meta(meta))
+
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
-                  vane_import=vane_import)
+                  vane_import=vane_import,
+                  populate_versions=populate_versions)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")

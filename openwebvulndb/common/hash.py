@@ -7,15 +7,15 @@ from .version import VersionCompare
 
 
 class RepositoryHasher:
-    def __init__(self, *, storage, hasher, subversion=None):
+    def __init__(self, *, storage, hasher=None, subversion=None):
         self.storage = storage
-        self.hasher = hasher
+        self.hasher = hasher or Hasher('SHA256')
         self.handlers = dict(subversion=subversion)
 
     async def collect_for_version(self, workspace, version, *, prefix=""):
         await workspace.to_version(version)
 
-        collector = HashCollector(workspace.workdir, hasher=self.hasher, prefix=prefix, lookup_version=version)
+        collector = HashCollector(path=workspace.workdir, hasher=self.hasher, prefix=prefix, lookup_version=version)
         return collector.collect()
 
     async def collect_for_workspace(self, key, workspace, *, prefix=""):
@@ -37,7 +37,7 @@ class RepositoryHasher:
             if repo_handler is None:
                 continue
 
-            with repo_handler.workspace(repo.location) as workspace:
+            with repo_handler.workspace(repository=repo.location) as workspace:
                 await workspace.prepare()
 
                 prefix = prefix_pattern.format(meta=meta)
@@ -64,13 +64,15 @@ class HashCollector:
 
     def collect(self):
         for path, dirs, files in walk(self.path):
-            files = [f for f in files if f[-4:] != ".php"]
 
             for file in files:
-                self.version_checker.reset()
-
                 full_path = join(path, file)
                 relative = full_path[len(self.path):].strip("/")
+
+                if relative[0] == "." or file[-4:] == ".php" or "/." in relative:
+                    continue
+
+                self.version_checker.reset()
 
                 sig = Signature(path=join(self.prefix, relative), algo=self.hasher.algo)
 

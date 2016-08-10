@@ -195,7 +195,7 @@ class SubversionWorkspaceTest(TestCase):
         self.assertEqual(["1.0", "1.1"], await workspace.list_versions())
 
     @async_test()
-    async def test_flat_structure(self, loop):
+    async def test_flat_does_not_alter_repo(self, loop):
 
         svn = Subversion(loop=loop, svn_base_dir="/temp/")
         svn.ls = lambda p: fake_future(['1.0/', '1.1/'], loop=loop)
@@ -208,8 +208,10 @@ class SubversionWorkspaceTest(TestCase):
         self.assertEqual(workspace.repository, "https://svn.example.com/")
 
     @async_test()
-    async def test_checkout_and_switch(self, loop):
+    async def test_checkout_and_switch(self, fake_future):
         svn = MagicMock()
+        svn.checkout.return_value = fake_future(None)
+        svn.switch.return_value = fake_future(None)
 
         workspace = SubversionWorkspace(workdir="/tmp/foo", subversion=svn, repository="https://svn.example.com/")
 

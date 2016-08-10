@@ -62,6 +62,27 @@ class HashCollectorTest(TestCase):
             self.assertNotIn(Signature(path="wp-content/plugins/my-plugin/css/index.php", hash="12345", algo="CONST"),
                              signatures)
 
+    def test_exclude_version_control_files(self):
+        with patch('openwebvulndb.common.hash.walk') as walk:
+            walk.return_value = [
+                ("/some/path/random1234", ["hidden", ".git"], ["readme.txt", "license.txt", "index.php"]),
+                ("/some/path/random1234/.git", [], ["HEAD"]),
+                ("/some/path/random1234/hidden", [".svn"], []),
+                ("/some/path/random1234/hidden/.svn", ["pristine"], []),
+                ("/some/path/random1234/hidden/.svn/pristine", ["da"], []),
+                ("/some/path/random1234/hidden/.svn/pristine/da", [], ["da9d42e33e31a89b8e43713fdf6d481a90346b3b.svn-base"]),  # noqa
+            ]
+            collector = HashCollector(path="/some/path/random1234", hasher=MagicMock(),
+                                      prefix="wp-content/plugins/my-plugin")
+            collector.hasher.algo = "CONST"
+            collector.hasher.hash.return_value = "12345"
+
+            signatures = list(collector.collect())
+
+            walk.assert_called_with("/some/path/random1234")
+
+            self.assertEqual(2, len(signatures))
+
     def test_flag_as_containing_version(self):
         class FakeHasher:
             algo = "CUST"
@@ -159,8 +180,8 @@ class RepositoryHasherTest(TestCase):
         workspace.prepare.return_value = fake_future(None)
 
         @contextmanager
-        def workspace_provider(repo):
-            self.assertEqual(repo, "https://svn.example.com")
+        def workspace_provider(repository):
+            self.assertEqual(repository, "https://svn.example.com")
             yield workspace
 
         subversion = MagicMock()
@@ -183,8 +204,8 @@ class RepositoryHasherTest(TestCase):
         workspace.prepare.return_value = fake_future(None)
 
         @contextmanager
-        def workspace_provider(repo):
-            self.assertEqual(repo, "https://svn.example.com")
+        def workspace_provider(repository):
+            self.assertEqual(repository, "https://svn.example.com")
             yield workspace
 
         subversion = MagicMock()
@@ -208,8 +229,8 @@ class RepositoryHasherTest(TestCase):
         workspace.prepare.return_value = fake_future(None)
 
         @contextmanager
-        def workspace_provider(repo):
-            self.assertEqual(repo, "https://svn.example.com/a-plugin")
+        def workspace_provider(repository):
+            self.assertEqual(repository, "https://svn.example.com/a-plugin")
             yield workspace
 
         subversion = MagicMock()
@@ -295,7 +316,7 @@ class RepositoryHasherTest(TestCase):
 
             self.assertEqual(["Hello"], out)
 
-            HashCollector.assert_called_with("/my/workspace/path", hasher=hasher.hasher,
+            HashCollector.assert_called_with(path="/my/workspace/path", hasher=hasher.hasher,
                                              prefix="test-prefix", lookup_version="2.1")
 
             collector.collect.assert_called_with()

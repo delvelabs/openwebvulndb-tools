@@ -141,10 +141,10 @@ class SubversionWorkspace(Workspace):
 
     async def to_version(self, version):
         if self.is_empty:
-            self.subversion.checkout(join(self.repository, version), workdir=self.workdir)
+            await self.subversion.checkout(join(self.repository, version), workdir=self.workdir)
             self.is_empty = False
         else:
-            self.subversion.switch(join(self.repository, version), workdir=self.workdir)
+            await self.subversion.switch(join(self.repository, version), workdir=self.workdir)
 
     async def list_versions(self):
         versions = await self.subversion.ls(self.repository)
