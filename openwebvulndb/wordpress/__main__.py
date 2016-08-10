@@ -24,10 +24,28 @@ def populate_versions(loop, repository_hasher, storage):
     meta = storage.read_meta("wordpress")
     loop.run_until_complete(repository_hasher.collect_from_meta(meta))
 
+
+def find_identity_files(storage):
+    versions = storage.read_versions("wordpress")
+
+    from collections import defaultdict
+    file_map = defaultdict(list)
+    for v in versions.versions:
+        for s in v.signatures:
+            file_map[s.path].append(s.hash)
+
+    data = [(len(set(values)), len(values), path) for path, values in file_map.items()]
+    data.sort(reverse=True)
+    for uniques, total, path in data:
+        print("%s/%s    %s" % (uniques, total, path))
+
+    print("Total version count: %s" % len(versions.versions))
+
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
-                  populate_versions=populate_versions)
+                  populate_versions=populate_versions,
+                  find_identity_files=find_identity_files)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")

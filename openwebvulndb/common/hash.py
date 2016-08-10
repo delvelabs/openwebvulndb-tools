@@ -16,7 +16,7 @@ class RepositoryHasher:
         await workspace.to_version(version)
 
         collector = HashCollector(path=workspace.workdir, hasher=self.hasher, prefix=prefix, lookup_version=version)
-        return collector.collect()
+        return list(collector.collect())
 
     async def collect_for_workspace(self, key, workspace, *, prefix=""):
         version_list = self.get_version_list(key)

@@ -6,6 +6,7 @@ from os import mkdir, walk, rmdir, remove
 from contextlib import contextmanager
 
 from .errors import ExecutionFailure
+from .logs import logger
 
 
 class Workspace:
@@ -145,6 +146,8 @@ class SubversionWorkspace(Workspace):
             self.is_empty = False
         else:
             await self.subversion.switch(join(self.repository, version), workdir=self.workdir)
+
+        logger.debug("Version %s ready (%s)", version, self.repository)
 
     async def list_versions(self):
         versions = await self.subversion.ls(self.repository)
