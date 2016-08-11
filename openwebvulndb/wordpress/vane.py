@@ -20,6 +20,11 @@ class VaneImporter:
     def get_list(self, *args):
         return self.manager.get_producer_list("VaneImporter", *args)
 
+    def dump(self, input_path):
+        self.dump_plugins(join(input_path, 'plugin_vulns.json'))
+        self.dump_themes(join(input_path, 'theme_vulns.json'))
+        self.dump_wordpress(join(input_path, 'wp_vulns.json'))
+
     def load(self, input_path):
         self.load_plugins(join(input_path, 'plugin_vulns.json'))
         self.load_themes(join(input_path, 'theme_vulns.json'))

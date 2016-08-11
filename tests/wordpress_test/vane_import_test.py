@@ -211,7 +211,7 @@ class VaneImportTest(TestCase):
         self.assertEqual(wordpress.vulnerabilities[-1].id, "5967")
 
 
-class VaneImportGlobalTest(TestCase):
+class VaneGlobalTest(TestCase):
 
     def setUp(self):
         self.importer = VaneImporter(vulnerability_manager=MagicMock())
@@ -225,3 +225,18 @@ class VaneImportGlobalTest(TestCase):
         self.importer.load_plugins.assert_called_with("/My/Path/plugin_vulns.json")
         self.importer.load_themes.assert_called_with("/My/Path/theme_vulns.json")
         self.importer.load_wordpress.assert_called_with("/My/Path/wp_vulns.json")
+
+    def test_export(self):
+        self.importer.dump_plugins = MagicMock()
+        self.importer.dump_themes = MagicMock()
+        self.importer.dump_wordpress = MagicMock()
+
+        self.importer.dump("/My/Path")
+        self.importer.dump_plugins.assert_called_with("/My/Path/plugin_vulns.json")
+        self.importer.dump_themes.assert_called_with("/My/Path/theme_vulns.json")
+        self.importer.dump_wordpress.assert_called_with("/My/Path/wp_vulns.json")
+
+
+class VaneExportTest(TestCase):
+
+    pass

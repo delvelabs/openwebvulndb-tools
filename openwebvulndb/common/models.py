@@ -1,5 +1,6 @@
 from .errors import VulnerabilityNotFound, VersionNotFound
 from .basemodel import Model
+from .version import parse
 from itertools import chain
 
 
@@ -70,6 +71,13 @@ class Vulnerability(Model):
 
         self.affected_versions.append(range)
 
+    def applies_to(self, version):
+        for r in self.affected_versions:
+            if r.contains(version):
+                return True
+
+        return len(self.affected_versions) == 0
+
     @property
     def children(self):
         return chain(self.references, self.affected_versions)
@@ -87,6 +95,32 @@ class VersionRange(Model):
     def init(self, *, introduced_in=None, fixed_in=None):
         self.introduced_in = introduced_in
         self.fixed_in = fixed_in
+
+    @property
+    def introduced_in(self):
+        return str(self._introduced_in) if self._introduced_in is not None else None
+
+    @introduced_in.setter
+    def introduced_in(self, val):
+        self._introduced_in = None if val is None else parse(val)
+
+    @property
+    def fixed_in(self):
+        return str(self._fixed_in) if self._fixed_in is not None else None
+
+    @fixed_in.setter
+    def fixed_in(self, val):
+        self._fixed_in = None if val is None else parse(val)
+
+    def contains(self, version):
+        version = parse(version)
+        return self._check_lower(version) and self._check_upper(version)
+
+    def _check_lower(self, version):
+        return self._introduced_in is None or version >= self._introduced_in
+
+    def _check_upper(self, version):
+        return self._fixed_in is None or version < self._fixed_in
 
 
 class VersionList(Model):

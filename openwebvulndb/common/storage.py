@@ -1,3 +1,4 @@
+import re
 from json.decoder import JSONDecodeError
 from os.path import join, dirname
 from os import makedirs, scandir, walk
@@ -24,7 +25,7 @@ class Storage:
     def list_meta(self, *args):
         base_len = len(self.base_path)
 
-        for path, _, files in walk(join(self.base_path, *args)):
+        for path, _, files in walk(self._path(*args)):
             if "META.json" in files:
                 key = path[base_len + 1:]
                 yield self.read_meta(key)
@@ -35,6 +36,14 @@ class Storage:
     def read_vulnerabilities(self, key, producer):
         return self._read(VulnerabilityListSchema(), key, 'vuln-%s.json' % producer.lower())
 
+    def list_vulnerabilities(self, key):
+        name_format = re.compile(r'^vuln-(\w+)\.json$')
+
+        for entry in scandir(self._path(key)):
+            parts = name_format.match(entry.name)
+            if parts and not entry.is_dir():
+                yield self.read_vulnerabilities(key, parts.group(1))
+
     def write_versions(self, vlist):
         self._write(VersionListSchema(), vlist, "versions.json")
 
@@ -43,7 +52,7 @@ class Storage:
 
     def list_directories(self, path):
         try:
-            return {entry.name for entry in scandir(join(self.base_path, path)) if entry.is_dir()}
+            return {entry.name for entry in scandir(self._path(path)) if entry.is_dir()}
         except FileNotFoundError:
             return set()
 
@@ -79,10 +88,13 @@ class Storage:
 
     @contextmanager
     def _open(self, mode, *args):
-        with open(join(self.base_path, *args), mode) as fp:
+        with open(self._path(*args), mode) as fp:
             yield fp
 
     def _prepare_path(self, relative):
         if relative not in self.known:
-            makedirs(join(self.base_path, relative), mode=0o755, exist_ok=True)
+            makedirs(self._path(relative), mode=0o755, exist_ok=True)
             self.known.add(relative)
+
+    def _path(self, *args):
+        return join(self.base_path, *args)

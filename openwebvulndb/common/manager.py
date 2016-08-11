@@ -30,6 +30,12 @@ class VulnerabilityManager:
         except FileNotFoundError:
             return VulnerabilityList(producer=producer, key=key)
 
+    def filter_for_version(self, version, vulnerability_lists):
+        for l in vulnerability_lists:
+            for v in l.vulnerabilities:
+                if v.applies_to(version):
+                    yield v
+
 
 class ReferenceManager:
 

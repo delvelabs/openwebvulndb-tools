@@ -1,5 +1,6 @@
 from unittest import TestCase
 from unittest.mock import mock_open, patch, call, MagicMock
+
 from fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
@@ -138,6 +139,55 @@ class StorageTest(TestCase):
 
             handle = m()
             handle.write.assert_called_once_with(VULNERABILITIES_FILE_DATA)
+
+    def test_list_vulnerabilities(self):
+        class DirEntry:
+            def __init__(self, name, is_dir=False):
+                self.name = name
+                self.is_dir = lambda: is_dir
+
+        with patch('openwebvulndb.common.storage.scandir') as scandir:
+            scandir.return_value = [
+                DirEntry(name="META.json"),
+                DirEntry(name="versions.json"),
+                DirEntry(name="vuln-vaneimporter.json"),
+                DirEntry(name="vuln-manual.json"),
+                DirEntry(name="test", is_dir=True),
+            ]
+            storage = Storage('/some/path')
+            storage.read_vulnerabilities = MagicMock()
+            storage.read_vulnerabilities.return_value = "a list"
+
+            vlists = storage.list_vulnerabilities('wordpress')
+
+            self.assertEqual(["a list", "a list"], list(vlists))
+            storage.read_vulnerabilities.assert_has_calls([
+                call("wordpress", "vaneimporter"),
+                call("wordpress", "manual"),
+            ])
+            scandir.assert_called_with("/some/path/wordpress")
+
+    def test_list_vulnerabilities_has_nothing(self):
+        class DirEntry:
+            def __init__(self, name, is_dir=False):
+                self.name = name
+                self.is_dir = lambda: is_dir
+
+        with patch('openwebvulndb.common.storage.scandir') as scandir:
+            scandir.return_value = [
+                DirEntry(name="META.json"),
+                DirEntry(name="versions.json"),
+                DirEntry(name="test", is_dir=True),
+            ]
+            storage = Storage('/some/path')
+            storage.read_vulnerabilities = MagicMock()
+            storage.read_vulnerabilities.return_value = "a list"
+
+            vlists = storage.list_vulnerabilities('wordpress')
+
+            self.assertEqual([], list(vlists))
+            storage.read_vulnerabilities.assert_not_called()
+            scandir.assert_called_with("/some/path/wordpress")
 
     def test_read_versions(self):
         m = mock_open(read_data=VERSIONS_FILE_DATA)

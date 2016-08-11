@@ -1,8 +1,9 @@
 
 
-
 def _clean(item):
-    return {key: value for key, value in item.__dict__.items() if key[0] != "_"}
+    return {key if key[0] != "_" else "[%s]" % key[1:]: value
+            for key, value in item.__dict__.items()
+            if key != "_dirty"}
 
 
 class Model:
