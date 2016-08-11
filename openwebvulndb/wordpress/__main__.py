@@ -41,8 +41,8 @@ def populate_versions(loop, repository_hasher, storage):
     loop.run_until_complete(load_input())
 
 
-def find_identity_files(storage):
-    versions = storage.read_versions("wordpress")
+def find_identity_files(storage, input_key):
+    versions = storage.read_versions(input_key)
 
     from collections import defaultdict
     file_map = defaultdict(list)
@@ -68,13 +68,16 @@ parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
 parser.add_argument("action", choices=operations.keys())
 parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
+parser.add_argument('-k', '--key', dest='input_key', default="wordpress",
+                    help='Software key for targetting specific plugins or themes')
 args = parser.parse_args()
 
 
 try:
     local = app.sub(repository=WordPressRepository,
                     vane_importer=VaneImporter,
-                    input_path=args.input_path)
+                    input_path=args.input_path,
+                    input_key=args.input_key)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
