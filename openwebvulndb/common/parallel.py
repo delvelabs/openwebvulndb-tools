@@ -1,4 +1,7 @@
 import asyncio
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
+
 from .logs import logger
 
 
@@ -32,3 +35,20 @@ class ParallelWorker:
                     task.cancel()
                 except:
                     pass
+
+
+class BackgroundRunner:
+    @staticmethod
+    async def default(callback, *args, **kwargs):
+        # Not actually running anything in the background, just pretending to
+        return callback(*args, **kwargs)
+
+    def __init__(self, loop, size=10):
+        if loop is None:
+            self.run = self.default
+        else:
+            self.loop = loop
+            self.executor = ThreadPoolExecutor(max_workers=size)
+
+    async def run(self, callback, *args, **kwargs):
+        return await self.loop.run_in_executor(self.executor, partial(callback, *args, **kwargs))

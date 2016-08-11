@@ -5,6 +5,7 @@ from fixtures import async_test, fake_future, file_path
 
 from openwebvulndb.common import RepositoryChecker, Repository
 from openwebvulndb.common.vcs import Subversion, SubversionWorkspace
+from openwebvulndb.common.errors import ExecutionFailure
 
 
 class VersionControlTest(TestCase):
@@ -93,6 +94,7 @@ class SubversionTest(TestCase):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
             proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
             svn = Subversion(loop=loop)
@@ -108,10 +110,32 @@ class SubversionTest(TestCase):
             proc.communicate.assert_called_with()
 
     @async_test()
+    async def test_execute_handle_error(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.returncode = 1
+            cse.return_value = fake_future(proc, loop=loop)
+
+            svn = Subversion(loop=loop)
+            with self.assertRaises(ExecutionFailure):
+                await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
+
+            cse.assert_called_with("svn", "checkout", "https://svn.example.com/tags/1.2.3", ".",
+                                   cwd="/tmp/foobar",
+                                   loop=loop,
+                                   stdout=asyncio.subprocess.PIPE,
+                                   stdin=asyncio.subprocess.DEVNULL,
+                                   stderr=asyncio.subprocess.DEVNULL)
+
+            proc.communicate.assert_called_with()
+
+    @async_test()
     async def test_execute_switch(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
             proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
             svn = Subversion(loop=loop)

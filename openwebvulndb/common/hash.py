@@ -3,47 +3,60 @@ from os import walk
 from os.path import join
 
 from .models import Signature, VersionList
+from .parallel import BackgroundRunner
 from .version import VersionCompare
+from .logs import logger
+from .errors import ExecutionFailure
 
 
 class RepositoryHasher:
-    def __init__(self, *, storage, hasher=None, subversion=None):
+    def __init__(self, *, storage, hasher=None, subversion=None, background_runner=None):
         self.storage = storage
         self.hasher = hasher or Hasher('SHA256')
         self.handlers = dict(subversion=subversion)
+        self.background_runner = background_runner or BackgroundRunner(None)
 
     async def collect_for_version(self, workspace, version, *, prefix=""):
         await workspace.to_version(version)
 
-        collector = HashCollector(path=workspace.workdir, hasher=self.hasher, prefix=prefix, lookup_version=version)
-        return list(collector.collect())
+        def collect():
+            collector = HashCollector(path=workspace.workdir, hasher=self.hasher, prefix=prefix, lookup_version=version)
+            return list(collector.collect())
+
+        return await self.background_runner.run(collect)
 
     async def collect_for_workspace(self, key, workspace, *, prefix=""):
-        version_list = self.get_version_list(key)
-        repository_versions = set(await workspace.list_versions())
-        stored_versions = {v.version for v in version_list.versions}
-        required_versions = VersionCompare.sorted(repository_versions - stored_versions)
+        version_list = await self.background_runner.run(self.get_version_list, key)
+        try:
+            repository_versions = set(await workspace.list_versions())
+            stored_versions = {v.version for v in version_list.versions}
+            required_versions = VersionCompare.sorted(repository_versions - stored_versions)
 
-        for v in required_versions:
-            signatures = await self.collect_for_version(workspace, v, prefix=prefix)
-            desc = version_list.get_version(v, create_missing=True)
-            desc.signatures = signatures
+            for v in required_versions:
+                signatures = await self.collect_for_version(workspace, v, prefix=prefix)
+                desc = version_list.get_version(v, create_missing=True)
+                desc.signatures = signatures
+        except ExecutionFailure:
+            logger.warn("A command failed to execute. Skipping the rest of the task, please try again later.")
 
-        self.storage.write_versions(version_list)
+        await self.background_runner.run(self.storage.write_versions, version_list)
 
     async def collect_from_meta(self, meta, prefix_pattern=""):
-        for repo in meta.repositories:
-            repo_handler = self.handlers.get(repo.type)
-            if repo_handler is None:
-                continue
+        try:
+            for repo in meta.repositories:
+                repo_handler = self.handlers.get(repo.type)
+                if repo_handler is None:
+                    continue
 
-            with repo_handler.workspace(repository=repo.location) as workspace:
-                await workspace.prepare()
+                with repo_handler.workspace(repository=repo.location) as workspace:
+                    await workspace.prepare()
 
-                prefix = prefix_pattern.format(meta=meta)
-                await self.collect_for_workspace(meta.key, workspace, prefix=prefix)
+                    prefix = prefix_pattern.format(meta=meta)
+                    await self.collect_for_workspace(meta.key, workspace, prefix=prefix)
 
-            return True
+                return True
+        except ExecutionFailure:
+            logger.warn("A command failed to execute. Skipping the rest of the task, please try again later.")
 
         return False
 

@@ -96,7 +96,7 @@ class Subversion:
             stderr=asyncio.subprocess.DEVNULL,
             stdin=asyncio.subprocess.DEVNULL
         )
-        await process.communicate()
+        await self._process(process)
 
     async def switch(self, path, *, workdir):
         process = await create_subprocess_exec(
@@ -107,7 +107,16 @@ class Subversion:
             stderr=asyncio.subprocess.DEVNULL,
             stdin=asyncio.subprocess.DEVNULL
         )
-        await process.communicate()
+        await self._process(process)
+
+    @staticmethod
+    async def _process(process):
+        out = await process.communicate()
+
+        if process.returncode != 0:
+            raise ExecutionFailure()
+
+        return out
 
     @contextmanager
     def workspace(self, *, repository):

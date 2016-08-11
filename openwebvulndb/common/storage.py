@@ -1,6 +1,6 @@
 from json.decoder import JSONDecodeError
 from os.path import join, dirname
-from os import makedirs, scandir
+from os import makedirs, scandir, walk
 from contextlib import contextmanager
 
 from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema
@@ -20,6 +20,14 @@ class Storage:
 
     def read_meta(self, key):
         return self._read(MetaSchema(), key, 'META.json')
+
+    def list_meta(self, *args):
+        base_len = len(self.base_path)
+
+        for path, _, files in walk(join(self.base_path, *args)):
+            if "META.json" in files:
+                key = path[base_len + 1:]
+                yield self.read_meta(key)
 
     def write_vulnerabilities(self, vlist):
         self._write(VulnerabilityListSchema(), vlist, 'vuln-%s.json' % vlist.producer.lower())

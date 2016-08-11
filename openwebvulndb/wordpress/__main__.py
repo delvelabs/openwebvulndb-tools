@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
+from random import shuffle
 
 from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter
+from ..common.parallel import ParallelWorker
 
 
 def list_plugins(loop, repository):
@@ -21,8 +23,22 @@ def vane_import(vane_importer, input_path):
 
 
 def populate_versions(loop, repository_hasher, storage):
-    meta = storage.read_meta("wordpress")
-    loop.run_until_complete(repository_hasher.collect_from_meta(meta))
+    async def load_input():
+        worker = ParallelWorker(4, loop=loop)
+        meta = storage.read_meta("wordpress")
+
+        await worker.request(repository_hasher.collect_from_meta, meta)
+
+        # When restarting the job, shuffle so that we don't spend so much time doing those already done
+        task_list = list(storage.list_meta("plugins"))
+        shuffle(task_list)
+
+        for meta in task_list:
+            await worker.request(repository_hasher.collect_from_meta, meta, prefix_pattern="wp-content/{meta.key}")
+
+        await worker.wait()
+
+    loop.run_until_complete(load_input())
 
 
 def find_identity_files(storage):

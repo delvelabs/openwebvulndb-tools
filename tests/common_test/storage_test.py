@@ -1,7 +1,5 @@
-import uuid
-from collections import OrderedDict
 from unittest import TestCase
-from unittest.mock import mock_open, patch, call
+from unittest.mock import mock_open, patch, call, MagicMock
 from fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
@@ -89,6 +87,27 @@ class StorageTest(TestCase):
 
             m.assert_called_with('/some/path/plugins/better-wp-security/META.json', 'r')
 
+    def test_list_meta(self):
+        with patch('openwebvulndb.common.storage.walk') as walk:
+            walk.return_value = [
+                ("/some/path/plugins", ["plugin-a", "plugin-b", "plugin-c"], []),
+                ("/some/path/plugins/plugin-a", [], ["META.json"]),
+                ("/some/path/plugins/plugin-b", [], ["otherfile.json"]),
+                ("/some/path/plugins/plugin-c", [], ["versions.json", "META.json"]),
+            ]
+
+            storage = Storage('/some/path')
+            storage.read_meta = MagicMock()
+            storage.read_meta.return_value = 'hello'
+            out = list(storage.list_meta("plugins"))
+
+            storage.read_meta.assert_has_calls([
+                call("plugins/plugin-a"),
+                call("plugins/plugin-c"),
+            ])
+            walk.assert_called_with("/some/path/plugins")
+            self.assertEqual(out, ['hello', 'hello'])
+
     def test_read_vulnerabilities(self):
         m = mock_open(read_data=VULNERABILITIES_FILE_DATA)
 
@@ -143,8 +162,11 @@ class StorageTest(TestCase):
             vlist = VersionList(key="plugins/better-wp-security",
                                 producer="SubversionFetcher")
             v = vlist.get_version("1.0", create_missing=True)
-            v.add_signature("wp-content/plugins/better-wp-security/readme.txt", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", contains_version=True),
-            v.add_signature("wp-content/plugins/better-wp-security/scripts/helper.js", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+            v.add_signature("wp-content/plugins/better-wp-security/readme.txt",
+                            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                            contains_version=True),
+            v.add_signature("wp-content/plugins/better-wp-security/scripts/helper.js",
+                            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
             storage.write_versions(vlist)
 
             makedirs.assert_called_once_with('/some/path/plugins/better-wp-security', mode=0o755, exist_ok=True)

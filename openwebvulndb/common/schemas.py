@@ -1,7 +1,6 @@
-from marshmallow import Schema, fields, validate, post_load, validates_schema, ValidationError
+from marshmallow import Schema, fields, post_load, validates_schema, ValidationError
 from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference
 from .models import VersionList, VersionDefinition, Signature
-from .serialize import serialize
 
 
 class RepositorySchema(Schema):
@@ -129,7 +128,7 @@ class VersionListSchema(Schema):
 
     key = fields.String(required=True)
     producer = fields.String(required=True)
-    versions = fields.Nested(VersionDefinitionSchema, many=True, required=True)
+    versions = fields.Nested(VersionDefinitionSchema, many=True, required=False)
 
     @post_load
     def make(self, data):

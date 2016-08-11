@@ -4,6 +4,7 @@ from contextlib import contextmanager
 
 from fixtures import async_test
 
+from openwebvulndb.common.errors import ExecutionFailure
 from openwebvulndb.common.hash import HashCollector, Hasher, VersionChecker, RepositoryHasher
 from openwebvulndb.common.models import Signature, VersionList, Meta, Repository
 
@@ -276,6 +277,28 @@ class RepositoryHasherTest(TestCase):
         v2.add_signature("wp-content/plugins/a-plugin/readme.txt", hash="12345")
         v10 = expect.get_version("10.1", create_missing=True)
         v10.add_signature("wp-content/plugins/a-plugin/readme.txt", hash="12345")
+
+        hasher.storage.write_versions.assert_called_with(expect)
+
+    @async_test()
+    async def test_execution_failures(self, fake_future):
+        workspace = MagicMock()
+        workspace.list_versions.return_value = fake_future(["1.0", "10.1", "2.0"])
+
+        hasher = RepositoryHasher(storage=MagicMock(), hasher=MagicMock())
+        hasher.collect_for_version = MagicMock()
+        hasher.collect_for_version.side_effect = ExecutionFailure()
+
+        hasher.storage.read_versions.side_effect = FileNotFoundError()
+
+        await hasher.collect_for_workspace("plugins/a-plugin", workspace, prefix="wp-content/plugins/a-plugin")
+
+        hasher.storage.read_versions.assert_called_with("plugins/a-plugin")
+        hasher.collect_for_version.assert_has_calls([
+            call(workspace, "1.0", prefix="wp-content/plugins/a-plugin"),
+        ], any_order=False)
+
+        expect = VersionList(producer="RepositoryHasher", key="plugins/a-plugin")
 
         hasher.storage.write_versions.assert_called_with(expect)
 
