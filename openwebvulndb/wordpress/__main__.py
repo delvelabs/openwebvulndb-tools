@@ -30,7 +30,7 @@ def populate_versions(loop, repository_hasher, storage):
         await worker.request(repository_hasher.collect_from_meta, meta)
 
         # When restarting the job, shuffle so that we don't spend so much time doing those already done
-        task_list = list(storage.list_meta("plugins"))
+        task_list = list(storage.list_meta("plugins")) + list(storage.list_meta("themes"))
         shuffle(task_list)
 
         for meta in task_list:
