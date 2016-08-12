@@ -1,9 +1,10 @@
 from unittest import TestCase
-from unittest.mock import MagicMock
-from fixtures import file_path
-from datetime import datetime
+from unittest.mock import MagicMock, mock_open, patch, call
+from fixtures import file_path, freeze_time
+from datetime import datetime, timedelta
 
-from openwebvulndb.common import VulnerabilityManager, Vulnerability, VersionRange
+from openwebvulndb.common import VulnerabilityManager
+from openwebvulndb.common import Vulnerability, VersionRange, VersionList, Reference, VulnerabilityList
 from openwebvulndb.wordpress import VaneImporter
 
 
@@ -12,7 +13,7 @@ class VaneImportTest(TestCase):
     def setUp(self):
         self.manager = VulnerabilityManager(storage=MagicMock())
         self.manager.storage.read_vulnerabilities.side_effect = FileNotFoundError()
-        self.importer = VaneImporter(vulnerability_manager=self.manager)
+        self.importer = VaneImporter(vulnerability_manager=self.manager, storage=self.manager.storage)
 
     def test_import_plugins_sample_file(self):
         self.importer.load_plugins(file_path(__file__, 'vane-plugin-vulnerability-sample.json'))
@@ -214,7 +215,7 @@ class VaneImportTest(TestCase):
 class VaneGlobalTest(TestCase):
 
     def setUp(self):
-        self.importer = VaneImporter(vulnerability_manager=MagicMock())
+        self.importer = VaneImporter(vulnerability_manager=MagicMock(), storage=MagicMock())
 
     def test_includes_plugin_vulnerabilities(self):
         self.importer.load_plugins = MagicMock()
@@ -239,4 +240,253 @@ class VaneGlobalTest(TestCase):
 
 class VaneExportTest(TestCase):
 
-    pass
+    def setUp(self):
+        self.manager = VulnerabilityManager(storage=MagicMock())
+        self.manager.storage.read_vulnerabilities.side_effect = FileNotFoundError()
+        self.importer = VaneImporter(vulnerability_manager=self.manager, storage=self.manager.storage)
+
+    def test_export_per_version(self):
+        expect = """
+[
+    {
+        "1.0": {
+            "vulnerabilities": [
+                "output for list a"
+            ]
+        }
+    },
+    {
+        "10.0": {
+            "vulnerabilities": [
+                "output for list c"
+            ]
+        }
+    }
+]
+""".strip()
+        version_list = VersionList(key="wordpress", producer="Test")
+        version_list.get_version("1.0", create_missing=True)
+        version_list.get_version("1.2", create_missing=True)
+        version_list.get_version("10.0", create_missing=True)
+
+        self.importer.storage.read_versions.return_value = version_list
+        self.importer.storage.list_vulnerabilities.return_value = "lists of vulnerabilities"
+        self.importer.dump_wordpress_vulnerabilities_for_version = MagicMock()
+        self.importer.dump_wordpress_vulnerabilities_for_version.side_effect = [
+            ["output for list a"],
+            [],
+            ["output for list c"],
+        ]
+
+        m = mock_open()
+        with patch('openwebvulndb.wordpress.vane.open', m, create=True):
+            self.importer.dump_wordpress("/some/file/path/wp_vulns.json")
+
+        m.assert_called_with("/some/file/path/wp_vulns.json", "w")
+        handle = m()
+        handle.write.assert_called_with(expect)
+
+        self.importer.storage.read_versions.assert_called_with("wordpress")
+        self.importer.storage.list_vulnerabilities.assert_called_with("wordpress")
+        self.importer.dump_wordpress_vulnerabilities_for_version.assert_has_calls([
+            call("lists of vulnerabilities", "1.0"),
+            call("lists of vulnerabilities", "1.2"),
+            call("lists of vulnerabilities", "10.0"),
+        ], any_order=False)
+
+    def test_test_collect_wordpress_vulnerabilities(self):
+        self.importer.manager.filter_for_version = MagicMock()
+        self.importer.manager.filter_for_version.return_value = [
+            Vulnerability(id="1121"),
+            Vulnerability(id="9920"),
+            Vulnerability(id="1231"),
+        ]
+
+        obtained = self.importer.dump_wordpress_vulnerabilities_for_version("some input data", "2.1")
+
+        self.assertEqual(["1121", "9920", "1231"], [x["id"] for x in obtained])
+
+        self.importer.manager.filter_for_version.assert_called_with("2.1", "some input data")
+
+    def test_dump_vulnerabilities_basic(self):
+        v = Vulnerability(id="1234", title="Hello World")
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "title": "Hello World",
+        })
+
+    def test_vuln_type(self):
+        v = Vulnerability(id="1234", reported_type="LFI")
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "vuln_type": "LFI",
+        })
+
+    @freeze_time("2016-08-12 10:31:22.123Z")
+    def test_dump_vulnerabilities_dates(self):
+        v = Vulnerability(id="1234",
+                          created_at=datetime.now() - timedelta(days=2, hours=3),
+                          updated_at=datetime.now())
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "updated_at": "2016-08-12T10:31:22.123Z",
+            "created_at": "2016-08-10T07:31:22.123Z",
+        })
+
+    @freeze_time("2016-08-12 10:31:22.123Z")
+    def test_dump_vulnerabilities_urls(self):
+        v = Vulnerability(id="1234", references=[
+            Reference(type="other", url="https://example.com/test123"),
+            Reference(type="other", url="https://example.com/test456"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "url": ["https://example.com/test123", "https://example.com/test456"],
+        })
+
+    @freeze_time("2016-08-12 10:31:22.123Z")
+    def test_dump_vulnerabilities_refs(self):
+        v = Vulnerability(id="1234", references=[
+            Reference(type="cve", id="2015-1234", url="https://example.com/test123"),
+            Reference(type="osvdb", id="12345"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "cve": ["2015-1234"],
+            "osvdb": ["12345"],
+        })
+
+    def test_dump_vulnerability_finds_appropriate_fixed_in(self):
+        v = Vulnerability(id="1234", affected_versions=[
+            VersionRange(fixed_in="1.7"),
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v, for_version="2.2"), {
+            "id": "1234",
+            "fixed_in": "2.4",
+        })
+
+    def test_dump_vulnerability_pick_highest_when_nothing_relative_specified(self):
+        v = Vulnerability(id="1234", affected_versions=[
+            VersionRange(fixed_in="1.7"),
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "fixed_in": "3.3",
+        })
+
+    def test_dump_vulnerability_no_appropriate_fix(self):
+        v = Vulnerability(id="1234")
+        self.assertEqual(self.importer.dump_vulnerability(v, for_version="2.2"), {
+            "id": "1234",
+        })
+
+    def test_dump_vulnerability_current_branch_not_fixed(self):
+        v = Vulnerability(id="1234", affected_versions=[
+            VersionRange(fixed_in="1.7"),
+            VersionRange(introduced_in="2.0"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v, for_version="2.2"), {
+            "id": "1234",
+        })
+
+    def test_export_per_plugin(self):
+        expect = """
+[
+    {
+        "better-wp-security": {
+            "vulnerabilities": [
+                "output for list a"
+            ]
+        }
+    },
+    {
+        "a-plugin": {
+            "vulnerabilities": [
+                "output for list c"
+            ]
+        }
+    }
+]
+""".strip()
+        self.importer.storage.list_directories.return_value = ['better-wp-security', 'some-plugin', 'a-plugin']
+        self.importer.dump_vulnerabilities = MagicMock()
+        self.importer.dump_vulnerabilities.side_effect = [
+            ["output for list a"],
+            [],
+            ["output for list c"],
+        ]
+
+        m = mock_open()
+        with patch('openwebvulndb.wordpress.vane.open', m, create=True):
+            self.importer.dump_plugins("/some/file/path/plugin_vulns.json")
+
+        m.assert_called_with("/some/file/path/plugin_vulns.json", "w")
+        handle = m()
+        handle.write.assert_called_with(expect)
+
+        self.importer.storage.list_directories.assert_called_with("plugins")
+        self.importer.dump_vulnerabilities.assert_has_calls([
+            call("plugins", "better-wp-security"),
+            call("plugins", "some-plugin"),
+            call("plugins", "a-plugin"),
+        ], any_order=False)
+
+    def test_export_per_theme(self):
+        expect = """
+[
+    {
+        "twentytwelve": {
+            "vulnerabilities": [
+                "output for list a"
+            ]
+        }
+    },
+    {
+        "twentyfourteen": {
+            "vulnerabilities": [
+                "output for list c"
+            ]
+        }
+    }
+]
+""".strip()
+        self.importer.storage.list_directories.return_value = ['twentytwelve', 'twentythirteen', 'twentyfourteen']
+        self.importer.dump_vulnerabilities = MagicMock()
+        self.importer.dump_vulnerabilities.side_effect = [
+            ["output for list a"],
+            [],
+            ["output for list c"],
+        ]
+
+        m = mock_open()
+        with patch('openwebvulndb.wordpress.vane.open', m, create=True):
+            self.importer.dump_themes("/some/file/path/theme_vulns.json")
+
+        m.assert_called_with("/some/file/path/theme_vulns.json", "w")
+        handle = m()
+        handle.write.assert_called_with(expect)
+
+        self.importer.storage.list_directories.assert_called_with("themes")
+        self.importer.dump_vulnerabilities.assert_has_calls([
+            call("themes", "twentytwelve"),
+            call("themes", "twentythirteen"),
+            call("themes", "twentyfourteen"),
+        ], any_order=False)
+
+    def test_dump_vulnerabilities(self):
+        vlist_1 = VulnerabilityList(key="plugins/some-plugin", producer="Test1")
+        vlist_1.get_vulnerability("123", create_missing=True)
+        vlist_1.get_vulnerability("234", create_missing=True)
+        vlist_2 = VulnerabilityList(key="plugins/some-plugin", producer="Test2")
+        vlist_2.get_vulnerability("345", create_missing=True)
+
+        self.importer.storage.list_vulnerabilities.return_value = [vlist_1, vlist_2]
+
+        out = list(self.importer.dump_vulnerabilities("plugins", "some-plugin"))
+
+        self.importer.storage.list_vulnerabilities.assert_called_with("plugins/some-plugin")
+        self.assertEqual(["123", "234", "345"], [x["id"] for x in out])

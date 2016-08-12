@@ -1,9 +1,19 @@
+import unittest
 import asyncio
 from functools import wraps
 from os.path import join, dirname
 from aiohttp.test_utils import loop_context
 
 from easyinject import Injector
+
+try:
+    from freezegun import freeze_time
+except ImportError:
+    def freeze_time(time):
+        def setup(f):
+            return unittest.skip("freezegun is required")(f)
+
+        return setup
 
 
 def file_path(relative, file):
