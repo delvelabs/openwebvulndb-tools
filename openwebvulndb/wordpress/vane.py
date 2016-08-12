@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 import re
 from os.path import join
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from ..common import VersionRange
 from ..common.version import VersionCompare
@@ -115,7 +115,8 @@ class VaneImporter:
 
     @classmethod
     def dump_vulnerability(cls, vuln, for_version=None):
-        out = dict(id=vuln.id)
+        out = OrderedDict()
+        out["id"] = vuln.id
 
         if vuln.title is not None:
             out["title"] = vuln.title

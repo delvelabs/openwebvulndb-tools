@@ -270,7 +270,7 @@ class VaneExportTest(TestCase):
         version_list.get_version("10.0", create_missing=True)
 
         self.importer.storage.read_versions.return_value = version_list
-        self.importer.storage.list_vulnerabilities.return_value = "lists of vulnerabilities"
+        self.importer.storage.list_vulnerabilities.return_value = ["lists of vulnerabilities"]
         self.importer.dump_wordpress_vulnerabilities_for_version = MagicMock()
         self.importer.dump_wordpress_vulnerabilities_for_version.side_effect = [
             ["output for list a"],
@@ -289,9 +289,9 @@ class VaneExportTest(TestCase):
         self.importer.storage.read_versions.assert_called_with("wordpress")
         self.importer.storage.list_vulnerabilities.assert_called_with("wordpress")
         self.importer.dump_wordpress_vulnerabilities_for_version.assert_has_calls([
-            call("lists of vulnerabilities", "1.0"),
-            call("lists of vulnerabilities", "1.2"),
-            call("lists of vulnerabilities", "10.0"),
+            call(["lists of vulnerabilities"], "1.0"),
+            call(["lists of vulnerabilities"], "1.2"),
+            call(["lists of vulnerabilities"], "10.0"),
         ], any_order=False)
 
     def test_test_collect_wordpress_vulnerabilities(self):
