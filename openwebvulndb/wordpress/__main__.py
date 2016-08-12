@@ -22,6 +22,12 @@ def vane_import(vane_importer, input_path):
     vane_importer.manager.flush()
 
 
+def vane_export(vane_importer, input_path):
+    if not input_path:
+        raise Exception("Options required: input_path")
+    vane_importer.dump(input_path)
+
+
 def populate_versions(loop, repository_hasher, storage):
     async def load_input():
         worker = ParallelWorker(8, loop=loop)
@@ -60,6 +66,7 @@ def find_identity_files(storage, input_key):
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
+                  vane_export=vane_export,
                   populate_versions=populate_versions,
                   find_identity_files=find_identity_files)
 

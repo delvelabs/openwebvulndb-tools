@@ -22,6 +22,12 @@ class VersionCompareTest(TestCase):
 
         self.assertEqual(expect, VersionCompare.sorted(versions))
 
+    def test_ordering_large_subversions(self):
+        versions = ["2.80", "2.76", "2.78", "2.8"]
+        expect = ["2.8", "2.76", "2.78", "2.80"]
+
+        self.assertEqual(expect, VersionCompare.sorted(versions))
+
 
 class NextMinorTest(TestCase):
 

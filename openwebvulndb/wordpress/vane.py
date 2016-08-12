@@ -4,9 +4,10 @@ import re
 from os.path import join
 from collections import defaultdict
 
-from openwebvulndb.common import VersionRange
-from openwebvulndb.common.version import VersionCompare
-from openwebvulndb.common.manager import ReferenceManager
+from ..common import VersionRange
+from ..common.version import VersionCompare
+from ..common.manager import ReferenceManager
+from ..common.logs import logger
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -59,7 +60,7 @@ class VaneImporter:
 
     def dump_wordpress(self, data_file_path):
         version_list = self.storage.read_versions("wordpress")
-        vulnerability_lists = self.storage.list_vulnerabilities("wordpress")
+        vulnerability_lists = list(self.storage.list_vulnerabilities("wordpress"))
 
         def iterate():
             for v in version_list.versions:
