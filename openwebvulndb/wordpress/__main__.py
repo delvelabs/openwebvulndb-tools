@@ -9,10 +9,12 @@ from ..common.parallel import ParallelWorker
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
+    loop.run_until_complete(repository.mark_popular_plugins())
 
 
 def list_themes(loop, repository):
     loop.run_until_complete(repository.perform_theme_lookup())
+    loop.run_until_complete(repository.mark_popular_themes())
 
 
 def vane_import(vane_importer, input_path):

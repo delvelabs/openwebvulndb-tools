@@ -53,6 +53,14 @@ class SerializeTest(TestCase):
 
         self.assertEqual(errors["key"], ['Missing data for required field.'])
 
+    def test_popular_mark(self):
+        plugin = Meta(key="plugins/wordpress-importer",
+                      name="WordPress Importer",
+                      is_popular=True)
+
+        data, err = serialize(MetaSchema(), plugin)
+        self.assertIn('"is_popular": true', data)
+
     def test_serialize_reference(self):
         ref = Reference(type="osvdb", id="12345")
         self.assertEqual('{"type": "osvdb", "id": "12345"}',

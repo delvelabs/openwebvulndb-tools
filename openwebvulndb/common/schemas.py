@@ -22,6 +22,7 @@ class MetaSchema(Schema):
     key = fields.String(required=True)
     name = fields.String(required=False, allow_none=True)
     url = fields.Url(required=False, allow_none=True)
+    is_popular = fields.Boolean(required=False, allow_none=True)
     repositories = fields.Nested(RepositorySchema, many=True, required=False)
 
     @post_load

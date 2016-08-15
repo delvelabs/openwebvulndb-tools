@@ -153,3 +153,35 @@ class EnumeratePluginsTest(TestCase):
             await handler.fetch_plugin('better-wp-security')
 
         handler.session.get.assert_called_with('https://api.wordpress.org/plugins/info/1.0/better-wp-security.json')
+
+    @async_test()
+    async def test_flag_as_popular_from_api(self, loop):
+        meta_1 = Meta(key="some-meta-1")
+        meta_2 = Meta(key="some-meta-2")
+        meta_3 = Meta(key="some-meta-3")
+
+        my_response = ClientResponse('GET', 'http://api.wordpress.org/plugins/info/1.1/?action=query_plugins'
+                                            '&request[browse]=popular&request[per_page]=200')
+        my_response.status = 200
+        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._content = read_file(__file__, 'popular-plugins.json').encode('utf8')
+
+        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock(), storage=MagicMock())
+        handler.session.get.return_value = fake_future(my_response, loop)
+        handler.storage.read_meta.side_effect = [meta_1, meta_2, meta_3]
+
+        await handler.mark_popular_plugins()
+
+        handler.session.get.assert_called_with('http://api.wordpress.org/plugins/info/1.1/?action=query_plugins'
+                                               '&request[browse]=popular&request[per_page]=200')
+        handler.storage.write_meta.assert_has_calls([
+            call(meta_1),
+            call(meta_2),
+        ])
+        handler.storage.read_meta.assert_has_calls([
+            call("plugins/woocommerce"),
+            call("plugins/google-sitemap-generator"),
+        ])
+        self.assertTrue(meta_1.is_popular)
+        self.assertTrue(meta_2.is_popular)
+        self.assertIsNone(meta_3.is_popular)

@@ -156,3 +156,35 @@ class EnumeratePluginsTest(TestCase):
             await handler.fetch_theme('twentyeleven')
 
         handler.session.get.assert_called_with('https://api.wordpress.org/themes/info/1.1/?action=theme_information&request[slug]=twentyeleven')  # noqa
+
+    @async_test()
+    async def test_flag_as_popular_from_api(self, loop):
+        meta_1 = Meta(key="some-meta-1")
+        meta_2 = Meta(key="some-meta-2")
+        meta_3 = Meta(key="some-meta-3")
+
+        my_response = ClientResponse('GET', 'http://api.wordpress.org/themes/info/1.1/?action=query_plugins'
+                                            '&request[browse]=popular&request[per_page]=100')
+        my_response.status = 100
+        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._content = read_file(__file__, 'popular-themes.json').encode('utf8')
+
+        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock(), storage=MagicMock())
+        handler.session.get.return_value = fake_future(my_response, loop)
+        handler.storage.read_meta.side_effect = [meta_1, meta_2, meta_3]
+
+        await handler.mark_popular_themes()
+
+        handler.session.get.assert_called_with('http://api.wordpress.org/themes/info/1.1/?action=query_themes'
+                                               '&request[browse]=popular&request[per_page]=100')
+        handler.storage.write_meta.assert_has_calls([
+            call(meta_1),
+            call(meta_2),
+        ])
+        handler.storage.read_meta.assert_has_calls([
+            call("themes/twentysixteen"),
+            call("themes/twentyfifteen"),
+        ])
+        self.assertTrue(meta_1.is_popular)
+        self.assertTrue(meta_2.is_popular)
+        self.assertIsNone(meta_3.is_popular)

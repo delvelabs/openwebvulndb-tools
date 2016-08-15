@@ -72,6 +72,27 @@ class WordPressRepository:
                                          self.fetch_theme,
                                          self.theme_parser.create_meta)
 
+    async def mark_popular_plugins(self):
+        return await self._mark_popular_from_api("plugins", 200)
+
+    async def mark_popular_themes(self):
+        return await self._mark_popular_from_api("themes", 100)
+
+    async def _mark_popular_from_api(self, group, count):
+        response = await self.session.get('http://api.wordpress.org/{group}/info/1.1/'
+                                          '?action=query_{group}&request[browse]=popular&request[per_page]={count}'.
+                                          format(group=group, count=count))
+        data = await response.json()
+        response.close()
+
+        for entry in data[group]:
+            slug = "{group}/{partial}".format(group=group, partial=entry["slug"])
+            meta = self.storage.read_meta(slug)
+            meta.is_popular = True
+
+            if meta.dirty:
+                self.storage.write_meta(meta)
+
     async def perform_lookup(self, current, obtain, fetch, default):
         current = current()
         repository = await obtain()
