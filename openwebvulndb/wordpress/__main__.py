@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
 from random import shuffle
+from os.path import join
 
 from openwebvulndb import app
 from .repository import WordPressRepository
-from .vane import VaneImporter
+from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 
 
@@ -24,10 +25,14 @@ def vane_import(vane_importer, input_path):
     vane_importer.manager.flush()
 
 
-def vane_export(vane_importer, input_path):
+def vane_export(vane_importer, storage, input_path):
     if not input_path:
         raise Exception("Options required: input_path")
     vane_importer.dump(input_path)
+
+    rebuild = VaneVersionRebuild(join(input_path, "wp_versions.xml"))
+    rebuild.update(storage.read_versions("wordpress"))
+    rebuild.write()
 
 
 def populate_versions(loop, repository_hasher, storage):

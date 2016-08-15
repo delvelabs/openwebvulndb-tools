@@ -1,6 +1,3 @@
-import asyncio
-import aiohttp
-
 from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from .parser import PluginParser, ThemeParser
@@ -87,11 +84,14 @@ class WordPressRepository:
 
         for entry in data[group]:
             slug = "{group}/{partial}".format(group=group, partial=entry["slug"])
-            meta = self.storage.read_meta(slug)
-            meta.is_popular = True
+            try:
+                meta = self.storage.read_meta(slug)
+                meta.is_popular = True
 
-            if meta.dirty:
-                self.storage.write_meta(meta)
+                if meta.dirty:
+                    self.storage.write_meta(meta)
+            except FileNotFoundError:
+                logger.warn("%s/META.json not found for popular plugin", slug)
 
     async def perform_lookup(self, current, obtain, fetch, default):
         current = current()

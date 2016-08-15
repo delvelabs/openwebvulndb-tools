@@ -4,7 +4,7 @@ from fixtures import file_path, freeze_time
 from datetime import datetime, timedelta
 
 from openwebvulndb.common import VulnerabilityManager
-from openwebvulndb.common import Vulnerability, VersionRange, VersionList, Reference, VulnerabilityList
+from openwebvulndb.common import Vulnerability, VersionRange, VersionList, Reference, VulnerabilityList, Meta
 from openwebvulndb.wordpress import VaneImporter
 
 
@@ -231,11 +231,16 @@ class VaneGlobalTest(TestCase):
         self.importer.dump_plugins = MagicMock()
         self.importer.dump_themes = MagicMock()
         self.importer.dump_wordpress = MagicMock()
+        self.importer.dump_lists = MagicMock()
 
         self.importer.dump("/My/Path")
         self.importer.dump_plugins.assert_called_with("/My/Path/plugin_vulns.json")
         self.importer.dump_themes.assert_called_with("/My/Path/theme_vulns.json")
         self.importer.dump_wordpress.assert_called_with("/My/Path/wp_vulns.json")
+        self.importer.dump_lists.assert_has_calls([
+            call("plugins", "/My/Path/plugins.txt", "/My/Path/plugins_full.txt"),
+            call("themes", "/My/Path/themes.txt", "/My/Path/themes_full.txt"),
+        ])
 
 
 class VaneExportTest(TestCase):
@@ -490,3 +495,23 @@ class VaneExportTest(TestCase):
 
         self.importer.storage.list_vulnerabilities.assert_called_with("plugins/some-plugin")
         self.assertEqual(["123", "234", "345"], [x["id"] for x in out])
+
+    def test_dump_lists(self):
+        meta_1 = Meta(key="plugins/popular-plugin", is_popular=True)
+        meta_2 = Meta(key="plugins/a-plugin")
+        self.importer.storage.list_meta.return_value = [meta_1, meta_2]
+
+        m = mock_open()
+        with patch('openwebvulndb.wordpress.vane.open', m, create=True):
+            self.importer.dump_lists("plugins", "pop.txt", "full.txt")
+            self.importer.storage.list_meta.assert_called_with("plugins")
+
+            m.assert_has_calls([
+                call("pop.txt", "w"),
+                call("full.txt", "w"),
+            ], any_order=True)
+            handle = m()
+            handle.write.assert_has_calls([
+                call("popular-plugin"),
+                call("a-plugin\npopular-plugin"),
+            ])

@@ -1,13 +1,15 @@
 from datetime import datetime
+from heapq import heappush
 import json
 import re
 from os.path import join
 from collections import defaultdict, OrderedDict
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 from ..common import VersionRange
 from ..common.version import VersionCompare
 from ..common.manager import ReferenceManager
-from ..common.logs import logger
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -27,14 +29,22 @@ class VaneImporter:
         return self.manager.get_producer_list("VaneImporter", *args)
 
     def dump(self, input_path):
-        self.dump_plugins(join(input_path, 'plugin_vulns.json'))
-        self.dump_themes(join(input_path, 'theme_vulns.json'))
-        self.dump_wordpress(join(input_path, 'wp_vulns.json'))
+        def path(file):
+            return join(input_path, file)
+
+        self.dump_plugins(path('plugin_vulns.json'))
+        self.dump_themes(path('theme_vulns.json'))
+        self.dump_wordpress(path('wp_vulns.json'))
+        self.dump_lists("plugins", path('plugins.txt'), path('plugins_full.txt'))
+        self.dump_lists("themes", path('themes.txt'), path('themes_full.txt'))
 
     def load(self, input_path):
-        self.load_plugins(join(input_path, 'plugin_vulns.json'))
-        self.load_themes(join(input_path, 'theme_vulns.json'))
-        self.load_wordpress(join(input_path, 'wp_vulns.json'))
+        def path(file):
+            return join(input_path, file)
+
+        self.load_plugins(path('plugin_vulns.json'))
+        self.load_themes(path('theme_vulns.json'))
+        self.load_wordpress(path('wp_vulns.json'))
 
     def load_wordpress(self, data_file_path):
         vl = self.get_list("wordpress")
@@ -104,6 +114,23 @@ class VaneImporter:
         for vlist in self.storage.list_vulnerabilities(key):
             for vuln in vlist.vulnerabilities:
                 yield self.dump_vulnerability(vuln)
+
+    def dump_lists(self, group, partial_file_path, full_file_path):
+        partial_list = []
+        full_list = []
+
+        for meta in self.storage.list_meta(group):
+            _, slug = meta.key.split("/")
+
+            heappush(full_list, slug)
+            if meta.is_popular:
+                heappush(partial_list, slug)
+
+        with open(partial_file_path, "w") as fp:
+            fp.write("\n".join(partial_list))
+
+        with open(full_file_path, "w") as fp:
+            fp.write("\n".join(full_list))
 
     @staticmethod
     def _iterate(data_file_path):
@@ -202,6 +229,83 @@ class VaneImporter:
             range.fixed_in = fixed_in
 
         return range
+
+
+class VaneVersionRebuild:
+
+    def __init__(self, file):
+        self.file = file
+        self.tree = ET.parse(file)
+        self.file_nodes = dict(self._list_files())
+
+    @property
+    def files(self):
+        return list(self.file_nodes.keys())
+
+    def get_hash(self, file_path, version):
+        try:
+            node = self.file_nodes[file_path]
+            for h in node.iter('hash'):
+                for v in h.iter('version'):
+                    if v.text == version:
+                        return h
+
+            h = node.makeelement('hash', {})
+            node.insert(0, h)
+            v = h.makeelement('version', {})
+            v.text = version
+            h.append(v)
+            return h
+        except KeyError:
+            raise FileNotFoundError(file_path)
+
+    @staticmethod
+    def load(string):
+        return ET.fromstring(string)
+
+    @staticmethod
+    def dump(node):
+        return ET.tostring(node).decode('utf-8')
+
+    def write(self):
+        self.tree.write(self.file, encoding="UTF-8")
+        xml = minidom.parse(self.file)
+
+        with open(self.file, "w") as fp:
+            fp.write(xml.toprettyxml())
+
+    def update(self, version_list):
+        for file, node in self.file_nodes.items():
+            for v in version_list.versions:
+                for sig in v.signatures:
+                    if sig.path == file:
+                        hash = self.get_hash(file, v.version)
+                        hash.attrib[sig.algo.lower()] = sig.hash
+                        break
+
+            self.clean(node)
+
+    @staticmethod
+    def clean(node):
+        existing = dict()
+        to_remove = set()
+        for child in node.iter('hash'):
+            for k, v in child.attrib.items():
+                if v in existing:
+                    to_remove.add(child)
+                    if existing[v] is not None:
+                        to_remove.add(existing[v])
+                        existing[v] = None
+                else:
+                    existing[v] = child
+
+        for r in to_remove:
+            node.remove(r)
+
+    def _list_files(self):
+        root = self.tree.getroot()
+        for node in root.iter("file"):
+            yield node.attrib["src"], node
 
 
 def _parse_date(data):
