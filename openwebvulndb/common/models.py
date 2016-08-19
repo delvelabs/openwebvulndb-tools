@@ -50,9 +50,10 @@ class VulnerabilityList(Model):
 class Vulnerability(Model):
 
     def init(self, *, id, title=None, reported_type=None, updated_at=None, created_at=None,
-             references=None, affected_versions=None):
+             references=None, affected_versions=None, description=None):
         self.id = id
         self.title = title
+        self.description = description
         self.reported_type = reported_type
         self.updated_at = updated_at
         self.created_at = created_at

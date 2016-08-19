@@ -1,1 +1,1 @@
-print("Available modules: openwebvulndb.wordpress")
+print("Available modules: openwebvulndb.wordpress, openwebvulndb.common")

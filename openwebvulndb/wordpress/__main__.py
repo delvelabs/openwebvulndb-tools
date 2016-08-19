@@ -39,7 +39,9 @@ def populate_versions(loop, repository_hasher, storage):
     async def load_input():
         worker = ParallelWorker(8, loop=loop)
         meta = storage.read_meta("wordpress")
+        await worker.request(repository_hasher.collect_from_meta, meta)
 
+        meta = storage.read_meta("mu")
         await worker.request(repository_hasher.collect_from_meta, meta)
 
         # When restarting the job, shuffle so that we don't spend so much time doing those already done
@@ -54,36 +56,30 @@ def populate_versions(loop, repository_hasher, storage):
     loop.run_until_complete(load_input())
 
 
-def find_identity_files(storage, input_key):
-    versions = storage.read_versions(input_key)
+def load_cve(loop, cve_reader, input_file):
+    cve_reader.groups = ["plugins", "themes"]
+    data = cve_reader.read_file(input_file)
+    for entry in data:
+        target = cve_reader.identify_target(entry)
+        if target is None:
+            print(entry)
+        else:
+            pass
 
-    from collections import defaultdict
-    file_map = defaultdict(list)
-    for v in versions.versions:
-        for s in v.signatures:
-            file_map[s.path].append(s.hash)
-
-    data = [(len(set(values)), len(values), path) for path, values in file_map.items()]
-    data.sort(reverse=True)
-    for uniques, total, path in data:
-        print("%s/%s    %s" % (uniques, total, path))
-
-    print("Total version count: %s" % len(versions.versions))
 
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
                   vane_export=vane_export,
                   populate_versions=populate_versions,
-                  find_identity_files=find_identity_files)
-
+                  load_cve=load_cve)
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
 parser.add_argument("action", choices=operations.keys())
 parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
-parser.add_argument('-k', '--key', dest='input_key', default="wordpress",
-                    help='Software key for targetting specific plugins or themes')
+parser.add_argument('-f', '--input-file', dest='input_file',
+                    help='Cached input file')
 args = parser.parse_args()
 
 
@@ -91,7 +87,7 @@ try:
     local = app.sub(repository=WordPressRepository,
                     vane_importer=VaneImporter,
                     input_path=args.input_path,
-                    input_key=args.input_key)
+                    input_file=args.input_file)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
