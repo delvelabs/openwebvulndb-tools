@@ -18,3 +18,8 @@ class SoftwareNotFound(Exception):
 
 class ExecutionFailure(Exception):
     pass
+
+
+class DirectoryExpected(ExecutionFailure):
+    # SVN related
+    pass

@@ -5,7 +5,7 @@ from fixtures import async_test, fake_future, file_path
 
 from openwebvulndb.common import RepositoryChecker, Repository
 from openwebvulndb.common.vcs import Subversion, SubversionWorkspace
-from openwebvulndb.common.errors import ExecutionFailure
+from openwebvulndb.common.errors import ExecutionFailure, DirectoryExpected
 
 
 class VersionControlTest(TestCase):
@@ -93,7 +93,7 @@ class SubversionTest(TestCase):
     async def test_execute_checkout(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
@@ -113,7 +113,7 @@ class SubversionTest(TestCase):
     async def test_execute_handle_error(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 1
             cse.return_value = fake_future(proc, loop=loop)
 
@@ -134,7 +134,7 @@ class SubversionTest(TestCase):
     async def test_execute_switch(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            proc.communicate.return_value = fake_future(("out", "err"), loop=loop)
+            proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
@@ -149,6 +149,18 @@ class SubversionTest(TestCase):
                                    stderr=asyncio.subprocess.PIPE)
 
             proc.communicate.assert_called_with()
+
+    @async_test()
+    async def test_execute_switch(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.return_value = fake_future(("out", b"svn: E200007: some file refers to a file, not a directory\n"), loop=loop)
+            proc.returncode = 1
+            cse.return_value = fake_future(proc, loop=loop)
+
+            svn = Subversion(loop=loop)
+            with self.assertRaises(DirectoryExpected):
+                await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
 
 class SubversionWorkspaceTest(TestCase):

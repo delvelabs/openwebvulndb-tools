@@ -5,7 +5,7 @@ from os.path import join
 from os import mkdir, walk, rmdir, remove
 from contextlib import contextmanager
 
-from .errors import ExecutionFailure
+from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
 
 
@@ -103,6 +103,9 @@ class Subversion:
             stdin=asyncio.subprocess.PIPE
         )
         out, err = await process.communicate()
+
+        if err.startswith(b"svn: E200007"):
+            raise DirectoryExpected(err)
 
         if process.returncode != 0:
             raise ExecutionFailure(err)

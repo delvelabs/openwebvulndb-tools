@@ -6,7 +6,7 @@ from .models import Signature, VersionList
 from .parallel import BackgroundRunner
 from .version import VersionCompare
 from .logs import logger
-from .errors import ExecutionFailure
+from .errors import ExecutionFailure, DirectoryExpected
 
 
 class RepositoryHasher:
@@ -33,9 +33,12 @@ class RepositoryHasher:
             required_versions = VersionCompare.sorted(repository_versions - stored_versions)
 
             for v in required_versions:
-                signatures = await self.collect_for_version(workspace, v, prefix=prefix)
-                desc = version_list.get_version(v, create_missing=True)
-                desc.signatures = signatures
+                try:
+                    signatures = await self.collect_for_version(workspace, v, prefix=prefix)
+                    desc = version_list.get_version(v, create_missing=True)
+                    desc.signatures = signatures
+                except DirectoryExpected:
+                    pass  # Bad version, skip
         except ExecutionFailure as e:
             logger.warn("A command failed to execute: %s", e)
 
