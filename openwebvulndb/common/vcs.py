@@ -85,36 +85,27 @@ class Subversion:
         if code == 0:
             return out
 
-        raise ExecutionFailure()
+        raise ExecutionFailure("Listing failure")
 
     async def checkout(self, path, *, workdir):
-        process = await create_subprocess_exec(
-            "svn", "checkout", path, ".",
-            cwd=workdir,
-            loop=self.loop,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-            stdin=asyncio.subprocess.DEVNULL
-        )
-        await self._process(process)
+        await self._process(["svn", "checkout", path, "."], workdir=workdir)
 
     async def switch(self, path, *, workdir):
+        await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+
+    async def _process(self, command, workdir):
         process = await create_subprocess_exec(
-            "svn", "switch", path,
+            *command,
             cwd=workdir,
             loop=self.loop,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-            stdin=asyncio.subprocess.DEVNULL
+            stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.PIPE
         )
-        await self._process(process)
-
-    @staticmethod
-    async def _process(process):
-        out = await process.communicate()
+        out, err = await process.communicate()
 
         if process.returncode != 0:
-            raise ExecutionFailure()
+            raise ExecutionFailure(err)
 
         return out
 

@@ -5,7 +5,7 @@ class VersionCompare:
 
     @staticmethod
     def sorted(list):
-        return [str(s) for s in sorted(parse(v) for v in list)]
+        return [str(v) for s, v in sorted((parse(v), v) for v in list)]
 
     @staticmethod
     def next_minor(version):

@@ -36,8 +36,8 @@ class RepositoryHasher:
                 signatures = await self.collect_for_version(workspace, v, prefix=prefix)
                 desc = version_list.get_version(v, create_missing=True)
                 desc.signatures = signatures
-        except ExecutionFailure:
-            logger.warn("A command failed to execute. Skipping the rest of the task, please try again later.")
+        except ExecutionFailure as e:
+            logger.warn("A command failed to execute: %s", e)
 
         await self.background_runner.run(self.storage.write_versions, version_list)
 
@@ -55,8 +55,8 @@ class RepositoryHasher:
                     await self.collect_for_workspace(meta.key, workspace, prefix=prefix)
 
                 return True
-        except ExecutionFailure:
-            logger.warn("A command failed to execute. Skipping the rest of the task, please try again later.")
+        except ExecutionFailure as e:
+            logger.warn("A command failed to execute: %s", e)
 
         return False
 

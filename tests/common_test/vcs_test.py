@@ -104,8 +104,8 @@ class SubversionTest(TestCase):
                                    cwd="/tmp/foobar",
                                    loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
-                                   stdin=asyncio.subprocess.DEVNULL,
-                                   stderr=asyncio.subprocess.DEVNULL)
+                                   stdin=asyncio.subprocess.PIPE,
+                                   stderr=asyncio.subprocess.PIPE)
 
             proc.communicate.assert_called_with()
 
@@ -125,8 +125,8 @@ class SubversionTest(TestCase):
                                    cwd="/tmp/foobar",
                                    loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
-                                   stdin=asyncio.subprocess.DEVNULL,
-                                   stderr=asyncio.subprocess.DEVNULL)
+                                   stdin=asyncio.subprocess.PIPE,
+                                   stderr=asyncio.subprocess.PIPE)
 
             proc.communicate.assert_called_with()
 
@@ -141,12 +141,12 @@ class SubversionTest(TestCase):
             svn = Subversion(loop=loop)
             await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
-            cse.assert_called_with("svn", "switch", "https://svn.example.com/tags/1.2.3",
+            cse.assert_called_with("svn", "switch", "--ignore-ancestry", "https://svn.example.com/tags/1.2.3",
                                    cwd="/tmp/foobar",
                                    loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
-                                   stdin=asyncio.subprocess.DEVNULL,
-                                   stderr=asyncio.subprocess.DEVNULL)
+                                   stdin=asyncio.subprocess.PIPE,
+                                   stderr=asyncio.subprocess.PIPE)
 
             proc.communicate.assert_called_with()
 

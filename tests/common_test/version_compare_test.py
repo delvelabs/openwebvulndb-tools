@@ -18,7 +18,7 @@ class VersionCompareTest(TestCase):
 
     def test_ordering_with_beta_flags(self):
         versions = ["4.0", "4.1", "4.1-alpha1", "4.1-beta1", "4.0-rc1"]
-        expect = ["4.0rc1", "4.0", "4.1a1", "4.1b1", "4.1"]
+        expect = ["4.0-rc1", "4.0", "4.1-alpha1", "4.1-beta1", "4.1"]
 
         self.assertEqual(expect, VersionCompare.sorted(versions))
 
