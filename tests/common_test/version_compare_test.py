@@ -70,3 +70,13 @@ class VersionRangeTest(TestCase):
         self.assertTrue(v.applies_to("2.1"))
         self.assertTrue(v.applies_to("3.0"))
         self.assertFalse(v.applies_to("3.1"))
+
+    def test_multiple_ranges(self):
+        v = Vulnerability(id="1")
+        v.add_affected_version(VersionRange(fixed_in="1.2"))
+        v.add_affected_version(VersionRange(fixed_in="1.3"))
+
+        self.assertEqual(v.affected_versions, [
+            VersionRange(fixed_in="1.2"),
+            VersionRange(fixed_in="1.3"),
+        ])

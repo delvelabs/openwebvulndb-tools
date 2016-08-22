@@ -1,9 +1,12 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file
+from datetime import datetime
+from fixtures import read_file, freeze_time
 
-from openwebvulndb.common.models import Meta
-from openwebvulndb.common.cve import CVEReader, CPEMapper
+from openwebvulndb.common.errors import VulnerabilityNotFound
+from openwebvulndb.common.models import Meta, VulnerabilityList, Reference, Vulnerability
+from openwebvulndb.common.models import VersionList, VersionRange
+from openwebvulndb.common.cve import CVEReader, CPEMapper, RangeGuesser
 
 
 content = read_file(__file__, 'cve.circl.lu.json')
@@ -216,3 +219,188 @@ class CPEMapperTest(TestCase):
         self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
         self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
         self.mapper.storage.list_meta.assert_called_once_with()
+
+
+class LookupVulnerabilityTest(TestCase):
+
+    def setUp(self):
+        self.manager = MagicMock()
+        self.reader = CVEReader(storage=MagicMock(), vulnerability_manager=self.manager)
+        self.reader.load_mapping({
+            "cpe:2.3:a:wordpress:wordpress": "wordpress",
+            "cpe:2.3:a:wordpress:wordpress_mu": "mu",
+        })
+
+    def test_lookup_does_not_exist(self):
+        self.manager.find_vulnerability.side_effect = VulnerabilityNotFound()
+        self.manager.get_producer_list.return_value = VulnerabilityList(producer="CVEReader", key="wordpress")
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+            "references": [
+                "http://example.com/133",
+            ]
+        })
+        self.manager.find_vulnerability.assert_called_with("wordpress",
+                                                           match_reference=Reference(type="cve", id="1234-2334"))
+        self.manager.flush.assert_called_with()
+        self.manager.get_producer_list.assert_called_with("CVEReader", "wordpress")
+        self.assertEqual(v.id, "CVE-1234-2334")
+        self.assertEqual(v.title, "Some Text")
+        self.assertEqual(v.description, "Some Text")
+
+        self.assertEqual("1234-2334", v.references[0].id)
+        self.assertEqual("http://example.com/133", v.references[1].url)
+
+    def test_only_override_description_when_old(self):
+        vuln = Vulnerability(id="X",
+                             title="My Title",
+                             description="A description")
+        self.manager.find_vulnerability.return_value = vuln
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.assertIs(vuln, v)
+        self.manager.flush.assert_called_with()
+        self.assertEqual(v.title, "My Title")
+        self.assertEqual(v.description, "Some Text")
+
+    @freeze_time("2016-08-25")  # Much after the vuln update
+    def test_apply_skips_if_no_update_is_required(self):
+        initial = datetime.now()
+        vuln = Vulnerability(id="X",
+                             title="My Title",
+                             description="A description",
+                             updated_at=initial)
+
+        self.manager.find_vulnerability.return_value = vuln
+        self.reader.apply_data = MagicMock()
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "last-modified": "2016-08-10T12:29:12.813-04:00",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.assertIs(vuln, v)
+        self.reader.apply_data.assert_not_called()
+        self.assertEqual(vuln.updated_at, initial)
+
+    @freeze_time("2016-07-25")  # Much prior the vuln update
+    def test_update_time_is_good(self):
+        initial = datetime.now()
+        vuln = Vulnerability(id="X",
+                             title="My Title",
+                             description="A description",
+                             updated_at=initial)
+
+        self.manager.find_vulnerability.return_value = vuln
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "last-modified": "2016-08-10T12:29:12.813-04:00",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.assertIs(vuln, v)
+        self.assertGreater(vuln.updated_at, initial)
+
+    def test_guess_versions(self):
+        vuln = Vulnerability(id="X",
+                             description="A description")
+        self.manager.find_vulnerability.return_value = vuln
+        self.reader.range_guesser = MagicMock()
+        self.reader.range_guesser.guess.return_value = [
+            VersionRange(introduced_in="1.0"),
+        ]
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.reader.range_guesser.load.assert_called_with("wordpress")
+        self.reader.range_guesser.guess.assert_called_with("Some Text", [
+            "cpe:2.3:a:wordpress:wordpress:4.4.3",
+            "cpe:2.3:a:wordpress:wordpress:4.4.4",
+        ])
+        self.assertEqual(v.affected_versions, [
+            VersionRange(introduced_in="1.0"),
+        ])
+
+
+class RangeGuesserTest(TestCase):
+
+    def setUp(self):
+        self.guesser = RangeGuesser(storage=MagicMock())
+        self.guess = self.guesser.guess
+
+    def test_from_summary(self):
+        self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", []))
+
+    def test_summary_always_has_precedence(self):
+        self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", [
+            "cpe:2.3:a:wordpress:wordpress:2.4.3",
+            "cpe:2.3:a:wordpress:wordpress:2.4.4",
+            "cpe:2.3:a:wordpress:wordpress:3.4.5",
+        ]))
+
+    def test_from_summary_not_explicit_enough(self):
+        self.assertNotIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS in 2.4.5 - critical", []))
+
+    def test_next_minor_is_known_version(self):
+        self.guesser.known_versions = ["2.4.3", "2.4.4", "3.5"]
+        self.assertIn(VersionRange(fixed_in="3.5"), self.guess("XSS - critical", [
+            "cpe:2.3:a:wordpress:wordpress:2.4.3",
+            "cpe:2.3:a:wordpress:wordpress:2.4.4",
+            "cpe:2.3:a:wordpress:wordpress:3.4.5",
+        ]))
+
+    def test_fix_does_not_appear_to_be_released(self):
+        self.guesser.known_versions = ["2.4.3", "2.4.4"]
+        self.assertNotIn(VersionRange(fixed_in="3.5"), self.guess("XSS - critical", [
+            "cpe:2.3:a:wordpress:wordpress:2.4.3",
+            "cpe:2.3:a:wordpress:wordpress:2.4.4",
+            "cpe:2.3:a:wordpress:wordpress:3.4.5",
+        ]))
+
+    def test_versions_not_found(self):
+        self.guesser.storage.read_versions.side_effect = FileNotFoundError()
+        self.guesser.known_versions = ["2.4.3", "2.4.4"]
+        self.guesser.load("anything")
+
+        self.assertEqual([], self.guesser.known_versions)
+
+    def test_versions_found(self):
+        vlist = VersionList(key="anything", producer="test")
+        vlist.get_version("1.0", create_missing=True)
+        vlist.get_version("1.2", create_missing=True)
+        self.guesser.storage.read_versions.return_value = vlist
+        self.guesser.known_versions = ["2.4.3", "2.4.4"]
+        self.guesser.load("anything")
+
+        self.assertEqual(["1.0", "1.2"], self.guesser.known_versions)

@@ -81,6 +81,13 @@ class Vulnerability(Model):
 
         return len(self.affected_versions) == 0
 
+    def matches(self, match_reference=None):
+        outcomes = []
+        if match_reference is not None:
+            outcomes.append(any(ref.matches(match_reference) for ref in self.references))
+
+        return all(outcomes)
+
     @property
     def children(self):
         return chain(self.references, self.affected_versions)
@@ -92,6 +99,15 @@ class Reference(Model):
         self.type = type
         self.id = id
         self.url = url
+
+    def matches(self, other):
+        if self.type != other.type:
+            return False
+
+        if self.id is not None or other.id is not None:
+            return self.id == other.id
+
+        return self.url == other.url
 
 
 class VersionRange(Model):

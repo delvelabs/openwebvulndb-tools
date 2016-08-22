@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from .models import VulnerabilityList, Reference
+from .errors import VulnerabilityNotFound
 
 
 class VulnerabilityManager:
@@ -23,6 +24,21 @@ class VulnerabilityManager:
             self.files[producer][key] = self._create_producer_list(key, producer)
 
         return self.files[producer][key]
+
+    def get_lists(self, *args):
+        for vlist in self.storage.list_vulnerabilities("/".join(args)):
+            if vlist.key not in self.files[vlist.producer]:
+                self.files[vlist.producer][vlist.key] = vlist
+
+            yield self.files[vlist.producer][vlist.key]
+
+    def find_vulnerability(self, *args, **kwargs):
+        for vlist in self.get_lists(*args):
+            for vuln in vlist.vulnerabilities:
+                if vuln.matches(**kwargs):
+                    return vuln
+
+        raise VulnerabilityNotFound()
 
     def _create_producer_list(self, key, producer):
         try:

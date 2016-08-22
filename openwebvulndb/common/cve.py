@@ -1,22 +1,36 @@
 import re
 import json
+from datetime import datetime
 from collections import OrderedDict
-from .logs import logger
 
+from .logs import logger
+from .models import Reference, VersionRange
+from .manager import ReferenceManager
+from .errors import VulnerabilityNotFound
+from .version import VersionCompare
+
+
+match_version_in_summary = re.compile(r'before (\d[\d\.]+)')
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
 
 match_cpe = re.compile(r':a:(?P<vendor>[^:]+):(?P<product>[^:]+)(?::(?P<version>[^:]+))?')
 
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+
 
 class CVEReader:
 
-    def __init__(self, *, storage):
+    def __init__(self, *, storage, vulnerability_manager=None):
         self.groups = []
         self.storage = storage
         self.known_entries = False
+        self.vulnerability_manager = vulnerability_manager
+
         self.cpe_mapper = CPEMapper(storage=storage)
+        self.range_guesser = RangeGuesser(storage=storage)
+        self.reference_manager = ReferenceManager()
 
     def load_mapping(self, mapping):
         self.cpe_mapper.load(mapping)
@@ -24,6 +38,45 @@ class CVEReader:
     def read_file(self, file_name):
         with open(file_name, "r") as fp:
             return json.load(fp)
+
+    def read_one(self, entry):
+        target = self.identify_target(entry)
+        if target is None:
+            logger.info("No suitable target found for %s", entry)
+            return
+
+        this_ref = Reference(type="cve", id=entry["id"][4:])
+        try:
+            v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
+        except VulnerabilityNotFound:
+            producer = self.vulnerability_manager.get_producer_list("CVEReader", target)
+            v = producer.get_vulnerability(entry["id"], create_missing=True)
+
+        last_modified = self._get_last_modified(entry)
+
+        if last_modified is None or v.updated_at is None or last_modified > v.updated_at:
+            self.range_guesser.load(target)
+            self.apply_data(v, entry)
+
+        self.vulnerability_manager.flush()
+        return v
+
+    def apply_data(self, vuln, entry):
+        if vuln.title is None:
+            vuln.title = entry.get("summary")
+
+        vuln.description = entry.get("summary")
+
+        vuln.updated_at = self._get_last_modified(entry)
+
+        ref_manager = self.reference_manager.for_list(vuln.references)
+        ref_manager.include_normalized("cve", entry["id"][4:])
+
+        for url in entry.get('references', []):
+            ref_manager.include_url(url)
+
+        for range in self.range_guesser.guess(vuln.description, entry.get('vulnerable_configuration', [])):
+            vuln.add_affected_version(range)
 
     def identify_target(self, data):
         vuln_configurations = data.get("vulnerable_configuration", [])
@@ -93,6 +146,15 @@ class CVEReader:
                 yield has_version, "{group}/{product}".format(group=g, vendor=vendor, product=product)
                 yield has_version, "{group}/{vendor}-{product}".format(group=g, vendor=vendor, product=product)
 
+    def _get_last_modified(self, entry):
+        string = entry.get('last-modified')
+        if string is None:
+            return None
+
+        string = string[0:-6]  # Strip the timezone, it's horrible to deal with
+
+        return datetime.strptime(string, DATE_FORMAT)
+
 
 class CPEMapper:
 
@@ -127,3 +189,31 @@ class CPEMapper:
         for meta in self.storage.list_meta():
             self.load_meta(meta)
         logger.info("CPE Mapping loaded.")
+
+
+class RangeGuesser:
+    def __init__(self, *, storage):
+        self.known_versions = []
+        self.storage = storage
+
+    def load(self, key):
+        try:
+            vlist = self.storage.read_versions(key)
+            self.known_versions = [v.version for v in vlist.versions]
+        except FileNotFoundError:
+            self.known_versions = []
+
+    def guess(self, summary, configurations):
+        summary_fix = match_version_in_summary.search(summary)
+        if summary_fix:
+            yield VersionRange(fixed_in=summary_fix.group(1))
+
+        versions = [match_cpe.search(v) for v in configurations]
+
+        if len(versions) == 0:
+            return
+
+        versions = VersionCompare.sorted(p.group('version') for p in versions if p.group('version') is not None)
+        next_minor = VersionCompare.next_minor(versions[-1])
+        if next_minor in self.known_versions:
+            yield VersionRange(fixed_in=next_minor)
