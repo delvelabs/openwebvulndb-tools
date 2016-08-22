@@ -46,6 +46,21 @@ class SerializeTest(TestCase):
         self.assertIsNot(plugin, found_back)
         self.assertEqual(plugin, found_back)
 
+    def test_read_and_write_cpe(self):
+        plugin = Meta(key="plugins/test-plugin",
+                      name="Test Plugin",
+                      cpe_names=["cpe:2.3:a:vendor_x:test_plugin"])
+
+        schema = MetaSchema()
+        as_string, _ = serialize(schema, plugin)
+
+        self.assertIn("cpe:2.3:a:vendor_x:test_plugin", as_string)
+
+        found_back, _ = schema.loads(as_string)
+
+        self.assertIsNot(plugin, found_back)
+        self.assertEqual(plugin, found_back)
+
     def test_load_missing_fields(self):
         string = '{"name": "A Plugin"}'
         schema = MetaSchema()

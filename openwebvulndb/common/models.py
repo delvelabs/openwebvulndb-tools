@@ -6,9 +6,10 @@ from itertools import chain
 
 class Meta(Model):
 
-    def init(self, *, key, name=None, url=None, repositories=None, is_popular=None):
+    def init(self, *, key, name=None, url=None, repositories=None, is_popular=None, cpe_names=None):
         self.key = key
         self.name = name
+        self.cpe_names = cpe_names
         self.url = url
         self.is_popular = is_popular
         self.repositories = repositories or []
