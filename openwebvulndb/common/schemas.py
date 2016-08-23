@@ -72,6 +72,7 @@ class VulnerabilitySchema(Schema):
 
     id = fields.String(required=True)
     title = fields.String(required=True)
+    cvss = fields.Float(required=False)
     description = fields.String(required=False)
 
     reported_type = fields.String(required=False)

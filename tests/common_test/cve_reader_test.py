@@ -238,6 +238,8 @@ class LookupVulnerabilityTest(TestCase):
         v = self.reader.read_one({
             "id": "CVE-1234-2334",
             "summary": "Some Text",
+            "cvss": 6.7,
+            "cwe": "CWE-79",
             "vulnerable_configuration": [
                 "cpe:2.3:a:wordpress:wordpress:4.4.3",
                 "cpe:2.3:a:wordpress:wordpress:4.4.4",
@@ -253,6 +255,8 @@ class LookupVulnerabilityTest(TestCase):
         self.assertEqual(v.id, "CVE-1234-2334")
         self.assertEqual(v.title, "Some Text")
         self.assertEqual(v.description, "Some Text")
+        self.assertEqual(v.cvss, 6.7)
+        self.assertEqual(v.reported_type, "CWE-79")
 
         self.assertEqual("1234-2334", v.references[0].id)
         self.assertEqual("http://example.com/133", v.references[1].url)

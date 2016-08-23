@@ -66,6 +66,8 @@ class CVEReader:
             vuln.title = entry.get("summary")
 
         vuln.description = entry.get("summary")
+        vuln.cvss = entry.get("cvss")
+        vuln.reported_type = entry.get("cwe")
 
         vuln.updated_at = self._get_last_modified(entry)
 

@@ -116,6 +116,17 @@ class SerializeTest(TestCase):
 
         self.assertEqual('{"id": "1234", "title": "Multiple XSS"}', serialize(schema, vuln, indent=None)[0])
 
+    def test_serialize_vulnerability_cvss(self):
+        schema = VulnerabilitySchema()
+        vuln = Vulnerability(id="1234",
+                             title="Multiple XSS",
+                             cvss=4.5)
+
+        expect = '{"id": "1234", "title": "Multiple XSS", "cvss": 4.5}'
+        self.assertEqual(expect, serialize(schema, vuln, indent=None)[0])
+        data, err = schema.loads(expect)
+        self.assertEqual(4.5, data.cvss)
+
     def test_serialize_all_values(self):
         reference_date = datetime.now()
         schema = VulnerabilitySchema()
