@@ -58,13 +58,7 @@ def populate_versions(loop, repository_hasher, storage):
 
 def load_cve(loop, cve_reader, input_file):
     cve_reader.groups = ["plugins", "themes"]
-    data = cve_reader.read_file(input_file)
-    for entry in data:
-        target = cve_reader.identify_target(entry)
-        if target is None:
-            print(entry)
-        else:
-            pass
+    cve_reader.read_file(input_file)
 
 
 operations = dict(list_themes=list_themes,

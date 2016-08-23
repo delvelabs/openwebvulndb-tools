@@ -37,7 +37,9 @@ class CVEReader:
 
     def read_file(self, file_name):
         with open(file_name, "r") as fp:
-            return json.load(fp)
+            data = json.load(fp)
+            for entry in data:
+                self.read_one(entry)
 
     def read_one(self, entry):
         target = self.identify_target(entry)
@@ -197,18 +199,23 @@ class RangeGuesser:
     def __init__(self, *, storage):
         self.known_versions = []
         self.storage = storage
+        self.cache = dict()
 
     def load(self, key):
         try:
-            vlist = self.storage.read_versions(key)
-            self.known_versions = [v.version for v in vlist.versions]
+            if key not in self.cache:
+                vlist = self.storage.read_versions(key)
+                self.cache[key] = [v.version for v in vlist.versions]
         except FileNotFoundError:
-            self.known_versions = []
+            self.cache[key] = []
+        finally:
+            self.known_versions = self.cache[key]
 
     def guess(self, summary, configurations):
         summary_fix = match_version_in_summary.search(summary)
         if summary_fix:
             yield VersionRange(fixed_in=summary_fix.group(1))
+            return
 
         versions = [match_cpe.search(v) for v in configurations]
 

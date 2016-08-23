@@ -1,15 +1,12 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from datetime import datetime
-from fixtures import read_file, freeze_time
+from fixtures import freeze_time
 
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.models import Meta, VulnerabilityList, Reference, Vulnerability
 from openwebvulndb.common.models import VersionList, VersionRange
 from openwebvulndb.common.cve import CVEReader, CPEMapper, RangeGuesser
-
-
-content = read_file(__file__, 'cve.circl.lu.json')
 
 
 class TargetIdentificationTest(TestCase):
@@ -367,11 +364,14 @@ class RangeGuesserTest(TestCase):
         self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", []))
 
     def test_summary_always_has_precedence(self):
-        self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", [
+        self.guesser.known_versions = ["2.4.5", "3.5"]
+        result = list(self.guess("XSS before 2.4.5 - critical", [
             "cpe:2.3:a:wordpress:wordpress:2.4.3",
             "cpe:2.3:a:wordpress:wordpress:2.4.4",
             "cpe:2.3:a:wordpress:wordpress:3.4.5",
         ]))
+        self.assertIn(VersionRange(fixed_in="2.4.5"), result)
+        self.assertNotIn(VersionRange(fixed_in="3.5"), result)
 
     def test_from_summary_not_explicit_enough(self):
         self.assertNotIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS in 2.4.5 - critical", []))
