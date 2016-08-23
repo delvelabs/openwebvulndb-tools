@@ -22,7 +22,9 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
 class CVEReader:
 
-    def __init__(self, *, storage, vulnerability_manager=None):
+    def __init__(self, *, storage, vulnerability_manager=None, aiohttp_session=None):
+        self.session = aiohttp_session
+
         self.groups = []
         self.storage = storage
         self.known_entries = False
@@ -40,6 +42,12 @@ class CVEReader:
             data = json.load(fp)
             for entry in data:
                 self.read_one(entry)
+
+    async def read_api(self, url):
+        response = await self.session.get(url)
+        data = await response.json()
+        for entry in data:
+            self.read_one(entry)
 
     def read_one(self, entry):
         target = self.identify_target(entry)

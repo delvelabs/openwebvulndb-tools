@@ -58,7 +58,10 @@ def populate_versions(loop, repository_hasher, storage):
 
 def load_cve(loop, cve_reader, input_file):
     cve_reader.groups = ["plugins", "themes"]
-    cve_reader.read_file(input_file)
+    if input_file:
+        cve_reader.read_file(input_file)
+    else:
+        loop.run_until_complete(cve_reader.read_api("http://cve.circl.lu/api/search/wordpress/wordpress"))
 
 
 operations = dict(list_themes=list_themes,
