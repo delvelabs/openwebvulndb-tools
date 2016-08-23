@@ -229,6 +229,9 @@ class RangeGuesser:
         if len(versions) == 0:
             return
 
+        next_revision = VersionCompare.next_revision(versions[-1])
         next_minor = VersionCompare.next_minor(versions[-1])
-        if next_minor in self.known_versions:
+        if next_revision in self.known_versions:
+            yield VersionRange(fixed_in=next_revision)
+        elif next_minor in self.known_versions:
             yield VersionRange(fixed_in=next_minor)

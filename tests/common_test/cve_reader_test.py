@@ -426,6 +426,14 @@ class RangeGuesserTest(TestCase):
     def test_from_summary_not_explicit_enough(self):
         self.assertNotIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS in 2.4.5 - critical", []))
 
+    def test_next_revision_is_fixing_things(self):
+        self.guesser.known_versions = ["2.4.3", "2.4.4", "3.4.6", "3.5"]
+        self.assertIn(VersionRange(fixed_in="3.4.6"), self.guess("XSS - critical", [
+            "cpe:2.3:a:wordpress:wordpress:2.4.3",
+            "cpe:2.3:a:wordpress:wordpress:2.4.4",
+            "cpe:2.3:a:wordpress:wordpress:3.4.5",
+        ]))
+
     def test_next_minor_is_known_version(self):
         self.guesser.known_versions = ["2.4.3", "2.4.4", "3.5"]
         self.assertIn(VersionRange(fixed_in="3.5"), self.guess("XSS - critical", [

@@ -42,6 +42,19 @@ class NextMinorTest(TestCase):
         self.assertEqual(".49", VersionCompare.next_minor(".48.2"))
 
 
+class NextRevisionTest(TestCase):
+
+    def test_next_minor(self):
+        self.assertEqual("3.4.1", VersionCompare.next_revision("3.4"))
+        self.assertEqual("3.5.5", VersionCompare.next_revision("3.5.4"))
+        self.assertEqual("3.5.5", VersionCompare.next_revision("3.5.4.1"))
+        self.assertEqual("3.0.1", VersionCompare.next_revision("3"))
+        self.assertEqual("3.4.2", VersionCompare.next_revision("3.4.1alpha2"))
+
+    def test_next_minor_without_leading_digit(self):
+        self.assertEqual(".48.3", VersionCompare.next_revision(".48.2"))
+
+
 class VersionRangeTest(TestCase):
 
     def test_vulnerability_has_no_applicable_ranges(self):
