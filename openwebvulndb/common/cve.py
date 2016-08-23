@@ -55,29 +55,33 @@ class CVEReader:
             v = producer.get_vulnerability(entry["id"], create_missing=True)
 
         last_modified = self._get_last_modified(entry)
-        try:
-            requires_update = last_modified is None or v.updated_at is None or last_modified > v.updated_at
-        except TypeError:
-            requires_update = True
+        updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
+        allow_override = last_modified is None or updated_at is None or last_modified > updated_at
 
-        if requires_update:
-            self.range_guesser.load(target)
-            self.apply_data(v, entry)
+        self.range_guesser.load(target)
+        self.apply_data(v, entry, allow_override=allow_override)
 
         self.vulnerability_manager.flush()
         return v
 
-    def apply_data(self, vuln, entry):
-        if vuln.title is None:
-            vuln.title = entry.get("summary")
+    def apply_data(self, vuln, entry, allow_override=False):
+        def apply_value(field, value):
+            if allow_override or getattr(vuln, field) is None:
+                setattr(vuln, field, value)
 
-        vuln.description = entry.get("summary")
-        vuln.cvss = entry.get("cvss")
+        if vuln.title is None:
+            apply_value("title", entry.get("summary"))
+
+        apply_value("description", entry.get("summary"))
+        apply_value("cvss", entry.get("cvss"))
 
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
             vuln.reported_type = entry.get("cwe")
 
-        vuln.updated_at = self._get_last_modified(entry)
+        dates = [x for x in [vuln.updated_at.replace(tzinfo=None) if vuln.updated_at else None,
+                             self._get_last_modified(entry)] if x is not None]
+        if len(dates):
+            vuln.updated_at = max(dates)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("cve", entry["id"][4:])
@@ -161,7 +165,7 @@ class CVEReader:
             string = entry.get(field)
             if string is not None:
                 string = string[0:-6]  # Strip the timezone, it's horrible to deal with
-                parsed = datetime.strptime(string, DATE_FORMAT)
+                parsed = datetime.strptime(string, DATE_FORMAT).replace(tzinfo=None)
                 return parsed - timedelta(microseconds=parsed.microsecond)
 
 

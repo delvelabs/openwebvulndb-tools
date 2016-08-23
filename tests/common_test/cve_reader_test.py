@@ -313,7 +313,6 @@ class LookupVulnerabilityTest(TestCase):
                              updated_at=initial)
 
         self.manager.find_vulnerability.return_value = vuln
-        self.reader.apply_data = MagicMock()
 
         v = self.reader.read_one({
             "id": "CVE-1234-2334",
@@ -326,7 +325,7 @@ class LookupVulnerabilityTest(TestCase):
         })
 
         self.assertIs(vuln, v)
-        self.reader.apply_data.assert_not_called()
+        self.assertEqual(vuln.description, "A description")
         self.assertEqual(vuln.updated_at, initial)
 
     def test_apply_skips_if_no_update_is_required_with_legacy_data(self):
@@ -337,7 +336,6 @@ class LookupVulnerabilityTest(TestCase):
                              updated_at=initial)
 
         self.manager.find_vulnerability.return_value = vuln
-        self.reader.apply_data = MagicMock()
 
         v = self.reader.read_one({
             "id": "CVE-1234-2334",
@@ -350,7 +348,7 @@ class LookupVulnerabilityTest(TestCase):
         })
 
         self.assertIs(vuln, v)
-        self.reader.apply_data.assert_not_called()
+        self.assertEqual(vuln.description, "A description")
         self.assertEqual(vuln.updated_at, initial)
 
     @freeze_time("2016-07-25")  # Much prior the vuln update
