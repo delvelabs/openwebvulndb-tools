@@ -413,6 +413,23 @@ class RangeGuesserTest(TestCase):
     def test_from_summary(self):
         self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", []))
 
+    def test_with_complex_summary(self):
+        summary = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post."
+        result = list(self.guess(summary, []))
+        self.assertEqual(result, [
+            VersionRange(fixed_in="3.7.5"),
+            VersionRange(introduced_in="3.8", fixed_in="3.8.5"),
+            VersionRange(introduced_in="3.9", fixed_in="3.9.3"),
+        ])
+
+    def test_complex_summary_with_major(self):
+        summary = "Cross-site scripting (XSS) vulnerability in the media-playlists feature in WordPress before 3.9.x before 3.9.3 and 4.x before 4.0.1 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors."
+        result = list(self.guess(summary, []))
+        self.assertEqual(result, [
+            VersionRange(introduced_in="3.9", fixed_in="3.9.3"),
+            VersionRange(introduced_in="4", fixed_in="4.0.1"),
+        ])
+
     def test_summary_always_has_precedence(self):
         self.guesser.known_versions = ["2.4.5", "3.5"]
         result = list(self.guess("XSS before 2.4.5 - critical", [
@@ -472,6 +489,3 @@ class RangeGuesserTest(TestCase):
         self.guesser.load("anything")
 
         self.assertEqual(["1.0", "1.2"], self.guesser.known_versions)
-
-# TODO : Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post.
-# TODO : Cross-site scripting (XSS) vulnerability in the media-playlists feature in WordPress before 3.9.x before 3.9.3 and 4.x before 4.0.1 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors.

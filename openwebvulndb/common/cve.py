@@ -10,7 +10,7 @@ from .errors import VulnerabilityNotFound
 from .version import VersionCompare
 
 
-match_version_in_summary = re.compile(r'before (\d[\d\.]+)')
+match_version_in_summary = re.compile(r'(?:(?:before )?(?P<intro>\d[\d\.]*)\.x )?before (?P<fix>\d[\d\.]+)')
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -217,9 +217,11 @@ class RangeGuesser:
             self.known_versions = self.cache[key]
 
     def guess(self, summary, configurations):
-        summary_fix = match_version_in_summary.search(summary)
-        if summary_fix:
-            yield VersionRange(fixed_in=summary_fix.group(1))
+        matches = list(match_version_in_summary.finditer(summary))
+        for v in matches:
+            yield VersionRange(introduced_in=v.group('intro'), fixed_in=v.group('fix'))
+
+        if len(matches) > 0:
             return
 
         versions = [match_cpe.search(v) for v in configurations]
