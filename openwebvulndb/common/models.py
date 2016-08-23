@@ -66,21 +66,33 @@ class Vulnerability(Model):
         if range.fixed_in is None and range.introduced_in is None:
             return
 
+        # Check direct matches
         if range.fixed_in is not None \
            and any(v.fixed_in == range.fixed_in for v in self.affected_versions):
             return
-        if range.introduced_in is not None \
-           and any(v.introduced_in == range.introduced_in for v in self.affected_versions):
+        if range.introduced_in is not None and range.fixed_in is None \
+           and self._applies_to_explicit(range.introduced_in):
+            return
+
+        # Check conflicting information
+        if range.fixed_in is not None and range.introduced_in is None \
+           and self._applies_to_explicit(range.fixed_in):
             return
 
         self.affected_versions.append(range)
 
     def applies_to(self, version):
+        # An applicable range means the vulnerability is applicable
+        # No ranges at all also means the vulnerablity is applicable
+        return len(self.affected_versions) == 0 or self._applies_to_explicit(version)
+
+    def _applies_to_explicit(self, version):
+        # Determines if a range is explicitly making this vulnerability applicable
         for r in self.affected_versions:
             if r.contains(version):
                 return True
 
-        return len(self.affected_versions) == 0
+        return False
 
     def matches(self, match_reference=None):
         outcomes = []

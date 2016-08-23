@@ -156,15 +156,17 @@ class VaneImportTest(TestCase):
         ])
 
     def test_confusing_ranges(self):
-        vuln = Vulnerability(id=1)
+        vuln = Vulnerability(id=1, title="Some Plugin 1.5 - XSS")
         vuln.affected_versions.append(VersionRange(introduced_in="1.2"))
         vuln.affected_versions.append(VersionRange(fixed_in="1.3"))
+        vuln.clean()
+
         self.importer.apply_data(vuln, {
             "title": "Some Plugin 1.5 - XSS",
         })
 
-        self.assertTrue(vuln.dirty)
-        self.assertEqual(vuln.affected_versions[-1], VersionRange(introduced_in="1.5"))
+        self.assertFalse(vuln.dirty)
+        self.assertNotIn(VersionRange(introduced_in="1.5"), vuln.affected_versions)
 
     def test_consider_key_as_convention(self):
         vuln = Vulnerability(id=1)

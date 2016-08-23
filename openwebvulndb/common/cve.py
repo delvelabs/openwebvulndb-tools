@@ -1,6 +1,6 @@
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import OrderedDict
 
 from .logs import logger
@@ -15,7 +15,7 @@ match_version_in_summary = re.compile(r'before (\d[\d\.]+)')
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
 
-match_cpe = re.compile(r':a:(?P<vendor>[^:]+):(?P<product>[^:]+)(?::(?P<version>[^:]+))?')
+match_cpe = re.compile(r':a:(?P<vendor>[^:]+):(?P<product>[^:]+)(?::(?P<version>[^-][^:]+))?')
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
@@ -55,8 +55,12 @@ class CVEReader:
             v = producer.get_vulnerability(entry["id"], create_missing=True)
 
         last_modified = self._get_last_modified(entry)
+        try:
+            requires_update = last_modified is None or v.updated_at is None or last_modified > v.updated_at
+        except TypeError:
+            requires_update = True
 
-        if last_modified is None or v.updated_at is None or last_modified > v.updated_at:
+        if requires_update:
             self.range_guesser.load(target)
             self.apply_data(v, entry)
 
@@ -69,7 +73,9 @@ class CVEReader:
 
         vuln.description = entry.get("summary")
         vuln.cvss = entry.get("cvss")
-        vuln.reported_type = entry.get("cwe")
+
+        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
+            vuln.reported_type = entry.get("cwe")
 
         vuln.updated_at = self._get_last_modified(entry)
 
@@ -151,13 +157,12 @@ class CVEReader:
                 yield has_version, "{group}/{vendor}-{product}".format(group=g, vendor=vendor, product=product)
 
     def _get_last_modified(self, entry):
-        string = entry.get('last-modified')
-        if string is None:
-            return None
-
-        string = string[0:-6]  # Strip the timezone, it's horrible to deal with
-
-        return datetime.strptime(string, DATE_FORMAT)
+        for field in ["last-modified", "Modified"]:
+            string = entry.get(field)
+            if string is not None:
+                string = string[0:-6]  # Strip the timezone, it's horrible to deal with
+                parsed = datetime.strptime(string, DATE_FORMAT)
+                return parsed - timedelta(microseconds=parsed.microsecond)
 
 
 class CPEMapper:
@@ -219,10 +224,11 @@ class RangeGuesser:
 
         versions = [match_cpe.search(v) for v in configurations]
 
+        versions = VersionCompare.sorted(p.group('version') for p in versions if p.group('version') is not None)
+
         if len(versions) == 0:
             return
 
-        versions = VersionCompare.sorted(p.group('version') for p in versions if p.group('version') is not None)
         next_minor = VersionCompare.next_minor(versions[-1])
         if next_minor in self.known_versions:
             yield VersionRange(fixed_in=next_minor)

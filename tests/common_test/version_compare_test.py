@@ -38,6 +38,9 @@ class NextMinorTest(TestCase):
         self.assertEqual("3.1", VersionCompare.next_minor("3"))
         self.assertEqual("3.5", VersionCompare.next_minor("3.4.1alpha2"))
 
+    def test_next_minor_without_leading_digit(self):
+        self.assertEqual(".49", VersionCompare.next_minor(".48.2"))
+
 
 class VersionRangeTest(TestCase):
 
@@ -79,4 +82,17 @@ class VersionRangeTest(TestCase):
         self.assertEqual(v.affected_versions, [
             VersionRange(fixed_in="1.2"),
             VersionRange(fixed_in="1.3"),
+        ])
+
+    def test_added_fix_conflicts_with_known_information(self):
+        v = Vulnerability(id="1")
+        v.add_affected_version(VersionRange(fixed_in="1.5"))
+        v.add_affected_version(VersionRange(introduced_in="2.0", fixed_in="2.5"))
+        v.add_affected_version(VersionRange(fixed_in="1.3"))
+        v.add_affected_version(VersionRange(fixed_in="2.3"))
+        v.add_affected_version(VersionRange(introduced_in="2.3"))
+
+        self.assertEqual(v.affected_versions, [
+            VersionRange(fixed_in="1.5"),
+            VersionRange(introduced_in="2.0", fixed_in="2.5"),
         ])

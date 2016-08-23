@@ -261,12 +261,14 @@ class LookupVulnerabilityTest(TestCase):
     def test_only_override_description_when_old(self):
         vuln = Vulnerability(id="X",
                              title="My Title",
+                             reported_type="SQLi",
                              description="A description")
         self.manager.find_vulnerability.return_value = vuln
 
         v = self.reader.read_one({
             "id": "CVE-1234-2334",
             "summary": "Some Text",
+            "cwe": "CWE-199",
             "vulnerable_configuration": [
                 "cpe:2.3:a:wordpress:wordpress:4.4.3",
                 "cpe:2.3:a:wordpress:wordpress:4.4.4",
@@ -276,6 +278,30 @@ class LookupVulnerabilityTest(TestCase):
         self.assertIs(vuln, v)
         self.manager.flush.assert_called_with()
         self.assertEqual(v.title, "My Title")
+        self.assertEqual(v.reported_type, "SQLi")
+        self.assertEqual(v.description, "Some Text")
+
+    def test_unknown_is_nothing(self):
+        vuln = Vulnerability(id="X",
+                             title="My Title",
+                             reported_type="Unknown",
+                             description="A description")
+        self.manager.find_vulnerability.return_value = vuln
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "cwe": "CWE-199",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.assertIs(vuln, v)
+        self.manager.flush.assert_called_with()
+        self.assertEqual(v.title, "My Title")
+        self.assertEqual(v.reported_type, "CWE-199")
         self.assertEqual(v.description, "Some Text")
 
     @freeze_time("2016-08-25")  # Much after the vuln update
@@ -293,6 +319,30 @@ class LookupVulnerabilityTest(TestCase):
             "id": "CVE-1234-2334",
             "summary": "Some Text",
             "last-modified": "2016-08-10T12:29:12.813-04:00",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        })
+
+        self.assertIs(vuln, v)
+        self.reader.apply_data.assert_not_called()
+        self.assertEqual(vuln.updated_at, initial)
+
+    def test_apply_skips_if_no_update_is_required_with_legacy_data(self):
+        initial = datetime.now()
+        vuln = Vulnerability(id="X",
+                             title="My Title",
+                             description="A description",
+                             updated_at=initial)
+
+        self.manager.find_vulnerability.return_value = vuln
+        self.reader.apply_data = MagicMock()
+
+        v = self.reader.read_one({
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "Modified": "2016-08-10T12:29:12.813-04:00",
             "vulnerable_configuration": [
                 "cpe:2.3:a:wordpress:wordpress:4.4.3",
                 "cpe:2.3:a:wordpress:wordpress:4.4.4",
@@ -392,6 +442,12 @@ class RangeGuesserTest(TestCase):
             "cpe:2.3:a:wordpress:wordpress:3.4.5",
         ]))
 
+    def test_bad_version(self):
+        self.guesser.known_versions = ["2.4.3", "2.4.4"]
+        self.assertNotIn(VersionRange(fixed_in="3.5"), self.guess("XSS - critical", [
+            "cpe:2.3:a:wordpress:wordpress:-",
+        ]))
+
     def test_versions_not_found(self):
         self.guesser.storage.read_versions.side_effect = FileNotFoundError()
         self.guesser.known_versions = ["2.4.3", "2.4.4"]
@@ -408,3 +464,6 @@ class RangeGuesserTest(TestCase):
         self.guesser.load("anything")
 
         self.assertEqual(["1.0", "1.2"], self.guesser.known_versions)
+
+# TODO : Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post.
+# TODO : Cross-site scripting (XSS) vulnerability in the media-playlists feature in WordPress before 3.9.x before 3.9.3 and 4.x before 4.0.1 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors.
