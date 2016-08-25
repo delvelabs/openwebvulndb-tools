@@ -100,8 +100,8 @@ class WordPressRepository:
 
         logger.info("Found {total} entries, processing {new} new ones.".format(total=len(repository), new=len(new)))
 
-        fetch_worker = ParallelWorker(5, loop=self.loop)
-        check_worker = ParallelWorker(5, loop=self.loop)
+        fetch_worker = ParallelWorker(5, loop=self.loop, timeout_per_job=30)
+        check_worker = ParallelWorker(5, loop=self.loop, timeout_per_job=60)
 
         async def do_check_content(slug, meta):
             for repo in meta.repositories:

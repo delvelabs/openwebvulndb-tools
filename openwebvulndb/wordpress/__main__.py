@@ -37,7 +37,7 @@ def vane_export(vane_importer, storage, input_path):
 
 def populate_versions(loop, repository_hasher, storage):
     async def load_input():
-        worker = ParallelWorker(8, loop=loop)
+        worker = ParallelWorker(8, loop=loop, timeout_per_job=1800)  # Half an hour at most
         meta = storage.read_meta("wordpress")
         await worker.request(repository_hasher.collect_from_meta, meta)
 

@@ -82,19 +82,25 @@ class HashCollector:
         for path, dirs, files in walk(self.path):
 
             for file in files:
-                full_path = join(path, file)
-                relative = full_path[len(self.path):].strip("/")
+                try:
+                    target_path = None
+                    full_path = join(path, file)
+                    relative = full_path[len(self.path):].strip("/")
 
-                if relative[0] == "." or file[-4:] == ".php" or "/." in relative:
-                    continue
+                    if relative[0] == "." or file[-4:] == ".php" or "/." in relative:
+                        continue
 
-                self.version_checker.reset()
+                    target_path = join(self.prefix, relative)
 
-                sig = Signature(path=join(self.prefix, relative), algo=self.hasher.algo)
+                    self.version_checker.reset()
 
-                sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
-                sig.contains_version = self.version_checker.contains_version
-                yield sig
+                    sig = Signature(path=target_path, algo=self.hasher.algo)
+
+                    sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
+                    sig.contains_version = self.version_checker.contains_version
+                    yield sig
+                except OSError as e:
+                    logger.warn("Error while hashing %s: %s, skipping", target_path, e)
 
 
 class Hasher:

@@ -7,11 +7,12 @@ from .logs import logger
 
 class ParallelWorker:
 
-    def __init__(self, worker_count, *, loop, name="Worker"):
+    def __init__(self, worker_count, *, loop, name="Worker", timeout_per_job=None):
         self.loop = loop
         self.name = name
         self.queue = asyncio.Queue(loop=loop)
         self.workers = [loop.create_task(self.consume(i)) for i in range(worker_count)]
+        self.timeout_per_job = timeout_per_job
 
     async def request(self, coroutine, *args, **kwargs):
         await self.queue.put((coroutine, args, kwargs))
@@ -22,7 +23,12 @@ class ParallelWorker:
 
             try:
                 logger.debug("{} {} picked up a task.".format(self.name, n))
-                await coroutine(*args, **kwargs)
+                if self.timeout_per_job is not None:
+                    await asyncio.wait_for(coroutine(*args, **kwargs), self.timeout_per_job, loop=self.loop)
+                else:
+                    await coroutine(*args, **kwargs)
+            except asyncio.TimeoutError:
+                logger.warn("Job timed out in %s: %s, %s", self.name, args, kwargs)
             finally:
                 self.queue.task_done()
 

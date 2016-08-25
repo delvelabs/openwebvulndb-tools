@@ -40,6 +40,42 @@ class HashCollectorTest(TestCase):
                           signatures)
             self.assertTrue(signatures[0].dirty)
 
+    def test_collect_files_has_issues_with_os(self):
+        # Ex: OSError: [Errno 40] Too many levels of symbolic links
+        with patch('openwebvulndb.common.hash.walk') as walk:
+            walk.return_value = [
+                ("/some/path/random1234", ["js", "css"], ["readme.txt", "license.txt"]),
+                ("/some/path/random1234/js", [], ["index.js"]),
+                ("/some/path/random1234/css", [], ["custom.css"]),
+            ]
+            collector = HashCollector(path="/some/path/random1234", hasher=MagicMock(),
+                                      prefix="wp-content/plugins/my-plugin")
+            collector.hasher.algo = "CONST"
+            collector.hasher.hash.side_effect = [
+                "12345",
+                "12345",
+                OSError(),
+                "12345",
+            ]
+
+            signatures = list(collector.collect())
+
+            walk.assert_called_with("/some/path/random1234")
+
+            collector.hasher.hash.assert_has_calls([
+                call("/some/path/random1234/readme.txt", chunk_cb=collector.version_checker),
+                call("/some/path/random1234/license.txt", chunk_cb=collector.version_checker),
+                call("/some/path/random1234/css/custom.css", chunk_cb=collector.version_checker),
+                call("/some/path/random1234/js/index.js", chunk_cb=collector.version_checker),
+            ], any_order=True)
+
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/readme.txt", hash="12345", algo="CONST"),
+                          signatures)
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/css/custom.css", hash="12345", algo="CONST"),
+                          signatures)
+            self.assertEqual(3, len(signatures))
+            self.assertTrue(signatures[0].dirty)
+
     def test_exclude_php_files(self):
         with patch('openwebvulndb.common.hash.walk') as walk:
             walk.return_value = [
