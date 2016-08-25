@@ -55,7 +55,7 @@ class VulnerabilityManager:
 
 class ReferenceManager:
 
-    normalized_sources = ["cve", "exploitdb", "secunia", "metasploit", "osvdb"]
+    normalized_sources = ["cve", "exploitdb", "secunia", "metasploit", "osvdb", "wpvulndb"]
 
     def __init__(self):
         self.references = None

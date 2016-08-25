@@ -23,11 +23,8 @@ class Storage:
         return self._read(MetaSchema(), key, 'META.json')
 
     def list_meta(self, *args):
-        base_len = len(self.base_path)
-
-        for path, _, files in walk(self._path(*args)):
+        for key, path, dirs, files in self.walk(*args):
             if "META.json" in files:
-                key = path[base_len + 1:]
                 yield self.read_meta(key)
 
     def write_vulnerabilities(self, vlist):
@@ -69,6 +66,13 @@ class Storage:
                     yield line.strip("\n")
         except FileNotFoundError:
             pass
+
+    def walk(self, *args):
+        base_len = len(self.base_path)
+
+        for path, dirs, files in walk(self._path(*args)):
+            key = path[base_len + 1:]
+            yield key, path, dirs, files
 
     def _write(self, schema, item, *args):
         data, errors = serialize(schema, item)
