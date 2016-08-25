@@ -93,6 +93,8 @@ class VulnerabilityListSchema(Schema):
 
     key = fields.String(required=True)
     producer = fields.String(required=True)
+    copyright = fields.String(required=False)
+    license = fields.String(required=False)
     vulnerabilities = fields.Nested(VulnerabilitySchema, many=True, required=True)
 
     @post_load

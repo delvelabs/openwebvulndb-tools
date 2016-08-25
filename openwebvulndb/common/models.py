@@ -24,9 +24,11 @@ class Repository(Model):
 
 class VulnerabilityList(Model):
 
-    def init(self, *, producer, key, vulnerabilities=None):
+    def init(self, *, producer, key, vulnerabilities=None, license=None, copyright=None):
         self.producer = producer
         self.key = key
+        self.copyright = copyright
+        self.license = license
         self.vulnerabilities = vulnerabilities or []
 
     def get_vulnerability(self, id, *, create_missing=False):

@@ -154,6 +154,8 @@ class SerializeTest(TestCase):
 
         vuln_list = VulnerabilityList(producer="Test Provider",
                                       key="plugins/test-plugin",
+                                      copyright="2016- Delve Labs inc.",
+                                      license="GNU General Public License, version 2",
                                       vulnerabilities=[
                                         Vulnerability(id="1234", title="Multiple XSS"),
                                       ])
@@ -161,6 +163,8 @@ class SerializeTest(TestCase):
         data = serialize(schema, vuln_list)[0]
         self.assertIn('"producer": "Test Provider"', data)
         self.assertIn('"key": "plugins/test-plugin"', data)
+        self.assertIn('"license": "GNU General Public License, version 2"', data)
+        self.assertIn('"copyright": "2016- Delve Labs inc."', data)
         self.assertIn('Multiple XSS', data)
 
         out, errors = schema.loads(data)
