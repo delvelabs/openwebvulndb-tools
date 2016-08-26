@@ -28,6 +28,10 @@ often project specific due to configuration requirements.
 # Find files that appear to be unique or differentiators
 python -m openwebvulndb.common find_identity_files -k wordpress
 python -m openwebvulndb.common find_identity_files -k plugins/better-wp-security
+
+# List vulnerabilities with no known fixed_in
+python -m openwebvulndb.common find_unclosed_vulnerabilities
+python -m openwebvulndb.common find_unclosed_vulnerabilities --filter popular
 ```
 
 ### WordPress Tools
