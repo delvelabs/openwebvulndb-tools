@@ -153,6 +153,7 @@ class SerializeTest(TestCase):
                              created_at=reference_date,
                              updated_at=reference_date + timedelta(days=6))
         vuln.add_affected_version(VersionRange(fixed_in="1.3"))
+        vuln.add_unaffected_version(VersionRange(fixed_in="2.4"))
         vuln.references.append(Reference(type="other", url="http://example.com/test"))
 
         data = serialize(schema, vuln, indent=None)[0]
@@ -164,6 +165,7 @@ class SerializeTest(TestCase):
 
         out, errors = schema.loads(data)
         self.assertEqual("1.3", out.affected_versions[0].fixed_in)
+        self.assertEqual("2.4", out.unaffected_versions[0].fixed_in)
         self.assertEqual("other", out.references[0].type)
 
     def test_serialize_vunlerability_list(self):

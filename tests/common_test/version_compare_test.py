@@ -126,3 +126,19 @@ class VersionRangeTest(TestCase):
             VersionRange(fixed_in="1.5"),
             VersionRange(introduced_in="2.0", fixed_in="2.5"),
         ])
+
+    def test_unaffected_versions(self):
+        v = Vulnerability(id="1")
+        v.unaffected_versions = [
+            VersionRange(introduced_in="6.0", fixed_in="6.1.2"),
+            VersionRange(introduced_in="7.0", fixed_in="7.0.7"),
+        ]
+
+        v.add_affected_version(VersionRange(fixed_in="1.5"))
+        v.add_affected_version(VersionRange(introduced_in="6.0", fixed_in="6.1.2"))
+        v.add_affected_version(VersionRange(fixed_in="6.1.2"))
+
+        self.assertEqual(v.affected_versions, [
+            VersionRange(fixed_in="1.5"),
+            VersionRange(fixed_in="6.1.2"),
+        ])

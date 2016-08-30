@@ -70,7 +70,7 @@ class VulnerabilityList(Model):
 class Vulnerability(Model):
 
     def init(self, *, id, title=None, reported_type=None, updated_at=None, created_at=None,
-             references=None, affected_versions=None, description=None, cvss=None):
+             references=None, affected_versions=None, unaffected_versions=None, description=None, cvss=None):
         self.id = id
         self.title = title
         self.cvss = cvss
@@ -80,9 +80,13 @@ class Vulnerability(Model):
         self.created_at = created_at
         self.references = references or []
         self.affected_versions = affected_versions or []
+        self.unaffected_versions = unaffected_versions or []
 
     def add_affected_version(self, range):
         if range.fixed_in is None and range.introduced_in is None:
+            return
+
+        if range.introduced_in is not None and any(u.contains(range.introduced_in) for u in self.unaffected_versions):
             return
 
         # Check direct matches
@@ -99,6 +103,9 @@ class Vulnerability(Model):
             return
 
         self.affected_versions.append(range)
+
+    def add_unaffected_version(self, range):
+        self.unaffected_versions.append(range)
 
     def applies_to(self, version):
         # An applicable range means the vulnerability is applicable

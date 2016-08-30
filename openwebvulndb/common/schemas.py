@@ -97,6 +97,7 @@ class VulnerabilitySchema(Schema):
     updated_at = fields.DateTime(required=False)
 
     affected_versions = fields.Nested(VersionRangeSchema, many=True, required=False)
+    unaffected_versions = fields.Nested(VersionRangeSchema, many=True, required=False)
     references = fields.Nested(ReferenceSchema, many=True, required=False)
 
     @post_load
