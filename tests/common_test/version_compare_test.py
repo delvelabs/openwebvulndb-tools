@@ -136,9 +136,8 @@ class VersionRangeTest(TestCase):
 
         v.add_affected_version(VersionRange(fixed_in="1.5"))
         v.add_affected_version(VersionRange(introduced_in="6.0", fixed_in="6.1.2"))
-        v.add_affected_version(VersionRange(fixed_in="6.1.2"))
+        v.add_affected_version(VersionRange(fixed_in="6.1.1"))
 
         self.assertEqual(v.affected_versions, [
             VersionRange(fixed_in="1.5"),
-            VersionRange(fixed_in="6.1.2"),
         ])

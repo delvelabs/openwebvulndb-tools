@@ -89,6 +89,8 @@ class Vulnerability(Model):
 
         if range.introduced_in is not None and any(u.contains(range.introduced_in) for u in self.unaffected_versions):
             return
+        if range.fixed_in is not None and any(u.contains(range.fixed_in) for u in self.unaffected_versions):
+            return
 
         # Check direct matches
         if range.fixed_in is not None \
