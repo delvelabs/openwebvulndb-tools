@@ -51,7 +51,8 @@ class SerializeTest(TestCase):
         plugin = Meta(key="plugins/test-plugin",
                       name="Test Plugin",
                       url="http://example.com/plugins/test-plugin",
-                      repositories=[repo])
+                      repositories=[repo],
+                      hints=[Reference(type="test", id="hello")])
 
         schema = MetaSchema()
         as_string, _ = serialize(schema, plugin)

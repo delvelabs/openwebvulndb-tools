@@ -51,8 +51,8 @@ class CVEReader:
         self.range_guesser = RangeGuesser(storage=storage)
         self.reference_manager = ReferenceManager()
 
-    def load_mapping(self, mapping):
-        self.cpe_mapper.load(mapping)
+    def load_mapping(self, *args, **kwargs):
+        self.cpe_mapper.load(*args, **kwargs)
 
     def read_file(self, file_name):
         with open(file_name, "r") as fp:
@@ -118,11 +118,16 @@ class CVEReader:
             vuln.add_affected_version(range)
 
     def identify_target(self, data):
+        if "id" in data:
+            from_id = self.cpe_mapper.lookup_id(data["id"])
+            if from_id is not None:
+                return from_id
+
         vuln_configurations = data.get("vulnerable_configuration", [])
 
         # If we have a known CPE with a version specified in the configuration, it applies
         for cpe in vuln_configurations:
-            key = self.cpe_mapper.lookup(cpe)
+            key = self.cpe_mapper.lookup_cpe(cpe)
             if key is not None:
                 return key
 
@@ -142,7 +147,7 @@ class CVEReader:
 
         # If none of the entries have specified versions, attempt to use the CPE names directly
         if not any_has_version:
-            values = [self.cpe_mapper.lookup(cpe, ignore_version=True) for cpe in vuln_configurations]
+            values = [self.cpe_mapper.lookup_cpe(cpe, ignore_version=True) for cpe in vuln_configurations]
             valid = [(10 - v.count("/"), v) for v in values if v is not None]
 
             # All CPE names must be known for this to apply, otherwise we always fall-back to the platform
@@ -199,20 +204,26 @@ class CPEMapper:
     def __init__(self, *, storage):
         self.storage = storage
         self.rules = OrderedDict()
+        self.hints = dict()
         self.loaded = False
 
-    def load(self, mapping):
+    def load(self, cpe_mapping={}, hint_mapping={}):
+        def _load(mapping, output, message):
+            for k, v in mapping.items():
+                if k in output:
+                    raise KeyError(k, message)
+                else:
+                    output[k] = v
+
         self.loaded = True
-        for k, v in mapping.items():
-            if k in self.rules:
-                raise KeyError(k, "Item already defined")
-            else:
-                self.rules[k] = v
+        _load(cpe_mapping, self.rules, "CPE already defined")
+        _load(hint_mapping, self.hints, "Hint already defined")
 
     def load_meta(self, meta):
-        self.load({cpe: meta.key for cpe in meta.cpe_names or []})
+        self.load({cpe: meta.key for cpe in meta.cpe_names or []},
+                  {ref.id: meta.key for ref in meta.hints or [] if ref.id is not None and ref.type == "cve"})
 
-    def lookup(self, cpe, *, ignore_version=False):
+    def lookup_cpe(self, cpe, *, ignore_version=False):
         if not self.loaded:
             self.load_from_storage()
 
@@ -221,6 +232,13 @@ class CPEMapper:
                 return v
             elif cpe.startswith(k + ":"):
                 return v
+
+    def lookup_id(self, id):
+        if id.startswith("CVE-"):
+            id = id[4:]
+
+        if id in self.hints:
+            return self.hints[id]
 
     def load_from_storage(self):
         logger.info("Loading CPE mapping.")

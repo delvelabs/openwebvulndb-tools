@@ -32,22 +32,6 @@ class RepositorySchema(Schema):
         return Repository(**data)
 
 
-class MetaSchema(Schema):
-    class Meta:
-        ordered = True
-
-    key = fields.String(required=True)
-    name = fields.String(required=False, allow_none=True)
-    cpe_names = fields.List(fields.String(), required=False)
-    url = fields.Url(required=False, allow_none=True)
-    is_popular = fields.Boolean(required=False, allow_none=True)
-    repositories = fields.Nested(RepositorySchema, many=True, required=False)
-
-    @post_load
-    def make(self, data):
-        return Meta(**data)
-
-
 class ReferenceSchema(Schema):
     class Meta:
         ordered = True
@@ -64,6 +48,23 @@ class ReferenceSchema(Schema):
     @post_load
     def make(self, data):
         return Reference(**data)
+
+
+class MetaSchema(Schema):
+    class Meta:
+        ordered = True
+
+    key = fields.String(required=True)
+    name = fields.String(required=False, allow_none=True)
+    cpe_names = fields.List(fields.String(), required=False)
+    url = fields.Url(required=False, allow_none=True)
+    is_popular = fields.Boolean(required=False, allow_none=True)
+    repositories = fields.Nested(RepositorySchema, many=True, required=False)
+    hints = fields.Nested(ReferenceSchema, many=True, required=False)
+
+    @post_load
+    def make(self, data):
+        return Meta(**data)
 
 
 class VersionRangeSchema(Schema):
