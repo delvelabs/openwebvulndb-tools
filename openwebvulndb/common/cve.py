@@ -27,7 +27,10 @@ from .errors import VulnerabilityNotFound
 from .version import VersionCompare
 
 
-match_version_in_summary = re.compile(r'(?:(?:before )?(?P<intro>\d[\d\.]*)\.x )?before (?P<fix>\d[\d\.]+)')
+match_version_in_summary = re.compile(r'(?:(?:before |and )?(?P<intro>\d[\d\.]*)\.x )?before (?P<fix>\d[\d\.]+)(, )?')
+match_standalone_version = re.compile(r'(?P<pre>[^\w])(?:possibly )?(?:in )?(?P<intro>\d[\d\.]*)\.[x\d]*(?:,? and (?:possibly )?earlier)? ?')
+match_different_vector = re.compile(r',? (a )?(different|similar|related) (vulnerability|vector|vectors|issue) (than|to) CVE-\d+-\d+\.?')
+match_spaces = re.compile(r'(\s\s+|,\s+,\s+)')
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -99,6 +102,9 @@ class CVEReader:
 
         apply_value("description", entry.get("summary"))
         apply_value("cvss", entry.get("cvss"))
+
+        if vuln.title == vuln.description:
+            vuln.title = self.summarize(vuln.description)
 
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
             vuln.reported_type = entry.get("cwe")
@@ -197,6 +203,25 @@ class CVEReader:
                 string = string[0:-6]  # Strip the timezone, it's horrible to deal with
                 parsed = datetime.strptime(string, DATE_FORMAT).replace(tzinfo=None)
                 return parsed - timedelta(microseconds=parsed.microsecond)
+
+    @staticmethod
+    def summarize(summary):
+        summary = match_different_vector.sub("", summary)
+        summary = match_version_in_summary.sub("", summary)
+        summary = match_standalone_version.sub("\g<pre>", summary)
+        summary = match_spaces.sub(" ", summary)
+        summary = summary.strip(".")
+        period = summary.find(". ")
+
+        if period > 0:
+            if len(summary) >= period:
+                if summary[period] == "." and summary[period - 1] == ".":
+                    return summary
+                else:
+                    return summary[0:period]
+        else:
+            return summary
+        return summary[0:period] if period > 0 else summary
 
 
 class CPEMapper:

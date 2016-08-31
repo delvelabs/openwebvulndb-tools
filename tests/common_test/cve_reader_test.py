@@ -550,3 +550,46 @@ class RangeGuesserTest(TestCase):
         self.guesser.load("anything")
 
         self.assertEqual(["1.0", "1.2"], self.guesser.known_versions)
+
+
+class SummarizeTest(TestCase):
+
+    def setUp(self):
+        self.reader = CVEReader(storage=MagicMock())
+
+    def test_summarize_empty_is_nothing(self):
+        self.assertEqual("", self.reader.summarize(""))
+
+    def test_summarize_short_description_changes_nothing(self):
+        self.assertEqual("This is a short vulnerability description", self.reader.summarize("This is a short vulnerability description"))  # noqa
+
+    def test_summarize_strips_out_versions(self):
+        description = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post."  # noqa
+        summary = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post"  # noqa
+
+        self.assertEqual(summary, self.reader.summarize(description))
+
+    def test_strip_discovery_versions(self):
+        description = "XSS in 2.4.5 - critical"
+        self.assertEqual("XSS - critical", self.reader.summarize(description))
+
+    def test_only_preserve_first_sentence(self):
+        description = "Cross-site scripting (XSS) vulnerability in wp-1pluginjquery.php in the ZooEffect plugin 1.01 for WordPress allows remote attackers to inject arbitrary web script or HTML via the page parameter.  NOTE: some of these details are obtained from third party information. NOTE: this has been disputed by a third party."  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in wp-1pluginjquery.php in the ZooEffect plugin for WordPress allows remote attackers to inject arbitrary web script or HTML via the page parameter", self.reader.summarize(description))  # noqa
+
+    def test_something_about_past_vulnerabilities(self):
+        self.maxDiff = None
+        description = "Multiple cross-site scripting (XSS) vulnerabilities in the Better WP Security (better_wp_security) plugin before 3.2.5 for WordPress allow remote attackers to inject arbitrary web script or HTML via unspecified vectors related to \"server variables,\" a different vulnerability than CVE-2012-4263."  # noqa
+        self.assertEqual("Multiple cross-site scripting (XSS) vulnerabilities in the Better WP Security (better_wp_security) plugin for WordPress allow remote attackers to inject arbitrary web script or HTML via unspecified vectors related to \"server variables,\"", self.reader.summarize(description))  # noqa
+
+    def test_path_traversal(self):
+        description = "Multiple directory traversal vulnerabilities in WordPress 2.0.11 and earlier allow remote attackers to read arbitrary files via a .. (dot dot) in (1) the page parameter to certain PHP scripts under wp-admin/ or (2) the import parameter to wp-admin/admin.php, as demonstrated by discovering the full path via a request for the \\..\\..\\wp-config pathname; and allow remote attackers to modify arbitrary files via a .. (dot dot) in the file parameter to wp-admin/templates.php."  # noqa
+        self.assertEqual("Multiple directory traversal vulnerabilities in WordPress allow remote attackers to read arbitrary files via a .. (dot dot) in (1) the page parameter to certain PHP scripts under wp-admin/ or (2) the import parameter to wp-admin/admin.php, as demonstrated by discovering the full path via a request for the \\..\\..\\wp-config pathname; and allow remote attackers to modify arbitrary files via a .. (dot dot) in the file parameter to wp-admin/templates.php", self.reader.summarize(description))  # noqa
+
+    def test_did_not_check_everything(self):
+        description = "Cross-site scripting (XSS) vulnerability in wpsc-admin/display-sales-logs.php in WP e-Commerce plugin 3.8.7.1 and possibly earlier for WordPress allows remote attackers to inject arbitrary web script or HTML via the custom_text parameter.  NOTE: some of these details are obtained from third party information"  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in wpsc-admin/display-sales-logs.php in WP e-Commerce plugin for WordPress allows remote attackers to inject arbitrary web script or HTML via the custom_text parameter", self.reader.summarize(description))  # noqa
+
+    def test_possibly_did_not_check_everything(self):
+        description = "Cross-site scripting (XSS) vulnerability in post_alert.php in Alert Before Your Post plugin, possibly 0.1.1 and earlier, for WordPress allows remote attackers to inject arbitrary"  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in post_alert.php in Alert Before Your Post plugin for WordPress allows remote attackers to inject arbitrary", self.reader.summarize(description))  # noqa
