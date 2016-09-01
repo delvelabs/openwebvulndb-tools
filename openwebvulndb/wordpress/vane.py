@@ -162,8 +162,14 @@ class VaneImporter:
         out = OrderedDict()
         out["id"] = vuln.id
 
+        def apply_title(r):
+            if r.introduced_in is not None:
+                out["title"] = "%s (%s+)" % (out["title"], r.introduced_in)
+
         if vuln.title is not None:
             out["title"] = vuln.title
+        if vuln.cvss is not None:
+            out["cvss"] = vuln.cvss
         if vuln.reported_type is not None:
             out["vuln_type"] = vuln.reported_type
         if vuln.updated_at is not None:
@@ -174,12 +180,14 @@ class VaneImporter:
         if for_version is not None:
             for r in vuln.affected_versions:
                 if r.fixed_in is not None and r.contains(for_version):
+                    apply_title(r)
                     out["fixed_in"] = r.fixed_in
                     break
         else:
             versions = [r.fixed_in for r in vuln.affected_versions if r.fixed_in is not None]
             if len(versions) > 0:
                 versions = VersionCompare.sorted(versions)
+                apply_title(vuln.affected_versions[0])
                 out["fixed_in"] = versions[-1]
 
         out.update(cls.extract_references(vuln))

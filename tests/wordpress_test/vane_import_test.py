@@ -346,6 +346,13 @@ class VaneExportTest(TestCase):
             "vuln_type": "LFI",
         })
 
+    def test_vuln_cvss(self):
+        v = Vulnerability(id="1234", cvss=2.6)
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "cvss": 2.6,
+        })
+
     @freeze_time("2016-08-12 10:31:22.123Z")
     def test_dump_vulnerabilities_dates(self):
         v = Vulnerability(id="1234",
@@ -381,24 +388,51 @@ class VaneExportTest(TestCase):
         })
 
     def test_dump_vulnerability_finds_appropriate_fixed_in(self):
-        v = Vulnerability(id="1234", affected_versions=[
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
             VersionRange(fixed_in="1.7"),
             VersionRange(introduced_in="2.0", fixed_in="2.4"),
             VersionRange(introduced_in="3.0", fixed_in="3.3"),
         ])
-        self.assertEqual(self.importer.dump_vulnerability(v, for_version="2.2"), {
+        dumped = self.importer.dump_vulnerability(v, for_version="2.2")
+        self.assertEqual(dumped, {
             "id": "1234",
+            "title": "My Description (2.0+)",
             "fixed_in": "2.4",
         })
 
+    def test_dump_vulnerability_finds_appropriate_fixed_in_in_lower_bound(self):
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
+            VersionRange(fixed_in="1.7"),
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        dumped = self.importer.dump_vulnerability(v, for_version="1.5")
+        self.assertEqual(dumped, {
+            "id": "1234",
+            "title": "My Description",
+            "fixed_in": "1.7",
+        })
+
     def test_dump_vulnerability_pick_highest_when_nothing_relative_specified(self):
-        v = Vulnerability(id="1234", affected_versions=[
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
             VersionRange(fixed_in="1.7"),
             VersionRange(introduced_in="2.0", fixed_in="2.4"),
             VersionRange(introduced_in="3.0", fixed_in="3.3"),
         ])
         self.assertEqual(self.importer.dump_vulnerability(v), {
             "id": "1234",
+            "title": "My Description",
+            "fixed_in": "3.3",
+        })
+
+    def test_dump_vulnerability_pick_highest_when_nothing_relative_specified_with_closed_range(self):
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "title": "My Description (2.0+)",
             "fixed_in": "3.3",
         })
 
