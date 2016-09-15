@@ -229,7 +229,7 @@ class StorageTest(TestCase):
         empty = file_path(__file__, '')
 
         storage = Storage(empty)
-        self.assertEqual(storage.list_directories('') - {'__pycache__'}, set())
+        self.assertEqual(storage.list_directories('securityfocus/samples') - {'__pycache__'}, set())
 
     def test_read_path_with_data(self):
         empty = file_path(__file__, '')

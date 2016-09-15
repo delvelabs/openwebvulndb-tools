@@ -141,3 +141,14 @@ class InfoTabParser:
     def get_not_vulnerable_versions(self):
         not_vuln_versions_list = self._parse_not_vulnerable_versions()
         return not_vuln_versions_list
+
+
+"""The parser for the reference tab of vulnerabilities in the security focus database."""
+class ReferenceTabParser:
+
+    def __init__(self):
+        self.html_tree = None
+
+    def set_html_page(self, filename):
+        parser = etree.HTMLParser()
+        self.html_tree = etree.parse(filename, parser)
