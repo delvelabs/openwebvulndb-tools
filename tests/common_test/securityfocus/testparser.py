@@ -18,8 +18,8 @@ class TestInfoTabParser(unittest.TestCase):
         self.assertEqual(parser.get_publication_date(), datetime(2016, 9, 7, 0, 0))
         self.assertEqual(parser.get_last_update_date(), datetime(2016, 9, 7, 0, 0))
         self.assertEqual(parser.get_credit(), "SumOfPwn researcher Cengiz Han Sahin and Dominik Schilling of WordPress.")
-        """ self.assertEqual(parser.get_introduced_in(), "0.6.2")
-        self.assertEqual(parser.get_fixed_in(), "4.6.1")"""
+        # TODO add tests for vulnerable versions.
+        self.assertEqual(parser.get_not_vulnerable_versions(), ["WordPress WordPress 4.6.1"])
         
     def test_parse_plugin_vuln_no_cve(self):
         parser = InfoTabParser()
@@ -33,8 +33,8 @@ class TestInfoTabParser(unittest.TestCase):
         self.assertEqual(parser.get_publication_date(), datetime(2009, 12, 7, 0, 0))
         self.assertEqual(parser.get_last_update_date(), datetime(2016, 9, 2, 20, 0))
         self.assertEqual(parser.get_credit(), "Henri Salo")
-        """self.assertEqual(parser.get_introduced_in(), "1.7.2")
-        self.assertEqual(parser.get_fixed_in(), "1.7.2.1")"""
+        self.assertEqual(parser.get_vulnerable_versions(), ["WordPress WassUp  1.7.2"])
+        self.assertEqual(parser.get_not_vulnerable_versions(), ["WordPress WassUp  1.7.2.1"])
         
     def test_parse_wordpress_vuln_with_cve(self):
         parser = InfoTabParser()
@@ -48,8 +48,8 @@ class TestInfoTabParser(unittest.TestCase):
         self.assertEqual(parser.get_publication_date(), datetime(2016, 8, 20, 0, 0))
         self.assertEqual(parser.get_last_update_date(), datetime(2016, 8, 20, 0, 0))
         self.assertEqual(parser.get_credit(), "Yorick Koster")
-        """self.assertEqual(parser.get_introduced_in(), "4.5.3")
-        self.assertEqual(parser.get_fixed_in(), "4.6")"""
+        self.assertEqual(parser.get_vulnerable_versions(), ['WordPress WordPress  4.5.3'])
+        self.assertEqual(parser.get_not_vulnerable_versions(), ['WordPress WordPress  4.6'])
     
     def test_parse_plugin_vuln_with_cve(self):
         parser = InfoTabParser()
@@ -63,8 +63,8 @@ class TestInfoTabParser(unittest.TestCase):
         self.assertEqual(parser.get_publication_date(), datetime(2016, 7, 20, 0, 0))
         self.assertEqual(parser.get_last_update_date(), datetime(2016, 7, 20, 0, 0))
         self.assertEqual(parser.get_credit(), "Gen Sato of TRADE WORKS Co.,Ltd. Security Dept.")
-        """self.assertEqual(parser.get_introduced_in(), "1.0.10")
-        self.assertEqual(parser.get_fixed_in(), "1.0.11")"""
+        self.assertEqual(parser.get_vulnerable_versions(), ["WordPress Nofollow Links 1.0.10"])
+        self.assertEqual(parser.get_not_vulnerable_versions(), ["WordPress Nofollow Links 1.0.11"])
 
         
 unittest.main()

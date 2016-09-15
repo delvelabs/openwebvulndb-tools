@@ -82,7 +82,27 @@ class InfoTabParser:
         minutes = int(str_min)
         date = datetime(year, month, day, hour, minutes)
         return date
-        
+
+    # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
+    def _parse_vulnerable_versions(self):
+        vuln_versions_list = self.html_tree.xpath('//span[text() = "Vulnerable:"]/../../td[2]/text()')
+        for i in range(len(vuln_versions_list)):
+            vuln_versions_list[i] = vuln_versions_list[i].strip()
+            # removes the empty string add at the end of the versions list because of the <br> tag.
+        for string in vuln_versions_list:
+            if len(string) == 0:
+                vuln_versions_list.remove(string)
+        return vuln_versions_list
+
+    def _parse_not_vulnerable_versions(self):
+        versions_list = self.html_tree.xpath('//span[text() = "Not Vulnerable:"]/../../td[2]/text()')
+        for i in range(len(versions_list)):
+            versions_list[i] = versions_list[i].strip()
+            # removes the empty string add at the end of the versions list because of the <br> tag.
+            if len(versions_list[i]) == 0:
+                del versions_list[i]
+        return versions_list
+
     def get_title(self):
         # return le text dans tous les elements span avec l'attribut class ayant la valeur "title"
         title = self.html_tree.xpath('//span[@class="title"]/text()')
@@ -114,10 +134,10 @@ class InfoTabParser:
     def get_credit(self):
         return self._parse_element("Credit:")
 
-    # TODO introduced_in and fixed_in in another method because many versions can be listed. Method should find the
-    # first vulnerable version or list all the versions?
-    def get_introduced_in(self):
-        return self.introducedIn
+    def get_vulnerable_versions(self):
+        vuln_versions_list = self._parse_vulnerable_versions()
+        return vuln_versions_list
         
-    def get_fixed_in(self):
-        return self.fixedIn
+    def get_not_vulnerable_versions(self):
+        not_vuln_versions_list = self._parse_not_vulnerable_versions()
+        return not_vuln_versions_list
