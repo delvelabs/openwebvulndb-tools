@@ -1,6 +1,8 @@
 import pycurl
 from io import BytesIO
 
+"""simple program to download a html page from an url."""
+
 def get_sample(url, dest_file_name):
     buffer = BytesIO()
     print(url)
