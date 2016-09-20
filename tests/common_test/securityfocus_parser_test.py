@@ -8,7 +8,7 @@ class InfoTabParserTest(unittest.TestCase):
     
     def test_parse_wordpress_vuln_no_cve(self):
         parser = InfoTabParser()
-        parser.set_html_page(file_path("samples/wordpress_vuln_no_cve.html", __file__))
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_no_cve.html"))
         self.assertEqual(parser.get_title(), "WordPress Cross Site Scripting And Directory Traversal Vulnerabilities")
         self.assertEqual(parser.get_bugtraq_id(), "92841")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
@@ -23,7 +23,7 @@ class InfoTabParserTest(unittest.TestCase):
         
     def test_parse_plugin_vuln_no_cve(self):
         parser = InfoTabParser()
-        parser.set_html_page(file_path("samples/plugin_vuln_no_cve.html", __file__))
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_no_cve.html"))
         self.assertEqual(parser.get_title(), "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "73931")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
@@ -38,7 +38,7 @@ class InfoTabParserTest(unittest.TestCase):
         
     def test_parse_wordpress_vuln_with_cve(self):
         parser = InfoTabParser()
-        parser.set_html_page(file_path("samples/wordpress_vuln_with_cve.html", __file__))
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_with_cve.html"))
         self.assertEqual(parser.get_title(), "WordPress CVE-2016-6897 Cross Site Request Forgery Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "92572")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
@@ -53,7 +53,7 @@ class InfoTabParserTest(unittest.TestCase):
     
     def test_parse_plugin_vuln_with_cve(self):
         parser = InfoTabParser()
-        parser.set_html_page(file_path("samples/plugin_vuln_with_cve.html", __file__))
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_with_cve.html"))
         self.assertEqual(parser.get_title(), "WordPress Nofollow Links Plugin 'nofollow-links.php' Cross Site Scripting Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "92077")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")

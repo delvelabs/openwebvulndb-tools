@@ -1,6 +1,8 @@
 from lxml import etree
 from datetime import datetime
 
+# %b = abbreviated month (Jan), %d = zero-padded day of month, %Y = year with century (2016), %I = hour in 12h format, %M = zero-padded minutes, %p = AM or PM.
+securityfocus_date_format = "%b %d %Y %I:%M%p"
 
 """The parser for the info tab of vulnerabilities in the security focus database."""
 class InfoTabParser:
@@ -25,63 +27,6 @@ class InfoTabParser:
             return None
         else:
             return element_value
-
-    """Convert a month represented by a 3 letter string (ex: "Dec" for december) to its number (ex: "Dec" return 12)."""
-    def _month_str_to_month_number(self, month_str):
-        if month_str == "Jan":
-            return 1
-        elif month_str == "Feb":
-            return 2
-        elif month_str == "Mar":
-            return 3
-        elif month_str == "Apr":
-            return 4
-        elif month_str == "May":
-            return 5
-        elif month_str == "Jun":
-            return 6
-        elif month_str == "Jul":
-            return 7
-        elif month_str == "Aug":
-            return 8
-        elif month_str == "Sep":
-            return 9
-        elif month_str == "Oct":
-            return 10
-        elif month_str == "Nov":
-            return 11
-        elif month_str == "Dec":
-            return 12
-        else:
-            return 0
-
-    """Convert the date in the string str_date into a datetime.datetime object. The format for the input string is:
-        'Mmm dd yyyy hh:mmAP', where Mmm is the first three letters of the month (first one is uppercase), dd is the day
-         in two digit, yyyy is the year, hh::mm is the hour and the minutes and AP is 'AM' or 'PM'."""
-    def _string_date_to_datetime_object(self, str_date):
-        date_elements = str_date.split(' ')
-        str_month = date_elements[0]
-        str_day = date_elements[1]
-        str_year = date_elements[2]
-        hour_elements = date_elements[3].split(':')
-        str_hour = hour_elements[0]
-        str_min = (hour_elements[1])[0:2]
-        if (hour_elements[1])[2:4] == "PM":
-            pm = True
-        else:
-            pm = False
-        month = self._month_str_to_month_number(str_month)
-        day = int(str_day)
-        year = int(str_year)
-        hour = int(str_hour)
-        if pm:
-            if hour < 12:
-                hour += 12
-        elif hour == 12:
-            hour = 0
-        minutes = int(str_min)
-        date = datetime(year, month, day, hour, minutes)
-        return date
 
     # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
     def _parse_vulnerable_versions(self):
@@ -125,11 +70,13 @@ class InfoTabParser:
         
     def get_publication_date(self):
         string_date = self._parse_element("Published:")
-        return self._string_date_to_datetime_object(string_date)
+        date = datetime.strptime(string_date, securityfocus_date_format)
+        return date
 
     def get_last_update_date(self):
         string_date = self._parse_element("Updated:")
-        return self._string_date_to_datetime_object(string_date)
+        date = datetime.strptime(string_date, securityfocus_date_format)
+        return date
         
     def get_credit(self):
         return self._parse_element("Credit:")
