@@ -99,3 +99,16 @@ class ReferenceTabParser:
     def set_html_page(self, filename):
         parser = etree.HTMLParser()
         self.html_tree = etree.parse(filename, parser)
+
+    def _get_reference_parent_tag(self):
+        return self.html_tree.xpath('//div[@id="vulnerability"]/ul')[0]  # returns the first ul tag in div vulnerability
+
+    def get_references(self):
+        references_list = []
+        parent_ul_tag = self._get_reference_parent_tag()
+        for li in list(parent_ul_tag):  # create a list with all the li elements.
+            a_tag = list(li)[0]
+            description = a_tag.text + a_tag.tail
+            url = li.xpath('a/@href')[0]
+            references_list.append([description, url])
+        return references_list
