@@ -60,7 +60,24 @@ class InfoTabParser:
         return self._parse_element("Class:")
         
     def get_cve_id(self):
-        return self._parse_element("CVE:")
+        # Get the td element with the cve id:
+        td_element = self.html_tree.xpath('//span[text() = "' + "CVE:" + '"]/../../td[2]')
+        td_element = td_element[0]
+        cve = td_element.text.strip()
+        if len(cve) == 0:
+            return None
+        cve_ids = []
+        cve_ids.append(cve)
+        for br_tag in td_element:
+            cve = br_tag.tail
+            if cve is not None:
+                cve = cve.strip()
+                if len(cve) != 0:
+                    cve_ids.append(cve)
+        if len(cve_ids) == 1:
+            return cve_ids[0]
+        else:
+            return cve_ids
         
     def is_vuln_remote(self):
         return self._parse_element("Remote:")
@@ -83,10 +100,14 @@ class InfoTabParser:
 
     def get_vulnerable_versions(self):
         vuln_versions_list = self._parse_vulnerable_versions()
+        if len(vuln_versions_list) == 0:
+            return None
         return vuln_versions_list
         
     def get_not_vulnerable_versions(self):
         not_vuln_versions_list = self._parse_not_vulnerable_versions()
+        if len(not_vuln_versions_list) == 0:
+            return None
         return not_vuln_versions_list
 
 

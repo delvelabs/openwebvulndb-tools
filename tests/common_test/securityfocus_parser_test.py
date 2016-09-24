@@ -4,7 +4,7 @@ from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParse
     DiscussionTabParser, ExploitTabParser, SolutionTabParser
 from fixtures import file_path
 
-"""The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 4 samples for the test."""
+"""The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 5 samples for the test."""
 class InfoTabParserTest(unittest.TestCase):
     
     def test_parse_wordpress_vuln_no_cve(self):
@@ -66,6 +66,22 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_credit(), "Gen Sato of TRADE WORKS Co.,Ltd. Security Dept.")
         self.assertEqual(parser.get_vulnerable_versions(), ["WordPress Nofollow Links 1.0.10"])
         self.assertEqual(parser.get_not_vulnerable_versions(), ["WordPress Nofollow Links 1.0.11"])
+
+    def test_parse_plugin_vuln_multiple_cve(self):
+        parser = InfoTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_multiple_cve.html"))
+        self.assertEqual(parser.get_title(),
+                         "WordPress Connections Business Directory Plugin 2016-0770 Cross Site Scripting Vulnerability")
+        self.assertEqual(parser.get_bugtraq_id(), "82355")
+        self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
+        self.assertEqual(parser.get_cve_id(), ["CVE-2016-0770", "CVE-2016-0770", "CVE-2016-0770", "CVE-2016-0770"])
+        self.assertEqual(parser.is_vuln_remote(), "Yes")
+        self.assertEqual(parser.is_vuln_local(), "No")
+        self.assertEqual(parser.get_publication_date(), datetime(2016, 2, 1, 0, 0))
+        self.assertEqual(parser.get_last_update_date(), datetime(2016, 7, 6, 12, 13))
+        self.assertEqual(parser.get_credit(), "Larry Cashdollar.")
+        self.assertEqual(parser.get_vulnerable_versions(), None)
+        self.assertEqual(parser.get_not_vulnerable_versions(), None)
 
 
 class ReferenceTabParserTest(unittest.TestCase):
