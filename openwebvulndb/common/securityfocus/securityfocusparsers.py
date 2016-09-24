@@ -112,3 +112,70 @@ class ReferenceTabParser:
             url = li.xpath('a/@href')[0]
             references_list.append([description, url])
         return references_list
+
+
+"""The parser for the discussion tab of the vulnerabilities in the security focus database."""
+class DiscussionTabParser:
+
+    def __init__(self):
+        self.html_tree = None
+
+    def set_html_page(self, filename):
+        parser = etree.HTMLParser()
+        self.html_tree = etree.parse(filename, parser)
+
+    def get_discussion(self):
+        div_tag = self.html_tree.xpath('//div[@id="vulnerability"]')[0]  # The div that contains the discussion text.
+        discussion_text = ""
+        for br_tag in div_tag:  # the text of the discussion is contained after <br> tags in the div.
+            if br_tag.tag == 'br':
+                br_text = br_tag.tail
+                if br_text is not None:
+                    discussion_text += br_text.strip()
+        return discussion_text
+
+
+"""The parser for the exploit tab of the vulnerabilities in the security focus database."""
+class ExploitTabParser:
+
+    def __init__(self):
+        self.html_tree = None
+
+    def set_html_page(self, filename):
+        parser = etree.HTMLParser()
+        self.html_tree = etree.parse(filename, parser)
+
+    def get_exploit_description(self):
+        div_tag = self.html_tree.xpath('//div[@id="vulnerability"]')[0]  # the div that contains the exploit description
+        exploit_description = ''
+        for br_tag in div_tag:  # the description of the exploit is contained after <br> tags in the div.
+            if br_tag.tag == 'br':
+                text = br_tag.tail
+                if text is not None:
+                    if "Currently, we are not aware of any working exploits." in text:
+                        return None
+                    exploit_description += text.strip()
+        return exploit_description
+
+
+"""The parser for the solution tab of the vulnerabilities in the security focus database."""
+class SolutionTabParser:
+
+    def __init__(self):
+        self.html_tree = None
+
+    def set_html_page(self, filename):
+        parser = etree.HTMLParser()
+        self.html_tree = etree.parse(filename, parser)
+
+    def get_solution(self):
+        div_tag = self.html_tree.xpath('//div[@id="vulnerability"]')[0]  # The div that contains the text of the solution.
+        solution_description = ''
+        for br_tag in div_tag:  # the description of the solution is contained after <br> tags in the div.
+            if br_tag.tag == 'br':
+                text = br_tag.tail
+                if text is not None:
+                    if "Currently we are not aware of any" in text:
+                        return None
+                    solution_description += text.strip()
+        return solution_description

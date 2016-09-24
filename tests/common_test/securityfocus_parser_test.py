@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime
-from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParser, ReferenceTabParser
+from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParser, ReferenceTabParser, \
+    DiscussionTabParser, ExploitTabParser, SolutionTabParser
 from fixtures import file_path
 
 """The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 4 samples for the test."""
@@ -113,7 +114,7 @@ class DiscussionTabParserTest(unittest.TestCase):
         parser = DiscussionTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_discussion_2_paragraphs.html"))
         self.assertEqual(parser.get_discussion(), "OneLogin SAML SSO Plugin for WordPress is prone to an authentication "
-                                                  "bypass vulnerability. An attacker can exploit this issue to bypass "
+                                                  "bypass vulnerability.An attacker can exploit this issue to bypass "
                                                   "the authentication mechanism and perform unauthorized actions .")
 
     def test_parse_discussion_3_paragraphs(self):
@@ -123,8 +124,8 @@ class DiscussionTabParserTest(unittest.TestCase):
                                                   " vulnerability because it fails to properly sanitize user-supplied "
                                                   "input.An attacker may leverage this issue to execute arbitrary script "
                                                   "code in the browser of an unsuspecting user in the context of the "
-                                                  "affected site.This can allow the attacker to steal cookie-based "
-                                                  "authentication credentials and to launch other attacks. W3 Total "
+                                                  "affected site. This can allow the attacker to steal cookie-based "
+                                                  "authentication credentials and to launch other attacks.W3 Total "
                                                   "Cache 0.9.4.1 and prior are vulnerable.")
 
 
@@ -140,15 +141,15 @@ class ExploitTabParserTest(unittest.TestCase):
         parser = ExploitTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_exploit_description_2_paragraphs.html"))
         self.assertEqual(parser.get_exploit_description(), "The following exploit URL is available:https://www.example.com"
-                                                           "/wordpress/wp-admin/admin.php?page=w3tc_support&amp;amp;"
-                                                           "request_type=bug_report&amp;amp;payment&amp;amp;url=http://"
-                                                           "example1.com&amp;amp;name=test&amp;amp;email=test%40example2"
-                                                           ".com&amp;amp;twitter&amp;amp;phone&amp;amp;subject=test&amp;"
-                                                           "amp;description=test&amp;amp;forum_url&amp;amp;wp_login&amp;"
-                                                           "amp;wp_password&amp;amp;ftp_host&amp;amp;ftp_login&amp;amp;"
-                                                           "ftp_password&amp;amp;subscribe_releases&amp;amp;subscribe_"
-                                                           "customer&amp;amp;w3tc_error=support_request&amp;amp;request"
-                                                           "_id=&amp;lt;XSS&amp;gt;")
+                                                           "/wordpress/wp-admin/admin.php?page=w3tc_support&amp;"
+                                                           "request_type=bug_report&amp;payment&amp;url=http://"
+                                                           "example1.com&amp;name=test&amp;email=test%40example2"
+                                                           ".com&amp;twitter&amp;phone&amp;subject=test&"
+                                                           "amp;description=test&amp;forum_url&amp;wp_login&"
+                                                           "amp;wp_password&amp;ftp_host&amp;ftp_login&amp;"
+                                                           "ftp_password&amp;subscribe_releases&amp;subscribe_"
+                                                           "customer&amp;w3tc_error=support_request&amp;request"
+                                                           "_id=&lt;XSS&gt;")
 
     def test_parse_exploit_no_exploit(self):
         parser = ExploitTabParser()
