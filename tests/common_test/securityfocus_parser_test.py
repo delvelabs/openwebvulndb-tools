@@ -105,3 +105,66 @@ class ReferenceTabParserTest(unittest.TestCase):
                                                    ["Path traversal vulnerability in WordPress Core Ajax handlers (sumofpwn.nl)",
                                                     "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html"],
                                                    ["WordPress HomePage (WordPress)", "http://wordpress.com/"]])
+
+
+class DiscussionTabParserTest(unittest.TestCase):
+
+    def test_parse_discussion_2_paragraphs(self):
+        parser = DiscussionTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_discussion_2_paragraphs.html"))
+        self.assertEqual(parser.get_discussion(), "OneLogin SAML SSO Plugin for WordPress is prone to an authentication "
+                                                  "bypass vulnerability. An attacker can exploit this issue to bypass "
+                                                  "the authentication mechanism and perform unauthorized actions .")
+
+    def test_parse_discussion_3_paragraphs(self):
+        parser = DiscussionTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_discussion_3_paragraphs.html"))
+        self.assertEqual(parser.get_discussion(), "W3 Total Cache plugin for WordPress is prone to a cross-site scripting"
+                                                  " vulnerability because it fails to properly sanitize user-supplied "
+                                                  "input.An attacker may leverage this issue to execute arbitrary script "
+                                                  "code in the browser of an unsuspecting user in the context of the "
+                                                  "affected site.This can allow the attacker to steal cookie-based "
+                                                  "authentication credentials and to launch other attacks. W3 Total "
+                                                  "Cache 0.9.4.1 and prior are vulnerable.")
+
+
+class ExploitTabParserTest(unittest.TestCase):
+
+    def test_parse_exploit_description_1_paragraph(self):
+        parser = ExploitTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_exploit_description_1_paragraph.html"))
+        self.assertEqual(parser.get_exploit_description(), "To exploit this issue an attacker must entice an unsuspecting"
+                                                           " victim to follow a malicious URI.")
+
+    def test_parse_exploit_description_2_paragraphs(self):
+        parser = ExploitTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_exploit_description_2_paragraphs.html"))
+        self.assertEqual(parser.get_exploit_description(), "The following exploit URL is available:https://www.example.com"
+                                                           "/wordpress/wp-admin/admin.php?page=w3tc_support&amp;amp;"
+                                                           "request_type=bug_report&amp;amp;payment&amp;amp;url=http://"
+                                                           "example1.com&amp;amp;name=test&amp;amp;email=test%40example2"
+                                                           ".com&amp;amp;twitter&amp;amp;phone&amp;amp;subject=test&amp;"
+                                                           "amp;description=test&amp;amp;forum_url&amp;amp;wp_login&amp;"
+                                                           "amp;wp_password&amp;amp;ftp_host&amp;amp;ftp_login&amp;amp;"
+                                                           "ftp_password&amp;amp;subscribe_releases&amp;amp;subscribe_"
+                                                           "customer&amp;amp;w3tc_error=support_request&amp;amp;request"
+                                                           "_id=&amp;lt;XSS&amp;gt;")
+
+    def test_parse_exploit_no_exploit(self):
+        parser = ExploitTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_exploit_no_exploit.html"))
+        self.assertEqual(parser.get_exploit_description(), None)
+
+
+class SolutionTabParserTest(unittest.TestCase):
+
+    def test_parse_solution(self):
+        parser = SolutionTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_solution.html"))
+        self.assertEqual(parser.get_solution(), "Updates are available. Please see the references or vendor advisory "
+                                                "for more information.")
+
+    def test_parse_solution_no_solution(self):
+        parser = SolutionTabParser()
+        parser.set_html_page(file_path(__file__, "samples/securityfocus_solution_no_solution.html"))
+        self.assertEqual(parser.get_solution(), None)
