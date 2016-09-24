@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from datetime import datetime, timedelta
 
 from unittest import TestCase
@@ -34,7 +51,8 @@ class SerializeTest(TestCase):
         plugin = Meta(key="plugins/test-plugin",
                       name="Test Plugin",
                       url="http://example.com/plugins/test-plugin",
-                      repositories=[repo])
+                      repositories=[repo],
+                      hints=[Reference(type="test", id="hello")])
 
         schema = MetaSchema()
         as_string, _ = serialize(schema, plugin)
@@ -136,6 +154,7 @@ class SerializeTest(TestCase):
                              created_at=reference_date,
                              updated_at=reference_date + timedelta(days=6))
         vuln.add_affected_version(VersionRange(fixed_in="1.3"))
+        vuln.add_unaffected_version(VersionRange(fixed_in="2.4"))
         vuln.references.append(Reference(type="other", url="http://example.com/test"))
 
         data = serialize(schema, vuln, indent=None)[0]
@@ -147,6 +166,7 @@ class SerializeTest(TestCase):
 
         out, errors = schema.loads(data)
         self.assertEqual("1.3", out.affected_versions[0].fixed_in)
+        self.assertEqual("2.4", out.unaffected_versions[0].fixed_in)
         self.assertEqual("other", out.references[0].type)
 
     def test_serialize_vunlerability_list(self):

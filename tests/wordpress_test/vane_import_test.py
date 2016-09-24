@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch, call
 from fixtures import file_path, freeze_time
@@ -329,6 +346,13 @@ class VaneExportTest(TestCase):
             "vuln_type": "LFI",
         })
 
+    def test_vuln_cvss(self):
+        v = Vulnerability(id="1234", cvss=2.6)
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "cvss": 2.6,
+        })
+
     @freeze_time("2016-08-12 10:31:22.123Z")
     def test_dump_vulnerabilities_dates(self):
         v = Vulnerability(id="1234",
@@ -364,24 +388,51 @@ class VaneExportTest(TestCase):
         })
 
     def test_dump_vulnerability_finds_appropriate_fixed_in(self):
-        v = Vulnerability(id="1234", affected_versions=[
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
             VersionRange(fixed_in="1.7"),
             VersionRange(introduced_in="2.0", fixed_in="2.4"),
             VersionRange(introduced_in="3.0", fixed_in="3.3"),
         ])
-        self.assertEqual(self.importer.dump_vulnerability(v, for_version="2.2"), {
+        dumped = self.importer.dump_vulnerability(v, for_version="2.2")
+        self.assertEqual(dumped, {
             "id": "1234",
+            "title": "My Description (2.0+)",
             "fixed_in": "2.4",
         })
 
+    def test_dump_vulnerability_finds_appropriate_fixed_in_in_lower_bound(self):
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
+            VersionRange(fixed_in="1.7"),
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        dumped = self.importer.dump_vulnerability(v, for_version="1.5")
+        self.assertEqual(dumped, {
+            "id": "1234",
+            "title": "My Description",
+            "fixed_in": "1.7",
+        })
+
     def test_dump_vulnerability_pick_highest_when_nothing_relative_specified(self):
-        v = Vulnerability(id="1234", affected_versions=[
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
             VersionRange(fixed_in="1.7"),
             VersionRange(introduced_in="2.0", fixed_in="2.4"),
             VersionRange(introduced_in="3.0", fixed_in="3.3"),
         ])
         self.assertEqual(self.importer.dump_vulnerability(v), {
             "id": "1234",
+            "title": "My Description",
+            "fixed_in": "3.3",
+        })
+
+    def test_dump_vulnerability_pick_highest_when_nothing_relative_specified_with_closed_range(self):
+        v = Vulnerability(id="1234", title="My Description", affected_versions=[
+            VersionRange(introduced_in="2.0", fixed_in="2.4"),
+            VersionRange(introduced_in="3.0", fixed_in="3.3"),
+        ])
+        self.assertEqual(self.importer.dump_vulnerability(v), {
+            "id": "1234",
+            "title": "My Description (2.0+)",
             "fixed_in": "3.3",
         })
 

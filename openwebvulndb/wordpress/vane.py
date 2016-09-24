@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from datetime import datetime
 from heapq import heappush
 import json
@@ -145,8 +162,14 @@ class VaneImporter:
         out = OrderedDict()
         out["id"] = vuln.id
 
+        def apply_title(r):
+            if r.introduced_in is not None:
+                out["title"] = "%s (%s+)" % (out["title"], r.introduced_in)
+
         if vuln.title is not None:
             out["title"] = vuln.title
+        if vuln.cvss is not None:
+            out["cvss"] = vuln.cvss
         if vuln.reported_type is not None:
             out["vuln_type"] = vuln.reported_type
         if vuln.updated_at is not None:
@@ -157,12 +180,14 @@ class VaneImporter:
         if for_version is not None:
             for r in vuln.affected_versions:
                 if r.fixed_in is not None and r.contains(for_version):
+                    apply_title(r)
                     out["fixed_in"] = r.fixed_in
                     break
         else:
             versions = [r.fixed_in for r in vuln.affected_versions if r.fixed_in is not None]
             if len(versions) > 0:
                 versions = VersionCompare.sorted(versions)
+                apply_title(vuln.affected_versions[0])
                 out["fixed_in"] = versions[-1]
 
         out.update(cls.extract_references(vuln))

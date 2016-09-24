@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from datetime import datetime
@@ -177,17 +194,17 @@ class CPEMapperTest(TestCase):
             "cpe:2.3:a:wordpress:wordpress_mu": "mu",
         })
         self.assertTrue(self.mapper.loaded)
-        self.assertEqual("wordpress", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
-        self.assertEqual("mu", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress_mu:1.4.5"))
-        self.assertIsNone(self.mapper.lookup("cpe:2.3:a:wordpress:wordpress"))
+        self.assertEqual("wordpress", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress:1.4.5"))
+        self.assertEqual("mu", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress_mu:1.4.5"))
+        self.assertIsNone(self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress"))
 
-        self.assertIsNone(self.mapper.lookup("cpe:2.3:a:wr:woess"))
+        self.assertIsNone(self.mapper.lookup_cpe("cpe:2.3:a:wr:woess"))
 
     def test_lookup_can_ignore_version(self):
         self.mapper.load({
             "cpe:2.3:a:wordpress:wordpress": "wordpress",
         })
-        self.assertEqual("wordpress", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress", ignore_version=True))
+        self.assertEqual("wordpress", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress", ignore_version=True))
 
     def test_cannot_load_same_key_multiple_times(self):
         self.mapper.load({
@@ -201,7 +218,7 @@ class CPEMapperTest(TestCase):
     def test_load_from_meta_with_cpe_names(self):
         meta = Meta(key="hello", cpe_names=["cpe:2.3:a:wordpress:wordpress"])
         self.mapper.load_meta(meta)
-        self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
+        self.assertEqual("hello", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress:1.4.5"))
 
     def test_load_from_meta_without_cpe_names(self):
         meta = Meta(key="hello")
@@ -212,10 +229,21 @@ class CPEMapperTest(TestCase):
         meta = Meta(key="hello", cpe_names=["cpe:2.3:a:wordpress:wordpress"])
         self.mapper.storage.list_meta.return_value = [meta]
 
-        self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
-        self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
-        self.assertEqual("hello", self.mapper.lookup("cpe:2.3:a:wordpress:wordpress:1.4.5"))
+        self.assertEqual("hello", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress:1.4.5"))
+        self.assertEqual("hello", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress:1.4.5"))
+        self.assertEqual("hello", self.mapper.lookup_cpe("cpe:2.3:a:wordpress:wordpress:1.4.5"))
         self.mapper.storage.list_meta.assert_called_once_with()
+
+    def test_load_from_meta_with_hints(self):
+        meta = Meta(key="hello", hints=[
+            Reference(type="cve", id="1234-1234"),
+            Reference(type="test", id="11211"),
+        ])
+        self.mapper.load_meta(meta)
+        self.assertTrue(self.mapper.loaded)
+
+        self.assertEqual("hello", self.mapper.lookup_id("CVE-1234-1234"))
+        self.assertIsNone(self.mapper.lookup_id("11211"))
 
 
 class LookupVulnerabilityTest(TestCase):
@@ -223,10 +251,12 @@ class LookupVulnerabilityTest(TestCase):
     def setUp(self):
         self.manager = MagicMock()
         self.reader = CVEReader(storage=MagicMock(), vulnerability_manager=self.manager)
-        self.reader.load_mapping({
-            "cpe:2.3:a:wordpress:wordpress": "wordpress",
-            "cpe:2.3:a:wordpress:wordpress_mu": "mu",
-        })
+        self.reader.load_mapping(
+            cpe_mapping={
+                "cpe:2.3:a:wordpress:wordpress": "wordpress",
+                "cpe:2.3:a:wordpress:wordpress_mu": "mu",
+            }
+        )
 
     def test_lookup_does_not_exist(self):
         self.manager.find_vulnerability.side_effect = VulnerabilityNotFound()
@@ -256,6 +286,39 @@ class LookupVulnerabilityTest(TestCase):
         self.assertEqual(v.reported_type, "CWE-79")
 
         self.assertEqual("1234-2334", v.references[0].id)
+        self.assertEqual("http://example.com/133", v.references[1].url)
+
+    def test_lookup_based_on_hints(self):
+        self.reader.load_mapping(hint_mapping={
+            "9999-9999": "plugins/contact-form",
+        })
+        self.manager.find_vulnerability.side_effect = VulnerabilityNotFound()
+        self.manager.get_producer_list.return_value = VulnerabilityList(producer="CVEReader",
+                                                                        key="plugins/contact-form")
+
+        v = self.reader.read_one({
+            "id": "CVE-9999-9999",
+            "summary": "Some Text",
+            "cvss": 6.7,
+            "cwe": "CWE-79",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress",
+            ],
+            "references": [
+                "http://example.com/133",
+            ]
+        })
+        self.manager.find_vulnerability.assert_called_with("plugins/contact-form",
+                                                           match_reference=Reference(type="cve", id="9999-9999"))
+        self.manager.flush.assert_called_with()
+        self.manager.get_producer_list.assert_called_with("CVEReader", "plugins/contact-form")
+        self.assertEqual(v.id, "CVE-9999-9999")
+        self.assertEqual(v.title, "Some Text")
+        self.assertEqual(v.description, "Some Text")
+        self.assertEqual(v.cvss, 6.7)
+        self.assertEqual(v.reported_type, "CWE-79")
+
+        self.assertEqual("9999-9999", v.references[0].id)
         self.assertEqual("http://example.com/133", v.references[1].url)
 
     def test_only_override_description_when_old(self):
@@ -412,7 +475,7 @@ class RangeGuesserTest(TestCase):
         self.assertIn(VersionRange(fixed_in="2.4.5"), self.guess("XSS before 2.4.5 - critical", []))
 
     def test_with_complex_summary(self):
-        summary = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post."
+        summary = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post."  # noqa
         result = list(self.guess(summary, []))
         self.assertEqual(result, [
             VersionRange(fixed_in="3.7.5"),
@@ -421,7 +484,7 @@ class RangeGuesserTest(TestCase):
         ])
 
     def test_complex_summary_with_major(self):
-        summary = "Cross-site scripting (XSS) vulnerability in the media-playlists feature in WordPress before 3.9.x before 3.9.3 and 4.x before 4.0.1 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors."
+        summary = "Cross-site scripting (XSS) vulnerability in the media-playlists feature in WordPress before 3.9.x before 3.9.3 and 4.x before 4.0.1 allows remote attackers to inject arbitrary web script or HTML via unspecified vectors."  # noqa
         result = list(self.guess(summary, []))
         self.assertEqual(result, [
             VersionRange(introduced_in="3.9", fixed_in="3.9.3"),
@@ -487,3 +550,46 @@ class RangeGuesserTest(TestCase):
         self.guesser.load("anything")
 
         self.assertEqual(["1.0", "1.2"], self.guesser.known_versions)
+
+
+class SummarizeTest(TestCase):
+
+    def setUp(self):
+        self.reader = CVEReader(storage=MagicMock())
+
+    def test_summarize_empty_is_nothing(self):
+        self.assertEqual("", self.reader.summarize(""))
+
+    def test_summarize_short_description_changes_nothing(self):
+        self.assertEqual("This is a short vulnerability description", self.reader.summarize("This is a short vulnerability description"))  # noqa
+
+    def test_summarize_strips_out_versions(self):
+        description = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress before 3.7.5, 3.8.x before 3.8.5, and 3.9.x before 3.9.3 allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post."  # noqa
+        summary = "Cross-site scripting (XSS) vulnerability in the wptexturize function in WordPress allows remote attackers to inject arbitrary web script or HTML via crafted use of shortcode brackets in a text field, as demonstrated by a comment or a post"  # noqa
+
+        self.assertEqual(summary, self.reader.summarize(description))
+
+    def test_strip_discovery_versions(self):
+        description = "XSS in 2.4.5 - critical"
+        self.assertEqual("XSS - critical", self.reader.summarize(description))
+
+    def test_only_preserve_first_sentence(self):
+        description = "Cross-site scripting (XSS) vulnerability in wp-1pluginjquery.php in the ZooEffect plugin 1.01 for WordPress allows remote attackers to inject arbitrary web script or HTML via the page parameter.  NOTE: some of these details are obtained from third party information. NOTE: this has been disputed by a third party."  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in wp-1pluginjquery.php in the ZooEffect plugin for WordPress allows remote attackers to inject arbitrary web script or HTML via the page parameter", self.reader.summarize(description))  # noqa
+
+    def test_something_about_past_vulnerabilities(self):
+        self.maxDiff = None
+        description = "Multiple cross-site scripting (XSS) vulnerabilities in the Better WP Security (better_wp_security) plugin before 3.2.5 for WordPress allow remote attackers to inject arbitrary web script or HTML via unspecified vectors related to \"server variables,\" a different vulnerability than CVE-2012-4263."  # noqa
+        self.assertEqual("Multiple cross-site scripting (XSS) vulnerabilities in the Better WP Security (better_wp_security) plugin for WordPress allow remote attackers to inject arbitrary web script or HTML via unspecified vectors related to \"server variables,\"", self.reader.summarize(description))  # noqa
+
+    def test_path_traversal(self):
+        description = "Multiple directory traversal vulnerabilities in WordPress 2.0.11 and earlier allow remote attackers to read arbitrary files via a .. (dot dot) in (1) the page parameter to certain PHP scripts under wp-admin/ or (2) the import parameter to wp-admin/admin.php, as demonstrated by discovering the full path via a request for the \\..\\..\\wp-config pathname; and allow remote attackers to modify arbitrary files via a .. (dot dot) in the file parameter to wp-admin/templates.php."  # noqa
+        self.assertEqual("Multiple directory traversal vulnerabilities in WordPress allow remote attackers to read arbitrary files via a .. (dot dot) in (1) the page parameter to certain PHP scripts under wp-admin/ or (2) the import parameter to wp-admin/admin.php, as demonstrated by discovering the full path via a request for the \\..\\..\\wp-config pathname; and allow remote attackers to modify arbitrary files via a .. (dot dot) in the file parameter to wp-admin/templates.php", self.reader.summarize(description))  # noqa
+
+    def test_did_not_check_everything(self):
+        description = "Cross-site scripting (XSS) vulnerability in wpsc-admin/display-sales-logs.php in WP e-Commerce plugin 3.8.7.1 and possibly earlier for WordPress allows remote attackers to inject arbitrary web script or HTML via the custom_text parameter.  NOTE: some of these details are obtained from third party information"  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in wpsc-admin/display-sales-logs.php in WP e-Commerce plugin for WordPress allows remote attackers to inject arbitrary web script or HTML via the custom_text parameter", self.reader.summarize(description))  # noqa
+
+    def test_possibly_did_not_check_everything(self):
+        description = "Cross-site scripting (XSS) vulnerability in post_alert.php in Alert Before Your Post plugin, possibly 0.1.1 and earlier, for WordPress allows remote attackers to inject arbitrary"  # noqa
+        self.assertEqual("Cross-site scripting (XSS) vulnerability in post_alert.php in Alert Before Your Post plugin for WordPress allows remote attackers to inject arbitrary", self.reader.summarize(description))  # noqa

@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from marshmallow import Schema, fields, post_load, validates_schema, ValidationError
 from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference
 from .models import VersionList, VersionDefinition, Signature
@@ -13,22 +30,6 @@ class RepositorySchema(Schema):
     @post_load
     def make(self, data):
         return Repository(**data)
-
-
-class MetaSchema(Schema):
-    class Meta:
-        ordered = True
-
-    key = fields.String(required=True)
-    name = fields.String(required=False, allow_none=True)
-    cpe_names = fields.List(fields.String(), required=False)
-    url = fields.Url(required=False, allow_none=True)
-    is_popular = fields.Boolean(required=False, allow_none=True)
-    repositories = fields.Nested(RepositorySchema, many=True, required=False)
-
-    @post_load
-    def make(self, data):
-        return Meta(**data)
 
 
 class ReferenceSchema(Schema):
@@ -47,6 +48,23 @@ class ReferenceSchema(Schema):
     @post_load
     def make(self, data):
         return Reference(**data)
+
+
+class MetaSchema(Schema):
+    class Meta:
+        ordered = True
+
+    key = fields.String(required=True)
+    name = fields.String(required=False, allow_none=True)
+    cpe_names = fields.List(fields.String(), required=False)
+    url = fields.Url(required=False, allow_none=True)
+    is_popular = fields.Boolean(required=False, allow_none=True)
+    repositories = fields.Nested(RepositorySchema, many=True, required=False)
+    hints = fields.Nested(ReferenceSchema, many=True, required=False)
+
+    @post_load
+    def make(self, data):
+        return Meta(**data)
 
 
 class VersionRangeSchema(Schema):
@@ -80,6 +98,7 @@ class VulnerabilitySchema(Schema):
     updated_at = fields.DateTime(required=False)
 
     affected_versions = fields.Nested(VersionRangeSchema, many=True, required=False)
+    unaffected_versions = fields.Nested(VersionRangeSchema, many=True, required=False)
     references = fields.Nested(ReferenceSchema, many=True, required=False)
 
     @post_load

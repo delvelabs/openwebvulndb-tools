@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 import re
 import json
 from datetime import datetime, timedelta
@@ -10,7 +27,10 @@ from .errors import VulnerabilityNotFound
 from .version import VersionCompare
 
 
-match_version_in_summary = re.compile(r'(?:(?:before )?(?P<intro>\d[\d\.]*)\.x )?before (?P<fix>\d[\d\.]+)')
+match_version_in_summary = re.compile(r'(?:(?:before |and )?(?P<intro>\d[\d\.]*)\.x )?before (?P<fix>\d[\d\.]+)(, )?')
+match_standalone_version = re.compile(r'(?P<pre>[^\w])(?:possibly )?(?:in )?(?P<intro>\d[\d\.]*)\.[x\d]*(?:,? and (?:possibly )?earlier)? ?')
+match_different_vector = re.compile(r',? (a )?(different|similar|related) (vulnerability|vector|vectors|issue) (than|to) CVE-\d+-\d+\.?')
+match_spaces = re.compile(r'(\s\s+|,\s+,\s+)')
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -34,8 +54,8 @@ class CVEReader:
         self.range_guesser = RangeGuesser(storage=storage)
         self.reference_manager = ReferenceManager()
 
-    def load_mapping(self, mapping):
-        self.cpe_mapper.load(mapping)
+    def load_mapping(self, *args, **kwargs):
+        self.cpe_mapper.load(*args, **kwargs)
 
     def read_file(self, file_name):
         with open(file_name, "r") as fp:
@@ -83,6 +103,9 @@ class CVEReader:
         apply_value("description", entry.get("summary"))
         apply_value("cvss", entry.get("cvss"))
 
+        if vuln.title == vuln.description:
+            vuln.title = self.summarize(vuln.description)
+
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
             vuln.reported_type = entry.get("cwe")
 
@@ -101,11 +124,16 @@ class CVEReader:
             vuln.add_affected_version(range)
 
     def identify_target(self, data):
+        if "id" in data:
+            from_id = self.cpe_mapper.lookup_id(data["id"])
+            if from_id is not None:
+                return from_id
+
         vuln_configurations = data.get("vulnerable_configuration", [])
 
         # If we have a known CPE with a version specified in the configuration, it applies
         for cpe in vuln_configurations:
-            key = self.cpe_mapper.lookup(cpe)
+            key = self.cpe_mapper.lookup_cpe(cpe)
             if key is not None:
                 return key
 
@@ -125,7 +153,7 @@ class CVEReader:
 
         # If none of the entries have specified versions, attempt to use the CPE names directly
         if not any_has_version:
-            values = [self.cpe_mapper.lookup(cpe, ignore_version=True) for cpe in vuln_configurations]
+            values = [self.cpe_mapper.lookup_cpe(cpe, ignore_version=True) for cpe in vuln_configurations]
             valid = [(10 - v.count("/"), v) for v in values if v is not None]
 
             # All CPE names must be known for this to apply, otherwise we always fall-back to the platform
@@ -176,26 +204,51 @@ class CVEReader:
                 parsed = datetime.strptime(string, DATE_FORMAT).replace(tzinfo=None)
                 return parsed - timedelta(microseconds=parsed.microsecond)
 
+    @staticmethod
+    def summarize(summary):
+        summary = match_different_vector.sub("", summary)
+        summary = match_version_in_summary.sub("", summary)
+        summary = match_standalone_version.sub("\g<pre>", summary)
+        summary = match_spaces.sub(" ", summary)
+        summary = summary.strip(".")
+        period = summary.find(". ")
+
+        if period > 0:
+            if len(summary) >= period:
+                if summary[period] == "." and summary[period - 1] == ".":
+                    return summary
+                else:
+                    return summary[0:period]
+        else:
+            return summary
+        return summary[0:period] if period > 0 else summary
+
 
 class CPEMapper:
 
     def __init__(self, *, storage):
         self.storage = storage
         self.rules = OrderedDict()
+        self.hints = dict()
         self.loaded = False
 
-    def load(self, mapping):
+    def load(self, cpe_mapping={}, hint_mapping={}):
+        def _load(mapping, output, message):
+            for k, v in mapping.items():
+                if k in output:
+                    raise KeyError(k, message)
+                else:
+                    output[k] = v
+
         self.loaded = True
-        for k, v in mapping.items():
-            if k in self.rules:
-                raise KeyError(k, "Item already defined")
-            else:
-                self.rules[k] = v
+        _load(cpe_mapping, self.rules, "CPE already defined")
+        _load(hint_mapping, self.hints, "Hint already defined")
 
     def load_meta(self, meta):
-        self.load({cpe: meta.key for cpe in meta.cpe_names or []})
+        self.load({cpe: meta.key for cpe in meta.cpe_names or []},
+                  {ref.id: meta.key for ref in meta.hints or [] if ref.id is not None and ref.type == "cve"})
 
-    def lookup(self, cpe, *, ignore_version=False):
+    def lookup_cpe(self, cpe, *, ignore_version=False):
         if not self.loaded:
             self.load_from_storage()
 
@@ -204,6 +257,13 @@ class CPEMapper:
                 return v
             elif cpe.startswith(k + ":"):
                 return v
+
+    def lookup_id(self, id):
+        if id.startswith("CVE-"):
+            id = id[4:]
+
+        if id in self.hints:
+            return self.hints[id]
 
     def load_from_storage(self):
         logger.info("Loading CPE mapping.")

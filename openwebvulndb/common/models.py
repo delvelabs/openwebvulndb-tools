@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from .errors import VulnerabilityNotFound, VersionNotFound
 from .basemodel import Model
 from .version import parse
@@ -6,13 +23,14 @@ from itertools import chain
 
 class Meta(Model):
 
-    def init(self, *, key, name=None, url=None, repositories=None, is_popular=None, cpe_names=None):
+    def init(self, *, key, name=None, url=None, repositories=None, is_popular=None, cpe_names=None, hints=None):
         self.key = key
         self.name = name
         self.cpe_names = cpe_names
         self.url = url
         self.is_popular = is_popular
         self.repositories = repositories or []
+        self.hints = hints or []
 
 
 class Repository(Model):
@@ -53,7 +71,7 @@ class VulnerabilityList(Model):
 class Vulnerability(Model):
 
     def init(self, *, id, title=None, reported_type=None, updated_at=None, created_at=None,
-             references=None, affected_versions=None, description=None, cvss=None):
+             references=None, affected_versions=None, unaffected_versions=None, description=None, cvss=None):
         self.id = id
         self.title = title
         self.cvss = cvss
@@ -63,9 +81,15 @@ class Vulnerability(Model):
         self.created_at = created_at
         self.references = references or []
         self.affected_versions = affected_versions or []
+        self.unaffected_versions = unaffected_versions or []
 
     def add_affected_version(self, range):
         if range.fixed_in is None and range.introduced_in is None:
+            return
+
+        if range.introduced_in is not None and any(u.contains(range.introduced_in) for u in self.unaffected_versions):
+            return
+        if range.fixed_in is not None and any(u.contains(range.fixed_in) for u in self.unaffected_versions):
             return
 
         # Check direct matches
@@ -82,6 +106,9 @@ class Vulnerability(Model):
             return
 
         self.affected_versions.append(range)
+
+    def add_unaffected_version(self, range):
+        self.unaffected_versions.append(range)
 
     def applies_to(self, version):
         # An applicable range means the vulnerability is applicable
