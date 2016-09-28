@@ -90,39 +90,39 @@ class ReferenceTabParserTest(unittest.TestCase):
     def test_parse_plugin_no_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_no_cve_references.html"))
-        self.assertEqual(parser.get_references(), [["CVE request: WordPress plugin wassup cross-site scripting vulnerability (Henri Salo)",
-                                                    "http://seclists.org/oss-sec/2015/q2/51"],
-                                                   ["WassUp Changelog (WordPress)", "http://wordpress.org/extend/plugins/wassup/changelog/"],
-                                                   ["WassUp Homepage (WordPress)", "http://wordpress.org/extend/plugins/wassup/"]])
+        self.assertEqual(parser.get_references(), [("CVE request: WordPress plugin wassup cross-site scripting vulnerability (Henri Salo)",
+                                                    "http://seclists.org/oss-sec/2015/q2/51"),
+                                                   ("WassUp Changelog (WordPress)", "http://wordpress.org/extend/plugins/wassup/changelog/"),
+                                                   ("WassUp Homepage (WordPress)", "http://wordpress.org/extend/plugins/wassup/")])
 
     def test_parse_plugin_with_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_with_cve_references.html"))
-        self.assertEqual(parser.get_references(), [["Nofollow Links Changelog Page (WordPress)",
-                                                    "https://wordpress.org/plugins/nofollow-links/changelog/"],
-                                                   ["WordPress HomePage (WordPress)", "http://wordpress.com/"],
-                                                   ["JVN#13582657 WordPress plugin 'Nofollow Links' vulnerable to cross-site scriptin (JPCERT/CC and IPA)",
-                                                    "https://jvn.jp/en/jp/JVN13582657/index.html"]])
+        self.assertEqual(parser.get_references(), [("Nofollow Links Changelog Page (WordPress)",
+                                                    "https://wordpress.org/plugins/nofollow-links/changelog/"),
+                                                   ("WordPress HomePage (WordPress)", "http://wordpress.com/"),
+                                                   ("JVN#13582657 WordPress plugin 'Nofollow Links' vulnerable to cross-site scriptin (JPCERT/CC and IPA)",
+                                                    "https://jvn.jp/en/jp/JVN13582657/index.html")])
 
     def test_parse_wordpress_no_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_no_cve_references.html"))
-        self.assertEqual(parser.get_references(), [["Media: Sanitize upload filename.  (WordPress)",
-                                                    "https://github.com/WordPress/WordPress/commit/c9e60dab176635d4bfaaf431c0ea891e4726d6e0"],
-                                                   ["WordPress HomePage (WordPress)", "http://wordpress.org/"],
-                                                   ["Upgrade/Install: Sanitize file name in `File_Upload_Upgrader`. (WordPress)",
-                                                    "https://github.com/WordPress/WordPress/commit/54720a14d85bc1197ded7cb09bd3ea790caa0b6e"],
-                                                   ["WordPress 4.6.1 Security and Maintenance Release (WordPress)",
-                                                    "https://wordpress.org/news/2016/09/wordpress-4-6-1-security-and-maintenance-release/"]])
+        self.assertEqual(parser.get_references(), [("Media: Sanitize upload filename.  (WordPress)",
+                                                    "https://github.com/WordPress/WordPress/commit/c9e60dab176635d4bfaaf431c0ea891e4726d6e0"),
+                                                   ("WordPress HomePage (WordPress)", "http://wordpress.org/"),
+                                                   ("Upgrade/Install: Sanitize file name in `File_Upload_Upgrader`. (WordPress)",
+                                                    "https://github.com/WordPress/WordPress/commit/54720a14d85bc1197ded7cb09bd3ea790caa0b6e"),
+                                                   ("WordPress 4.6.1 Security and Maintenance Release (WordPress)",
+                                                    "https://wordpress.org/news/2016/09/wordpress-4-6-1-security-and-maintenance-release/")])
 
     def test_parse_wordpress_with_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_with_cve_references.html"))
-        self.assertEqual(parser.get_references(), [[" Improve capability checks in wp_ajax_update_plugin() and wp_ajax_delete_plugin( (WordPress)",
-                                                    "https://core.trac.wordpress.org/ticket/37490"],
-                                                   ["Path traversal vulnerability in WordPress Core Ajax handlers (sumofpwn.nl)",
-                                                    "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html"],
-                                                   ["WordPress HomePage (WordPress)", "http://wordpress.com/"]])
+        self.assertEqual(parser.get_references(), [(" Improve capability checks in wp_ajax_update_plugin() and wp_ajax_delete_plugin( (WordPress)",
+                                                    "https://core.trac.wordpress.org/ticket/37490"),
+                                                   ("Path traversal vulnerability in WordPress Core Ajax handlers (sumofpwn.nl)",
+                                                    "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html"),
+                                                   ("WordPress HomePage (WordPress)", "http://wordpress.com/")])
 
 
 class DiscussionTabParserTest(unittest.TestCase):
@@ -131,7 +131,7 @@ class DiscussionTabParserTest(unittest.TestCase):
         parser = DiscussionTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_discussion_2_paragraphs.html"))
         self.assertEqual(parser.get_discussion(), "OneLogin SAML SSO Plugin for WordPress is prone to an authentication "
-                                                  "bypass vulnerability.An attacker can exploit this issue to bypass "
+                                                  "bypass vulnerability. An attacker can exploit this issue to bypass "
                                                   "the authentication mechanism and perform unauthorized actions .")
 
     def test_parse_discussion_3_paragraphs(self):
@@ -139,10 +139,10 @@ class DiscussionTabParserTest(unittest.TestCase):
         parser.set_html_page(file_path(__file__, "samples/securityfocus_discussion_3_paragraphs.html"))
         self.assertEqual(parser.get_discussion(), "W3 Total Cache plugin for WordPress is prone to a cross-site scripting"
                                                   " vulnerability because it fails to properly sanitize user-supplied "
-                                                  "input.An attacker may leverage this issue to execute arbitrary script "
-                                                  "code in the browser of an unsuspecting user in the context of the "
+                                                  "input. An attacker may leverage this issue to execute arbitrary script"
+                                                  " code in the browser of an unsuspecting user in the context of the "
                                                   "affected site. This can allow the attacker to steal cookie-based "
-                                                  "authentication credentials and to launch other attacks.W3 Total "
+                                                  "authentication credentials and to launch other attacks. W3 Total "
                                                   "Cache 0.9.4.1 and prior are vulnerable.")
 
 
@@ -157,8 +157,8 @@ class ExploitTabParserTest(unittest.TestCase):
     def test_parse_exploit_description_2_paragraphs(self):
         parser = ExploitTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_exploit_description_2_paragraphs.html"))
-        self.assertEqual(parser.get_exploit_description(), "The following exploit URL is available:https://www.example.com"
-                                                           "/wordpress/wp-admin/admin.php?page=w3tc_support&amp;"
+        self.assertEqual(parser.get_exploit_description(), "The following exploit URL is available: https://www.example"
+                                                           ".com/wordpress/wp-admin/admin.php?page=w3tc_support&amp;"
                                                            "request_type=bug_report&amp;payment&amp;url=http://"
                                                            "example1.com&amp;name=test&amp;email=test%40example2"
                                                            ".com&amp;twitter&amp;phone&amp;subject=test&"

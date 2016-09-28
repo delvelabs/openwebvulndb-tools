@@ -1,5 +1,6 @@
 from lxml import etree
 from datetime import datetime
+import re
 
 # %b = abbreviated month (Jan), %d = zero-padded day of month, %Y = year with century (2016), %I = hour in 12h format, %M = zero-padded minutes, %p = AM or PM.
 securityfocus_date_format = "%b %d %Y %I:%M%p"
@@ -169,7 +170,9 @@ class DiscussionTabParser:
             if br_tag.tag == 'br':
                 br_text = br_tag.tail
                 if br_text is not None:
-                    discussion_text += br_text.strip()
+                    discussion_text += br_text
+        discussion_text = re.sub(' {2,}', ' ', discussion_text)  # replace multiple spaces with one space
+        discussion_text = discussion_text.strip()  # Remove \n, \t, etc.
         return discussion_text
 
 
@@ -192,7 +195,9 @@ class ExploitTabParser:
                 if text is not None:
                     if "Currently, we are not aware of any working exploits." in text:
                         return None
-                    exploit_description += text.strip()
+                    exploit_description += text
+        exploit_description = re.sub(' {2,}', ' ', exploit_description)  # replace multiple white spaces with one space.
+        exploit_description = exploit_description.strip()  # Remove \n, \t, etc.
         return exploit_description
 
 
@@ -215,5 +220,7 @@ class SolutionTabParser:
                 if text is not None:
                     if "Currently we are not aware of any" in text:
                         return None
-                    solution_description += text.strip()
+                    solution_description += text
+        solution_description = re.sub(' {2,}', ' ', solution_description)  # replace multiple white spaces with one space.
+        solution_description = solution_description.strip()  # Remove \n, \t, etc.
         return solution_description
