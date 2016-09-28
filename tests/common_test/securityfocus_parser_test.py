@@ -4,8 +4,9 @@ from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParse
     DiscussionTabParser, ExploitTabParser, SolutionTabParser
 from fixtures import file_path
 
-"""The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 5 samples for the test."""
+
 class InfoTabParserTest(unittest.TestCase):
+    """The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 5 samples for the test."""
     
     def test_parse_wordpress_vuln_no_cve(self):
         parser = InfoTabParser()

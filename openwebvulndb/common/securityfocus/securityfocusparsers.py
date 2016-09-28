@@ -4,9 +4,24 @@ from datetime import datetime
 # %b = abbreviated month (Jan), %d = zero-padded day of month, %Y = year with century (2016), %I = hour in 12h format, %M = zero-padded minutes, %p = AM or PM.
 securityfocus_date_format = "%b %d %Y %I:%M%p"
 
-"""The parser for the info tab of vulnerabilities in the security focus database."""
+
 class InfoTabParser:
-    
+    """The parser for the info tab of a vulnerability entry in the security focus database.
+
+    The info tab can contain the following data about a vulnerability:
+    -Title (often takes the form of a short description)
+    -Bugtraq ID (Security focus' ID system for vulnerability)
+    -Class (type of vulnerability eg: Input validation error)
+    -CVE ID (if it has one)
+    -Remote (yes or no, if the vulnerability can be exploited remotly)
+    -Local (see remote)
+    -Publication date
+    -Last update date
+    -Credit
+    -Vulnerable versions
+    -not vulnerable versions
+    """
+
     def __init__(self):
         self.html_tree = None
         
@@ -14,11 +29,10 @@ class InfoTabParser:
         parser = etree.HTMLParser()
         self.html_tree = etree.parse(filename, parser)
 
-    """
-       Parse the elements in the info page that are contained in the <tr><td><span>element name</span></td><td>element
-       value</td></tr> pattern. This is the pattern for all elements except the title.
-    """
     def _parse_element(self, element_name):
+        """Parse the elements in the info page that are contained in the <tr><td><span>element name</span></td><td>element
+        value</td></tr> pattern. This is the pattern for all elements except the title.
+        """
         element_value = self.html_tree.xpath('//span[text() = "' + element_name + '"]/../../td[2]/text()')
         # removes the white spaces around the value in the <td> (the whitespaces not preceded by a non-whitespace char
         # to preserve the white space between the word in the value.)
@@ -111,8 +125,11 @@ class InfoTabParser:
         return not_vuln_versions_list
 
 
-"""The parser for the reference tab of vulnerabilities in the security focus database."""
 class ReferenceTabParser:
+    """The parser for the reference tab of vulnerability entry in the security focus database.
+
+    The reference tab contains external references about the vulnerability. A reference is a description with an URL.
+    """
 
     def __init__(self):
         self.html_tree = None
@@ -135,8 +152,8 @@ class ReferenceTabParser:
         return references_list
 
 
-"""The parser for the discussion tab of the vulnerabilities in the security focus database."""
 class DiscussionTabParser:
+    """The parser for the discussion tab of the vulnerability entry in the security focus database."""
 
     def __init__(self):
         self.html_tree = None
@@ -156,8 +173,8 @@ class DiscussionTabParser:
         return discussion_text
 
 
-"""The parser for the exploit tab of the vulnerabilities in the security focus database."""
 class ExploitTabParser:
+    """The parser for the exploit tab of the vulnerability entry in the security focus database."""
 
     def __init__(self):
         self.html_tree = None
@@ -179,8 +196,8 @@ class ExploitTabParser:
         return exploit_description
 
 
-"""The parser for the solution tab of the vulnerabilities in the security focus database."""
 class SolutionTabParser:
+    """The parser for the solution tab of the vulnerability entry in the security focus database."""
 
     def __init__(self):
         self.html_tree = None
