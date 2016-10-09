@@ -39,10 +39,9 @@ class SecurityFocusReader:
         except VulnerabilityNotFound:
             producer = self.vulnerability_manager.get_producer_list("security-focus", target)
             v = producer.get_vulnerability(entry['id'], create_missing=True)
-        #last_modified = self._get_last_modified(entry)
-        #updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
-        #allow_override = last_modified is None or updated_at is None or last_modified > updated_at
-        allow_override = True
+        last_modified = self._get_last_modified(entry)
+        updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
+        allow_override = last_modified is None or updated_at is None or last_modified > updated_at
         #self.range_guesser.load(target)
         self.apply_data(v, entry, allow_override=allow_override)
 
@@ -54,11 +53,13 @@ class SecurityFocusReader:
             if allow_override or getattr(vuln, field) is None:
                 setattr(vuln, field, value)
 
-        if vuln.title is None:
+        if vuln.title is None or allow_override:
             apply_value("title", entry['info_parser'].get_title())
 
-        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
+        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown" or allow_override:
             vuln.reported_type = entry['info_parser'].get_vuln_class()
+        if allow_override:
+            vuln.updated_at = self._get_last_modified(entry)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
@@ -115,3 +116,6 @@ class SecurityFocusReader:
             plugin_name = plugin_name.lower()
             return "plugins/" + plugin_name
         return None
+
+    def _get_last_modified(self, entry):
+        return entry['info_parser'].get_last_update_date()
