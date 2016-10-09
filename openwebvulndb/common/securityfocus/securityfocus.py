@@ -64,7 +64,6 @@ class SecurityFocusReader:
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
 
     def identify_target(self, entry):
-        print(entry['info_parser'].get_cve_id())
         if entry['info_parser'].get_cve_id() is not None:
             from_cve = self.cpe_mapper.lookup_id(entry['info_parser'].get_cve_id())
             if from_cve is not None:
@@ -100,6 +99,5 @@ class SecurityFocusReader:
             plugin_name = re.sub(" Plugin", '', plugin_name)
             plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
             plugin_name = plugin_name.lower()
-            print(plugin_name)
             return "plugins/" + plugin_name
         return None
