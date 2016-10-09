@@ -65,7 +65,7 @@ def test_securityfocus(loop, storage):
     reader = SecurityFocusReader(storage)
     session = aiohttp.ClientSession(loop=loop)
     fetcher = SecurityFocusVulnerabilityFetcher(session)
-    entry = loop.run_until_complete(fetcher.get_vulnerability_entry("92077", "/home/nicolas/delve-labs/openwebvulndb-tools/tests/common_test/samples/92077"))
+    entry = loop.run_until_complete(fetcher.get_vulnerability_entry("93104", "/home/nicolas/delve-labs/openwebvulndb-tools/tests/common_test/samples/93104"))
     session.close()
     reader.read_one(entry)
     loop.close()

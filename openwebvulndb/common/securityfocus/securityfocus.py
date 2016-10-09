@@ -62,15 +62,17 @@ class SecurityFocusReader:
 
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
+        if entry['info_parser'].get_cve_id() is not None:
+            ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])
 
     def identify_target(self, entry):
         if entry['info_parser'].get_cve_id() is not None:
             from_cve = self.cpe_mapper.lookup_id(entry['info_parser'].get_cve_id())
             if from_cve is not None:
                 return from_cve
-        #from_url = self._identify_from_url(entry['references_parser'])  # skip it because no reference tab is provided during the test.
-        #if from_url is not None:
-            #return from_url
+        from_url = self._identify_from_url(entry['references_parser'])
+        if from_url is not None:
+            return from_url
         return self._identify_from_name(entry)
 
     def _identify_from_url(self, references_parser):
@@ -78,18 +80,30 @@ class SecurityFocusReader:
             url = reference[1]
             match = match_svn.search(url) or match_website.search(url)
             if match:
+                print(match.group())
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
     def _identify_from_name(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
+        if self._is_wordpress(entry):
+            return "wordpress"
 
     def _is_plugin(self, entry):
         match = re.search("WordPress [\w\s]* Plugin", entry['info_parser'].get_title())
-        if len(match.group()) == 0:
+        if match is None or len(match.group()) == 0:
             return False
         else:
             return True
+
+    def _is_wordpress(self, entry):
+        match = re.search("([Pp]lugin[s?]|[Tt]heme[s?])", entry['info_parser'].get_title())
+        if match is None:
+            match = re.search("WordPress", entry['info_parser'].get_title())
+            if match is not None:
+                if len(match.group()) != 0:
+                    return True
+        return False
 
     def _get_plugin_name(self, entry):
         match = re.search("WordPress [\w\s]* Plugin", entry['info_parser'].get_title())
