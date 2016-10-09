@@ -1,5 +1,6 @@
 from .securityfocusparsers import InfoTabParser, ReferenceTabParser, DiscussionTabParser, SolutionTabParser, ExploitTabParser
 import json
+from io import StringIO
 
 
 class SecurityFocusVulnerabilityFetcher:
@@ -20,17 +21,22 @@ class SecurityFocusVulnerabilityFetcher:
         print("getting " + base_url + "/exploit")
         exploit_tab = await self.http_session.get(base_url + "/exploit")
         print("done getting html pages.")
+        info_tab_data = await info_tab.text()
+        reference_tab_data = await reference_tab.text()
+        solution_tab_data = await solution_tab.text()
+        discussion_tab_data = await discussion_tab.text()
+        exploit_tab_data = await exploit_tab.text()
         if dest_folder is not None:
             file_info = open(dest_folder + "/info_tab.html", 'wt')
             file_reference = open(dest_folder + "/references_tab.html", 'wt')
             file_discussion = open(dest_folder + "/discussion_tab.html", 'wt')
             file_solution = open(dest_folder + "/solution_tab.html", 'wt')
             file_exploit = open(dest_folder + "/exploit_tab.html", 'wt')
-            file_info.write(info_tab.content.text())
-            file_reference.write(reference_tab.content.text())
-            file_discussion.write(discussion_tab.content.text())
-            file_solution.write(solution_tab.content.text())
-            file_exploit.write(exploit_tab.content.text())
+            file_info.write(info_tab_data)
+            file_reference.write(reference_tab_data)
+            file_discussion.write(discussion_tab_data)
+            file_solution.write(solution_tab_data)
+            file_exploit.write(exploit_tab_data)
             file_info.close()
             file_reference.close()
             file_discussion.close()
@@ -38,15 +44,20 @@ class SecurityFocusVulnerabilityFetcher:
             file_exploit.close()
         entry = dict()
         info_tab_parser = InfoTabParser()
-        info_tab_parser.set_html_page(info_tab)
+        info_tab_parser.set_html_page(info_tab_data)
         reference_tab_parser = ReferenceTabParser()
-        reference_tab_parser.set_html_page(reference_tab)
+        reference_tab_parser.set_html_page(reference_tab_data)
         discussion_tab_parser = DiscussionTabParser()
-        discussion_tab_parser.set_html_page(discussion_tab)
+        discussion_tab_parser.set_html_page(discussion_tab_data)
         exploit_tab_parser = ExploitTabParser()
-        exploit_tab_parser.set_html_page(exploit_tab)
+        exploit_tab_parser.set_html_page(exploit_tab_data)
         solution_tab_parser = SolutionTabParser()
-        solution_tab_parser.set_html_page(solution_tab)
+        solution_tab_parser.set_html_page(solution_tab_data)
+        info_tab.close()
+        reference_tab.close()
+        solution_tab.close()
+        discussion_tab.close()
+        exploit_tab.close()
         entry['id'] = bugtraq_id
         entry['info_parser'] = info_tab_parser
         entry['references_parser'] = reference_tab_parser
