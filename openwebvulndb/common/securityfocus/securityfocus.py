@@ -69,6 +69,8 @@ class SecurityFocusReader:
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
         if entry['info_parser'].get_cve_id() is not None:
             ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])
+        for reference in entry['references_parser'].get_references():
+            ref_manager.include_url(reference[1])
 
     def identify_target(self, entry):
         if entry['info_parser'].get_cve_id() is not None:

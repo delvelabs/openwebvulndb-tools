@@ -43,6 +43,15 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
+        reference = vuln['references'][1]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://seclists.org/oss-sec/2015/q2/51")
+        reference = vuln['references'][2]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://wordpress.org/extend/plugins/wassup/changelog/")
+        reference = vuln['references'][3]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://wordpress.org/extend/plugins/wassup/")
         vuln_entry_file.close()
 
     def test_add_vuln_73931_to_database_allow_override(self):
@@ -73,11 +82,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['title'], "WordPress WassUp Plugin 'main.php' Fake Title")
         self.assertEqual(vuln['reported_type'], "Random Vuln Class")
         self.assertEqual(vuln['updated_at'], "2016-09-04T20:00:00+00:00")
-        self.assertEqual(vuln['created_at'], "2009-12-07T00:00:00+00:00")
-        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.7.2.1")
-        reference = vuln['references'][0]
-        self.assertEqual(reference['type'], "Bugtraq-ID")
-        self.assertEqual(reference['id'], bugtraq_id)
         vuln_entry_file.close()
 
     def test_add_vuln_73931_to_database_no_override(self):
@@ -108,11 +112,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['title'], "WordPress WassUp Plugin 'main.php' Fake Title")
         self.assertEqual(vuln['reported_type'], "Random Vuln Class")
         self.assertEqual(vuln['updated_at'], "2016-09-04T20:00:00+00:00")
-        self.assertEqual(vuln['created_at'], "2009-12-07T00:00:00+00:00")
-        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.7.2.1")
-        reference = vuln['references'][0]
-        self.assertEqual(reference['type'], "Bugtraq-ID")
-        self.assertEqual(reference['id'], bugtraq_id)
         vuln_entry_file.close()
 
     def test_add_vuln_92077_to_database(self):
@@ -152,6 +151,15 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reference = vuln['references'][1]
         self.assertEqual(reference['type'], "cve")
         self.assertEqual(reference['id'], "2016-4833")
+        reference = vuln['references'][2]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://wordpress.org/plugins/nofollow-links/changelog/")
+        reference = vuln['references'][3]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://wordpress.com/")
+        reference = vuln['references'][4]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://jvn.jp/en/jp/JVN13582657/index.html")
         vuln_entry_file.close()
 
     def test_add_vuln_92572_to_database(self):
@@ -191,6 +199,15 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reference = vuln['references'][1]
         self.assertEqual(reference['type'], "cve")
         self.assertEqual(reference['id'], "2016-6897")
+        reference = vuln['references'][2]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://core.trac.wordpress.org/ticket/37490")
+        reference = vuln['references'][3]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html")
+        reference = vuln['references'][4]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://wordpress.com/")
         vuln_entry_file.close()
 
     def test_add_vuln_92841_to_database(self):
@@ -225,4 +242,16 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
+        reference = vuln['references'][1]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://github.com/WordPress/WordPress/commit/c9e60dab176635d4bfaaf431c0ea891e4726d6e0")
+        reference = vuln['references'][2]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "http://wordpress.org/")
+        reference = vuln['references'][3]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://github.com/WordPress/WordPress/commit/54720a14d85bc1197ded7cb09bd3ea790caa0b6e")
+        reference = vuln['references'][4]
+        self.assertEqual(reference['type'], "other")
+        self.assertEqual(reference['url'], "https://wordpress.org/news/2016/09/wordpress-4-6-1-security-and-maintenance-release/")
         vuln_entry_file.close()

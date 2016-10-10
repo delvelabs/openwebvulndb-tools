@@ -14,7 +14,7 @@ class InfoTabParser:
     -Bugtraq ID (Security focus' ID system for vulnerability)
     -Class (type of vulnerability eg: Input validation error)
     -CVE ID (if it has one)
-    -Remote (yes or no, if the vulnerability can be exploited remotly)
+    -Remote (yes or no, if the vulnerability can be exploited remotely)
     -Local (see remote)
     -Publication date
     -Last update date
