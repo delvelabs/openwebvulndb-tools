@@ -37,6 +37,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability")
         self.assertEqual(vuln['reported_type'], "Input Validation Error")
+        self.assertEqual(vuln['updated_at'], "2016-09-02T20:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2009-12-07T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.7.2.1")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
@@ -69,6 +72,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress WassUp Plugin 'main.php' Fake Title")
         self.assertEqual(vuln['reported_type'], "Random Vuln Class")
+        self.assertEqual(vuln['updated_at'], "2016-09-04T20:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2009-12-07T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.7.2.1")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
@@ -101,6 +107,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress WassUp Plugin 'main.php' Fake Title")
         self.assertEqual(vuln['reported_type'], "Random Vuln Class")
+        self.assertEqual(vuln['updated_at'], "2016-09-04T20:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2009-12-07T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.7.2.1")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
@@ -134,6 +143,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress Nofollow Links Plugin 'nofollow-links.php' Cross Site Scripting Vulnerability")
         self.assertEqual(vuln['reported_type'], "Input Validation Error")
+        self.assertEqual(vuln['updated_at'], "2016-07-20T00:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2016-07-20T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "1.0.11")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
@@ -170,6 +182,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress CVE-2016-6897 Cross Site Request Forgery Vulnerability")
         self.assertEqual(vuln['reported_type'], "Input Validation Error")
+        self.assertEqual(vuln['updated_at'], "2016-08-20T00:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2016-08-20T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "4.6")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)
@@ -204,6 +219,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln['id'], bugtraq_id)
         self.assertEqual(vuln['title'], "WordPress Cross Site Scripting And Directory Traversal Vulnerabilities")
         self.assertEqual(vuln['reported_type'], "Input Validation Error")
+        self.assertEqual(vuln['updated_at'], "2016-09-07T00:00:00+00:00")
+        self.assertEqual(vuln['created_at'], "2016-09-07T00:00:00+00:00")
+        self.assertEqual(vuln['affected_versions'][0]['fixed_in'], "4.6.1")
         reference = vuln['references'][0]
         self.assertEqual(reference['type'], "Bugtraq-ID")
         self.assertEqual(reference['id'], bugtraq_id)

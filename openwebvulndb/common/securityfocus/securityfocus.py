@@ -1,7 +1,7 @@
 import json
 import re
 from openwebvulndb.common.logs import logger
-from openwebvulndb.common.models import Reference
+from openwebvulndb.common.models import Reference, VersionRange
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
@@ -42,7 +42,6 @@ class SecurityFocusReader:
         last_modified = self._get_last_modified(entry)
         updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
         allow_override = last_modified is None or updated_at is None or last_modified > updated_at
-        #self.range_guesser.load(target)
         self.apply_data(v, entry, allow_override=allow_override)
 
         self.vulnerability_manager.flush()
@@ -58,8 +57,13 @@ class SecurityFocusReader:
 
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown" or allow_override:
             vuln.reported_type = entry['info_parser'].get_vuln_class()
-        if allow_override:
-            vuln.updated_at = self._get_last_modified(entry)
+
+        apply_value('updated_at', self._get_last_modified(entry))
+        apply_value('created_at', entry['info_parser'].get_publication_date())
+        fixed_in = self._get_fixed_in(entry)
+        if fixed_in is not None:
+            version_range = VersionRange(fixed_in=fixed_in)
+            vuln.add_affected_version(version_range)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
@@ -119,3 +123,11 @@ class SecurityFocusReader:
 
     def _get_last_modified(self, entry):
         return entry['info_parser'].get_last_update_date()
+
+    def _get_fixed_in(self, entry):
+        version_str = entry['info_parser'].get_not_vulnerable_versions()[0]
+        if version_str is not None:
+            version = re.sub("WordPress (\D)*", '', version_str)
+            return version
+        else:
+            return None
