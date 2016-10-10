@@ -23,7 +23,7 @@ from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
-
+from ..common.securityfocus.securityfocusreader import test_securityfocus
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
@@ -86,7 +86,8 @@ operations = dict(list_themes=list_themes,
                   vane_import=vane_import,
                   vane_export=vane_export,
                   populate_versions=populate_versions,
-                  load_cve=load_cve)
+                  load_cve=load_cve,
+                  test_securityfocus=test_securityfocus)
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
 parser.add_argument("action", choices=operations.keys())
@@ -95,7 +96,6 @@ parser.add_argument('-i', '--input-path', dest='input_path',
 parser.add_argument('-f', '--input-file', dest='input_file',
                     help='Cached input file')
 args = parser.parse_args()
-
 
 try:
     local = app.sub(repository=WordPressRepository,

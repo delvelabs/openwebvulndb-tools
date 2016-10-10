@@ -1,6 +1,6 @@
 from .securityfocusparsers import InfoTabParser, ReferenceTabParser, DiscussionTabParser, SolutionTabParser, ExploitTabParser
 import json
-from io import StringIO
+import os
 
 
 class SecurityFocusVulnerabilityFetcher:
@@ -11,37 +11,56 @@ class SecurityFocusVulnerabilityFetcher:
     async def get_vulnerability_entry(self, bugtraq_id, dest_folder=None):  # Set dest_folder to store the html_pages and the entry in files for tests.
         base_url = "http://www.securityfocus.com/bid/" + bugtraq_id
         print("getting " + base_url + "/info")
-        info_tab = await self.http_session.get(base_url + "/info")
+        if dest_folder is not None and os.path.isfile(dest_folder + "/info_tab.html"):
+            print("file already exists, skip to the next file...")
+        else:
+            info_tab = await self.http_session.get(base_url + "/info")
+            info_tab_data = await info_tab.text()
+            if dest_folder is not None and os.path.isfile(dest_folder + "/info_tab.html"):
+                file_info = open(dest_folder + "/info_tab.html", 'wt')
+                file_info.write(info_tab_data)
+                file_info.close()
         print("getting " + base_url + "/references")
-        reference_tab = await self.http_session.get(base_url + "/references")
+        if dest_folder is not None and os.path.isfile(dest_folder + "/references_tab.html"):
+            print("file already exists, skip to the next file...")
+        else:
+            reference_tab = await self.http_session.get(base_url + "/references")
+            if dest_folder is not None:
+                reference_tab_data = await reference_tab.text()
+                file_reference = open(dest_folder + "/references_tab.html", 'wt')
+                file_reference.write(reference_tab_data)
+                file_reference.close()
         print("getting " + base_url + "/discuss")
-        discussion_tab = await self.http_session.get(base_url + "/discuss")
+        if dest_folder is not None and os.path.isfile(dest_folder + "/discussion_tab.html"):
+            print("file already exists, skip to the next file...")
+        else:
+            discussion_tab = await self.http_session.get(base_url + "/discuss")
+            if dest_folder is not None:
+                discussion_tab_data = await discussion_tab.text()
+                file_discussion = open(dest_folder + "/discussion_tab.html", 'wt')
+                file_discussion.write(discussion_tab_data)
+                file_discussion.close()
         print("getting " + base_url + "/solution")
-        solution_tab = await self.http_session.get(base_url + "/solution")
+        if dest_folder is not None and os.path.isfile(dest_folder + "/solution_tab.html"):
+            print("file already exists, skip to the next file...")
+        else:
+            solution_tab = await self.http_session.get(base_url + "/solution")
+            if dest_folder is not None:
+                solution_tab_data = await solution_tab.text()
+                file_solution = open(dest_folder + "/solution_tab.html", 'wt')
+                file_solution.write(solution_tab_data)
+                file_solution.close()
         print("getting " + base_url + "/exploit")
-        exploit_tab = await self.http_session.get(base_url + "/exploit")
+        if dest_folder is not None and os.path.isfile(dest_folder + "/exploit_tab.html"):
+            print("file already exists, skip to the next file...")
+        else:
+            exploit_tab = await self.http_session.get(base_url + "/exploit")
+            if dest_folder is not None:
+                exploit_tab_data = await exploit_tab.text()
+                file_exploit = open(dest_folder + "/exploit_tab.html", 'wt')
+                file_exploit.write(exploit_tab_data)
+                file_exploit.close()
         print("done getting html pages.")
-        info_tab_data = await info_tab.text()
-        reference_tab_data = await reference_tab.text()
-        solution_tab_data = await solution_tab.text()
-        discussion_tab_data = await discussion_tab.text()
-        exploit_tab_data = await exploit_tab.text()
-        if dest_folder is not None:
-            file_info = open(dest_folder + "/info_tab.html", 'wt')
-            file_reference = open(dest_folder + "/references_tab.html", 'wt')
-            file_discussion = open(dest_folder + "/discussion_tab.html", 'wt')
-            file_solution = open(dest_folder + "/solution_tab.html", 'wt')
-            file_exploit = open(dest_folder + "/exploit_tab.html", 'wt')
-            file_info.write(info_tab_data)
-            file_reference.write(reference_tab_data)
-            file_discussion.write(discussion_tab_data)
-            file_solution.write(solution_tab_data)
-            file_exploit.write(exploit_tab_data)
-            file_info.close()
-            file_reference.close()
-            file_discussion.close()
-            file_solution.close()
-            file_exploit.close()
         entry = dict()
         info_tab_parser = InfoTabParser()
         info_tab_parser.set_html_page(info_tab_data)
