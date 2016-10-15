@@ -201,7 +201,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
             self.assertEqual(vuln_entry.updated_at, info_parser.get_last_update_date())
             self.assertEqual(vuln_entry.created_at, info_parser.get_publication_date())
             parsed_fixed_in = info_parser.get_not_vulnerable_versions()
-            if parsed_fixed_in is not None:
+            if len(parsed_fixed_in):
                 parsed_fixed_in = re.sub("WordPress (\D)*", '', parsed_fixed_in[0])
                 self.assertEqual(vuln_entry.affected_versions[0].fixed_in, parsed_fixed_in)
             else:
@@ -209,13 +209,12 @@ class SecurityFocusReaderTest(unittest.TestCase):
             references = vuln_entry.references
             self.assertEqual(references[0].type, "bugtraqid")
             self.assertEqual(references[0].id, bugtraq_id)
-            has_cve = False
-            # fixme cve parsing does not work with multiple cve, fix the parser and update the test.
-            if info_parser.get_cve_id() is not None:
-                #self.assertEqual(references[1].type, "cve")
-                #self.assertEqual(references[1].id, info_parser.get_cve_id())
-                has_cve = True
-            self.assertEqual(len(references_parser.get_references()), len(references) - (2 if has_cve else 1))
-            for entry_ref, parser_ref in zip(references[(2 if has_cve else 1):], references_parser.get_references()):
+            reference_index = 1
+            for cve_id in info_parser.get_cve_id():
+                self.assertEqual(references[reference_index].type, "cve")
+                self.assertEqual(references[reference_index].id, cve_id[4:])
+                reference_index += 1
+            self.assertEqual(len(references_parser.get_references()), len(references) - reference_index)
+            for entry_ref, parser_ref in zip(references[reference_index:], references_parser.get_references()):
                 self.assertEqual(entry_ref.type, "other")
-                self.assertEqual(entry_ref.url, parser_ref[1])
+                self.assertEqual(entry_ref.url, parser_ref["url"])

@@ -70,11 +70,10 @@ class SecurityFocusReader:
 
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("bugtraqid", entry['info_parser'].get_bugtraq_id())
-        if entry['info_parser'].get_cve_id() is not None:
-            # fixme does not work for vuln with multiple cve.
-            ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])  # Remove the "CVE-"
+        for cve in entry['info_parser'].get_cve_id():
+            ref_manager.include_normalized("cve", cve[4:])  # Remove the "CVE-" and the beginning of the cve id string
         for reference in entry['references_parser'].get_references():
-            ref_manager.include_url(reference[1])
+            ref_manager.include_url(reference["url"])
 
     def identify_target(self, entry):
         from_url = self._identify_from_url(entry['references_parser'])
@@ -84,7 +83,7 @@ class SecurityFocusReader:
 
     def _identify_from_url(self, references_parser):
         for reference in references_parser.get_references():
-            url = reference[1]
+            url = reference["url"]
             match = match_svn.search(url) or match_website.search(url)
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
@@ -126,7 +125,8 @@ class SecurityFocusReader:
         return entry['info_parser'].get_last_update_date()
 
     def _get_fixed_in(self, entry):
-        if entry['info_parser'].get_not_vulnerable_versions() is None:
+        # TODO if more than one not vulnerable version, find the older one and return it as the fixed_in.
+        if len(entry['info_parser'].get_not_vulnerable_versions()) == 0:
             return None
         version_str = entry['info_parser'].get_not_vulnerable_versions()[0]
         if version_str is not None:

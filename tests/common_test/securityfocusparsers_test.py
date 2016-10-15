@@ -14,7 +14,7 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_title(), "WordPress Cross Site Scripting And Directory Traversal Vulnerabilities")
         self.assertEqual(parser.get_bugtraq_id(), "92841")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
-        self.assertEqual(parser.get_cve_id(), None)
+        self.assertEqual(parser.get_cve_id(), [])
         self.assertEqual(parser.is_vuln_remote(), "Yes")
         self.assertEqual(parser.is_vuln_local(), "No")
         self.assertEqual(parser.get_publication_date(), datetime(2016, 9, 7, 0, 0))
@@ -29,7 +29,7 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_title(), "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "73931")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
-        self.assertEqual(parser.get_cve_id(), None)
+        self.assertEqual(parser.get_cve_id(), [])
         self.assertEqual(parser.is_vuln_remote(), "Yes")
         self.assertEqual(parser.is_vuln_local(), "No")
         self.assertEqual(parser.get_publication_date(), datetime(2009, 12, 7, 0, 0))
@@ -44,7 +44,7 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_title(), "WordPress CVE-2016-6897 Cross Site Request Forgery Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "92572")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
-        self.assertEqual(parser.get_cve_id(), "CVE-2016-6897")
+        self.assertEqual(parser.get_cve_id(), ["CVE-2016-6897"])
         self.assertEqual(parser.is_vuln_remote(), "Yes")
         self.assertEqual(parser.is_vuln_local(), "No")
         self.assertEqual(parser.get_publication_date(), datetime(2016, 8, 20, 0, 0))
@@ -59,7 +59,7 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_title(), "WordPress Nofollow Links Plugin 'nofollow-links.php' Cross Site Scripting Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "92077")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
-        self.assertEqual(parser.get_cve_id(), "CVE-2016-4833")
+        self.assertEqual(parser.get_cve_id(), ["CVE-2016-4833"])
         self.assertEqual(parser.is_vuln_remote(), "Yes")
         self.assertEqual(parser.is_vuln_local(), "No")
         self.assertEqual(parser.get_publication_date(), datetime(2016, 7, 20, 0, 0))
@@ -68,21 +68,21 @@ class InfoTabParserTest(unittest.TestCase):
         self.assertEqual(parser.get_vulnerable_versions(), ["WordPress Nofollow Links 1.0.10"])
         self.assertEqual(parser.get_not_vulnerable_versions(), ["WordPress Nofollow Links 1.0.11"])
 
-    def test_parse_plugin_vuln_multiple_cve(self):
+    def test_parse_plugin_vuln_multiple_identical_cve(self):
         parser = InfoTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_multiple_cve.html"))
         self.assertEqual(parser.get_title(),
                          "WordPress Connections Business Directory Plugin 2016-0770 Cross Site Scripting Vulnerability")
         self.assertEqual(parser.get_bugtraq_id(), "82355")
         self.assertEqual(parser.get_vuln_class(), "Input Validation Error")
-        self.assertEqual(parser.get_cve_id(), ["CVE-2016-0770", "CVE-2016-0770", "CVE-2016-0770", "CVE-2016-0770"])
+        self.assertEqual(parser.get_cve_id(), ["CVE-2016-0770"])
         self.assertEqual(parser.is_vuln_remote(), "Yes")
         self.assertEqual(parser.is_vuln_local(), "No")
         self.assertEqual(parser.get_publication_date(), datetime(2016, 2, 1, 0, 0))
         self.assertEqual(parser.get_last_update_date(), datetime(2016, 7, 6, 12, 13))
         self.assertEqual(parser.get_credit(), "Larry Cashdollar.")
-        self.assertEqual(parser.get_vulnerable_versions(), None)
-        self.assertEqual(parser.get_not_vulnerable_versions(), None)
+        self.assertEqual(parser.get_vulnerable_versions(), [])
+        self.assertEqual(parser.get_not_vulnerable_versions(), [])
 
 
 class ReferenceTabParserTest(unittest.TestCase):
@@ -90,39 +90,65 @@ class ReferenceTabParserTest(unittest.TestCase):
     def test_parse_plugin_no_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_no_cve_references.html"))
-        self.assertEqual(parser.get_references(), [("CVE request: WordPress plugin wassup cross-site scripting vulnerability (Henri Salo)",
-                                                    "http://seclists.org/oss-sec/2015/q2/51"),
-                                                   ("WassUp Changelog (WordPress)", "http://wordpress.org/extend/plugins/wassup/changelog/"),
-                                                   ("WassUp Homepage (WordPress)", "http://wordpress.org/extend/plugins/wassup/")])
+        references_list = parser.get_references()
+        self.assertEqual(len(references_list), 3)
+        reference = references_list[0]
+        self.assertEqual(reference["description"], "CVE request: WordPress plugin wassup cross-site scripting vulnerability (Henri Salo)")
+        self.assertEqual(reference["url"], "http://seclists.org/oss-sec/2015/q2/51")
+        reference = references_list[1]
+        self.assertEqual(reference["description"], "WassUp Changelog (WordPress)")
+        self.assertEqual(reference["url"], "http://wordpress.org/extend/plugins/wassup/changelog/")
+        reference = references_list[2]
+        self.assertEqual(reference["description"], "WassUp Homepage (WordPress)")
+        self.assertEqual(reference["url"], "http://wordpress.org/extend/plugins/wassup/")
 
     def test_parse_plugin_with_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_plugin_vuln_with_cve_references.html"))
-        self.assertEqual(parser.get_references(), [("Nofollow Links Changelog Page (WordPress)",
-                                                    "https://wordpress.org/plugins/nofollow-links/changelog/"),
-                                                   ("WordPress HomePage (WordPress)", "http://wordpress.com/"),
-                                                   ("JVN#13582657 WordPress plugin 'Nofollow Links' vulnerable to cross-site scriptin (JPCERT/CC and IPA)",
-                                                    "https://jvn.jp/en/jp/JVN13582657/index.html")])
+        references_list = parser.get_references()
+        self.assertEqual(len(references_list), 3)
+        reference = references_list[0]
+        self.assertEqual(reference["description"], "Nofollow Links Changelog Page (WordPress)")
+        self.assertEqual(reference["url"], "https://wordpress.org/plugins/nofollow-links/changelog/")
+        reference = references_list[1]
+        self.assertEqual(reference["description"], "WordPress HomePage (WordPress)")
+        self.assertEqual(reference["url"], "http://wordpress.com/")
+        reference = references_list[2]
+        self.assertEqual(reference["description"], "JVN#13582657 WordPress plugin 'Nofollow Links' vulnerable to cross-site scriptin (JPCERT/CC and IPA)")
+        self.assertEqual(reference["url"], "https://jvn.jp/en/jp/JVN13582657/index.html")
 
     def test_parse_wordpress_no_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_no_cve_references.html"))
-        self.assertEqual(parser.get_references(), [("Media: Sanitize upload filename.  (WordPress)",
-                                                    "https://github.com/WordPress/WordPress/commit/c9e60dab176635d4bfaaf431c0ea891e4726d6e0"),
-                                                   ("WordPress HomePage (WordPress)", "http://wordpress.org/"),
-                                                   ("Upgrade/Install: Sanitize file name in `File_Upload_Upgrader`. (WordPress)",
-                                                    "https://github.com/WordPress/WordPress/commit/54720a14d85bc1197ded7cb09bd3ea790caa0b6e"),
-                                                   ("WordPress 4.6.1 Security and Maintenance Release (WordPress)",
-                                                    "https://wordpress.org/news/2016/09/wordpress-4-6-1-security-and-maintenance-release/")])
+        references_list = parser.get_references()
+        self.assertEqual(len(references_list), 4)
+        reference = references_list[0]
+        self.assertEqual(reference["description"], "Media: Sanitize upload filename.  (WordPress)")
+        self.assertEqual(reference["url"], "https://github.com/WordPress/WordPress/commit/c9e60dab176635d4bfaaf431c0ea891e4726d6e0")
+        reference = references_list[1]
+        self.assertEqual(reference["description"], "WordPress HomePage (WordPress)")
+        self.assertEqual(reference["url"], "http://wordpress.org/")
+        reference = references_list[2]
+        self.assertEqual(reference["description"], "Upgrade/Install: Sanitize file name in `File_Upload_Upgrader`. (WordPress)")
+        self.assertEqual(reference["url"], "https://github.com/WordPress/WordPress/commit/54720a14d85bc1197ded7cb09bd3ea790caa0b6e")
+        reference = references_list[3]
+        self.assertEqual(reference["description"], "WordPress 4.6.1 Security and Maintenance Release (WordPress)")
+        self.assertEqual(reference["url"], "https://wordpress.org/news/2016/09/wordpress-4-6-1-security-and-maintenance-release/")
 
     def test_parse_wordpress_with_cve(self):
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/securityfocus_wordpress_vuln_with_cve_references.html"))
-        self.assertEqual(parser.get_references(), [(" Improve capability checks in wp_ajax_update_plugin() and wp_ajax_delete_plugin( (WordPress)",
-                                                    "https://core.trac.wordpress.org/ticket/37490"),
-                                                   ("Path traversal vulnerability in WordPress Core Ajax handlers (sumofpwn.nl)",
-                                                    "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html"),
-                                                   ("WordPress HomePage (WordPress)", "http://wordpress.com/")])
+        references_list = parser.get_references()
+        self.assertEqual(len(references_list), 3)
+        reference = references_list[0]
+        self.assertEqual(reference["description"], " Improve capability checks in wp_ajax_update_plugin() and wp_ajax_delete_plugin( (WordPress)")
+        self.assertEqual(reference["url"], "https://core.trac.wordpress.org/ticket/37490")
+        reference = references_list[1]
+        self.assertEqual(reference["description"], "Path traversal vulnerability in WordPress Core Ajax handlers (sumofpwn.nl)")
+        self.assertEqual(reference["url"], "https://sumofpwn.nl/advisory/2016/path_traversal_vulnerability_in_wordpress_core_ajax_handlers.html")
+        reference = references_list[2]
+        self.assertEqual(reference["description"], "WordPress HomePage (WordPress)")
+        self.assertEqual(reference["url"], "http://wordpress.com/")
 
 
 class DiscussionTabParserTest(unittest.TestCase):

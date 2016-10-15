@@ -80,19 +80,17 @@ class InfoTabParser:
         td_element = td_element[0]
         cve = td_element.text.strip()
         if len(cve) == 0:
-            return None
+            return list()
         cve_ids = []
         cve_ids.append(cve)
         for br_tag in td_element:
             cve = br_tag.tail
             if cve is not None:
                 cve = cve.strip()
-                if len(cve) != 0:
+                if len(cve) != 0 and cve not in cve_ids:  # Prevent the same cve id to be listed mutliple times if it appears more than once in the vulnerability page (see sample 82355).
                     cve_ids.append(cve)
-        if len(cve_ids) == 1:
-            return cve_ids[0]
-        else:
-            return cve_ids
+
+        return cve_ids
         
     def is_vuln_remote(self):
         return self._parse_element("Remote:")
@@ -116,13 +114,13 @@ class InfoTabParser:
     def get_vulnerable_versions(self):
         vuln_versions_list = self._parse_vulnerable_versions()
         if len(vuln_versions_list) == 0:
-            return None
+            list()
         return vuln_versions_list
         
     def get_not_vulnerable_versions(self):
         not_vuln_versions_list = self._parse_not_vulnerable_versions()
         if len(not_vuln_versions_list) == 0:
-            return None
+            list()
         return not_vuln_versions_list
 
 
@@ -149,7 +147,7 @@ class ReferenceTabParser:
             a_tag = list(li)[0]
             description = a_tag.text + a_tag.tail
             url = li.xpath('a/@href')[0]
-            references_list.append((description, url))  # TODO replace with dict because tupple with index makes unclear code.
+            references_list.append({"description": description, "url": url})
         return references_list
 
 
