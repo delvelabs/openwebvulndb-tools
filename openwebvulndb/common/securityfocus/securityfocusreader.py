@@ -52,7 +52,7 @@ async def get_vulnerabilities_entry_from_list(vuln_list, http_session, reader):
     vuln_fetcher = SecurityFocusVulnerabilityFetcher(http_session)
     for vuln in vuln_list:
         bugtraq_id = get_bugtraq_id_from_url(vuln['url'])
-        entry = await vuln_fetcher.get_vulnerability_entry(bugtraq_id)
+        entry = await vuln_fetcher.get_vulnerability_data(bugtraq_id)
         reader.read_one(entry)
 
 
@@ -65,7 +65,7 @@ def test_securityfocus(loop, storage):
     reader = SecurityFocusReader(storage)
     session = aiohttp.ClientSession(loop=loop)
     fetcher = SecurityFocusVulnerabilityFetcher(session)
-    entry = loop.run_until_complete(fetcher.get_vulnerability_entry("92355", "/home/nicolas/delve-labs/openwebvulndb-tools/tests/common_test/samples/92355"))
+    entry = loop.run_until_complete(fetcher.get_vulnerability_data("73931", "/home/nicolas/delve-labs/openwebvulndb-tools/tests/common_test/samples/73931"))
     session.close()
-    reader.read_one(entry)
+    #reader.read_one(entry)
     loop.close()
