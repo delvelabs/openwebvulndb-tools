@@ -36,8 +36,7 @@ class SecurityFocusReader:
         if target is None:
             logger.info("No suitable target found for %s.", entry)
             return
-        # todo replace Bugtraq-ID with bugtraqid
-        this_ref = Reference(type="Bugtraq-ID", id=entry['id'])
+        this_ref = Reference(type="bugtraqid", id=entry['id'])
         try:
             v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
         except VulnerabilityNotFound:
@@ -70,8 +69,7 @@ class SecurityFocusReader:
             vuln.add_affected_version(version_range)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
-        # todo replace Bugtraq-ID with bugtraqid
-        ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
+        ref_manager.include_normalized("bugtraqid", entry['info_parser'].get_bugtraq_id())
         if entry['info_parser'].get_cve_id() is not None:
             # fixme does not work for vuln with multiple cve.
             ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])  # Remove the "CVE-"
@@ -82,7 +80,7 @@ class SecurityFocusReader:
         from_url = self._identify_from_url(entry['references_parser'])
         if from_url is not None:
             return from_url
-        return self._identify_from_name(entry)
+        return self._identify_from_title(entry)
 
     def _identify_from_url(self, references_parser):
         for reference in references_parser.get_references():
@@ -91,8 +89,7 @@ class SecurityFocusReader:
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
-    # todo rename to _identify_from_title
-    def _identify_from_name(self, entry):
+    def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
         if self._is_wordpress(entry):

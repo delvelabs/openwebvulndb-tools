@@ -94,7 +94,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln_entry.created_at, datetime(2009, 12, 7, 0, 0))
         self.assertEqual(vuln_entry.affected_versions[0].fixed_in, "1.7.2.1")
         references = vuln_entry.references
-        self.assertEqual(references[0].type, "Bugtraq-ID")
+        self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
@@ -109,7 +109,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         bugtraq_id = "73931"
         previous_vuln_entry = Vulnerability(id=bugtraq_id, title="WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability",
                                             reported_type="Input Validation Error", created_at=datetime(2009, 12, 7, 0, 0),
-                                            updated_at=datetime(2016, 9, 2, 20, 0), references=[Reference(type="Bugtraq-ID", id=bugtraq_id)])
+                                            updated_at=datetime(2016, 9, 2, 20, 0), references=[Reference(type="bugtraqid", id=bugtraq_id)])
         self.storage.list_vulnerabilities.return_value = [VulnerabilityList(producer="security-focus", key="plugins/wassup",
                                                                             vulnerabilities=[previous_vuln_entry])]
         reader = SecurityFocusReader(self.storage)
@@ -130,7 +130,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln_entry.created_at, datetime(2009, 12, 7, 0, 0))
         self.assertEqual(vuln_entry.affected_versions[0].fixed_in, "1.7.2.1")
         references = vuln_entry.references
-        self.assertEqual(references[0].type, "Bugtraq-ID")
+        self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
@@ -148,7 +148,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
                                             reported_type="Input Validation Error",
                                             created_at=datetime(2009, 12, 7, 0, 0),
                                             updated_at=datetime(2016, 9, 2, 20, 0),
-                                            references=[Reference(type="Bugtraq-ID", id=bugtraq_id)])
+                                            references=[Reference(type="bugtraqid", id=bugtraq_id)])
         self.storage.list_vulnerabilities.return_value = [VulnerabilityList(producer="security-focus", key="plugins/wassup", vulnerabilities=[previous_vuln_entry])]
         reader = SecurityFocusReader(self.storage)
         entry = dict()
@@ -168,7 +168,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(vuln_entry.created_at, datetime(2009, 12, 7, 0, 0))
         self.assertEqual(vuln_entry.affected_versions[0].fixed_in, "1.7.2.1")
         references = vuln_entry.references
-        self.assertEqual(references[0].type, "Bugtraq-ID")
+        self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
@@ -207,7 +207,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
             else:
                 self.assertEqual(vuln_entry.affected_versions, list())
             references = vuln_entry.references
-            self.assertEqual(references[0].type, "Bugtraq-ID")
+            self.assertEqual(references[0].type, "bugtraqid")
             self.assertEqual(references[0].id, bugtraq_id)
             has_cve = False
             # fixme cve parsing does not work with multiple cve, fix the parser and update the test.
