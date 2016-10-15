@@ -14,7 +14,10 @@ class SecurityFocusReader:
 
     def __init__(self, storage, vulnerability_manager=None, aiohttp_session=None):
         self.storage = storage
-        self.vulnerability_manager = VulnerabilityManager(storage=storage)
+        if vulnerability_manager is None:
+            self.vulnerability_manager = VulnerabilityManager(storage=storage)
+        else:
+            self.vulnerability_manager = vulnerability_manager
         self.aiohttp_session = aiohttp_session
         self.cpe_mapper = CPEMapper(storage=storage)
         self.reference_manager = ReferenceManager()
@@ -33,6 +36,7 @@ class SecurityFocusReader:
         if target is None:
             logger.info("No suitable target found for %s.", entry)
             return
+        # todo replace Bugtraq-ID with bugtraqid
         this_ref = Reference(type="Bugtraq-ID", id=entry['id'])
         try:
             v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
@@ -66,17 +70,15 @@ class SecurityFocusReader:
             vuln.add_affected_version(version_range)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
+        # todo replace Bugtraq-ID with bugtraqid
         ref_manager.include_normalized("Bugtraq-ID", entry['info_parser'].get_bugtraq_id())
         if entry['info_parser'].get_cve_id() is not None:
-            ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])
+            # fixme does not work for vuln with multiple cve.
+            ref_manager.include_normalized("cve", entry['info_parser'].get_cve_id()[4:])  # Remove the "CVE-"
         for reference in entry['references_parser'].get_references():
             ref_manager.include_url(reference[1])
 
     def identify_target(self, entry):
-        if entry['info_parser'].get_cve_id() is not None:
-            from_cve = self.cpe_mapper.lookup_id(entry['info_parser'].get_cve_id())
-            if from_cve is not None:
-                return from_cve
         from_url = self._identify_from_url(entry['references_parser'])
         if from_url is not None:
             return from_url
@@ -87,9 +89,9 @@ class SecurityFocusReader:
             url = reference[1]
             match = match_svn.search(url) or match_website.search(url)
             if match:
-                print(match.group())
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
+    # todo rename to _identify_from_title
     def _identify_from_name(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
@@ -97,7 +99,7 @@ class SecurityFocusReader:
             return "wordpress"
 
     def _is_plugin(self, entry):
-        match = re.search("WordPress [\w\s]* Plugin", entry['info_parser'].get_title())
+        match = re.search("Word[Pp]ress [\w\s-]* Plugin", entry['info_parser'].get_title())
         if match is None or len(match.group()) == 0:
             return False
         else:
@@ -113,7 +115,7 @@ class SecurityFocusReader:
         return False
 
     def _get_plugin_name(self, entry):
-        match = re.search("WordPress [\w\s]* Plugin", entry['info_parser'].get_title())
+        match = re.search("Word[Pp]ress [\w\s-]* Plugin", entry['info_parser'].get_title())
         if len(match.group()) != 0:
             plugin_name = (match.group())
             plugin_name = re.sub("WordPress ", '', plugin_name)
@@ -127,6 +129,8 @@ class SecurityFocusReader:
         return entry['info_parser'].get_last_update_date()
 
     def _get_fixed_in(self, entry):
+        if entry['info_parser'].get_not_vulnerable_versions() is None:
+            return None
         version_str = entry['info_parser'].get_not_vulnerable_versions()[0]
         if version_str is not None:
             version = re.sub("WordPress (\D)*", '', version_str)

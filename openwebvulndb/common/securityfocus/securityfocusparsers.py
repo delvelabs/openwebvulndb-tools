@@ -149,7 +149,7 @@ class ReferenceTabParser:
             a_tag = list(li)[0]
             description = a_tag.text + a_tag.tail
             url = li.xpath('a/@href')[0]
-            references_list.append((description, url))
+            references_list.append((description, url))  # TODO replace with dict because tupple with index makes unclear code.
         return references_list
 
 
