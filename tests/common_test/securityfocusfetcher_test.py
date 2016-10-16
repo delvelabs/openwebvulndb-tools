@@ -3,6 +3,7 @@ from fixtures import file_path
 import asyncio
 from openwebvulndb.common.securityfocus.securityfocusfetcher import SecurityFocusFetcher
 
+
 class SecurityFocusFetcherTest(unittest.TestCase):
 
     def test_fetch_list_of_first_page_vuln(self):

@@ -24,6 +24,7 @@ from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.securityfocusreader import test_securityfocus
+from ..common.securityfocus.securityfocusdatabase import update_securityfocus_database, create_securityfocus_database
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
@@ -87,7 +88,10 @@ operations = dict(list_themes=list_themes,
                   vane_export=vane_export,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
-                  test_securityfocus=test_securityfocus)
+                  test_securityfocus=test_securityfocus,
+                  update_securityfocus_database=update_securityfocus_database,
+                  create_securityfocus_database=create_securityfocus_database
+                  )
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
 parser.add_argument("action", choices=operations.keys())
