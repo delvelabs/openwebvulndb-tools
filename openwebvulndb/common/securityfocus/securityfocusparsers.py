@@ -43,26 +43,6 @@ class InfoTabParser:
         else:
             return element_value
 
-    # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
-    def _parse_vulnerable_versions(self):
-        vuln_versions_list = self.html_tree.xpath('//span[text() = "Vulnerable:"]/../../td[2]/text()')
-        for i in range(len(vuln_versions_list)):
-            vuln_versions_list[i] = vuln_versions_list[i].strip()
-            # removes the empty string add at the end of the versions list because of the <br> tag.
-        for string in vuln_versions_list:
-            if len(string) == 0:
-                vuln_versions_list.remove(string)
-        return vuln_versions_list
-
-    def _parse_not_vulnerable_versions(self):
-        versions_list = self.html_tree.xpath('//span[text() = "Not Vulnerable:"]/../../td[2]/text()')
-        for i in range(len(versions_list)):
-            versions_list[i] = versions_list[i].strip()
-            # removes the empty string add at the end of the versions list because of the <br> tag.
-            if len(versions_list[i]) == 0:
-                del versions_list[i]
-        return versions_list
-
     def get_title(self):
         # return le text dans tous les elements span avec l'attribut class ayant la valeur "title"
         title = self.html_tree.xpath('//span[@class="title"]/text()')
@@ -81,8 +61,7 @@ class InfoTabParser:
         cve = td_element.text.strip()
         if len(cve) == 0:
             return list()
-        cve_ids = []
-        cve_ids.append(cve)
+        cve_ids = [cve]
         for br_tag in td_element:
             cve = br_tag.tail
             if cve is not None:
@@ -111,17 +90,26 @@ class InfoTabParser:
     def get_credit(self):
         return self._parse_element("Credit:")
 
+    # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
     def get_vulnerable_versions(self):
-        vuln_versions_list = self._parse_vulnerable_versions()
-        if len(vuln_versions_list) == 0:
-            list()
+        vuln_versions_list = self.html_tree.xpath('//span[text() = "Vulnerable:"]/../../td[2]/text()')
+        for i in range(len(vuln_versions_list)):
+            vuln_versions_list[i] = vuln_versions_list[i].strip()
+        # removes the empty string added at the end of the versions list because of the <br> tag.
+        for version in vuln_versions_list:
+            if len(version) == 0:
+                vuln_versions_list.remove(version)
         return vuln_versions_list
-        
+
     def get_not_vulnerable_versions(self):
-        not_vuln_versions_list = self._parse_not_vulnerable_versions()
-        if len(not_vuln_versions_list) == 0:
-            list()
-        return not_vuln_versions_list
+        versions_list = self.html_tree.xpath('//span[text() = "Not Vulnerable:"]/../../td[2]/text()')
+        for i in range(len(versions_list)):
+            versions_list[i] = versions_list[i].strip()
+        # removes the empty string added at the end of the versions list because of the <br> tag.
+        for version in versions_list:
+            if len(version) == 0:
+                versions_list.remove(version)
+        return versions_list
 
 
 class ReferenceTabParser:
@@ -144,7 +132,7 @@ class ReferenceTabParser:
         references_list = []
         parent_ul_tag = self._get_reference_parent_tag()
         for li in list(parent_ul_tag):  # create a list with all the li elements.
-            a_tag = list(li)[0]
+            a_tag = li[0]
             description = a_tag.text + a_tag.tail
             url = li.xpath('a/@href')[0]
             references_list.append({"description": description, "url": url})
@@ -169,8 +157,9 @@ class DiscussionTabParser:
                 br_text = br_tag.tail
                 if br_text is not None:
                     discussion_text += br_text
-        discussion_text = re.sub(' {2,}', ' ', discussion_text)  # replace multiple spaces with one space
-        discussion_text = discussion_text.strip()  # Remove \n, \t, etc.
+        # replace multiple spaces, \t and \n with one space
+        discussion_text = re.sub('\s\s+', ' ', discussion_text)
+        discussion_text = discussion_text.strip()  # Remove spaces at the beginning and at the end of the string.
         return discussion_text
 
 
