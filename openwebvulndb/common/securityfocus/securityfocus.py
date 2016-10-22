@@ -32,23 +32,23 @@ class SecurityFocusReader:
     def read_api(self, url):
         pass
 
-    #todo check if cve exists, add info to cve file if it exists.
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
             logger.info("No suitable target found for %s.", entry)
             return
-        this_ref = Reference(type="bugtraqid", id=entry['id'])
-        try:
-            v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
-        except VulnerabilityNotFound:
-            producer = self.vulnerability_manager.get_producer_list("security-focus", target)
-            v = producer.get_vulnerability(entry['id'], create_missing=True)
+        v = self._get_vuln_from_cve(entry, target)
+        if v is None:
+            this_ref = Reference(type="bugtraqid", id=entry['id'])
+            try:
+                v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
+            except VulnerabilityNotFound:
+                producer = self.vulnerability_manager.get_producer_list("securityfocus", target)
+                v = producer.get_vulnerability(entry['id'], create_missing=True)
         last_modified = self._get_last_modified(entry)
         updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
         allow_override = last_modified is None or updated_at is None or last_modified > updated_at
         self.apply_data(v, entry, allow_override=allow_override)
-
         self.vulnerability_manager.flush()
         return v
 
@@ -138,3 +138,16 @@ class SecurityFocusReader:
             return version
         else:
             return None
+
+    def _get_vuln_from_cve(self, entry, target):
+        if len(entry["info_parser"].get_cve_id()) != 0:
+            cve_id = entry["info_parser"].get_cve_id()[0][4:]  # Remove the "CVE-" before the id.
+            logger.debug(cve_id)
+            ref = Reference(type="cve", id=cve_id)
+            try:
+                vuln = self.vulnerability_manager.find_vulnerability(target, match_reference=ref)
+                return vuln
+            except VulnerabilityNotFound:
+                logger.debug("vuln not found")
+                pass
+        return

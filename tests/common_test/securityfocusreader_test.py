@@ -4,6 +4,7 @@ from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParse
 from fixtures import file_path
 from openwebvulndb.common.securityfocus.securityfocus import SecurityFocusReader
 from openwebvulndb.common.storage import Storage
+from openwebvulndb.common.manager import VulnerabilityManager
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.models import VulnerabilityList, Vulnerability, Reference
 from datetime import datetime
@@ -218,3 +219,28 @@ class SecurityFocusReaderTest(unittest.TestCase):
             for entry_ref, parser_ref in zip(references[reference_index:], references_parser.get_references()):
                 self.assertEqual(entry_ref.type, "other")
                 self.assertEqual(entry_ref.url, parser_ref["url"])
+
+    def test_cve_reference_already_exists(self):
+        path = file_path(__file__, "samples/fake_data")
+        storage = Storage(path)
+        vulnerability_manager = VulnerabilityManager(storage=storage)
+        vuln_file_path = os.path.join(path, "wordpress/vuln-fakeproducer.json")
+        if os.path.isfile(vuln_file_path):
+            os.remove(vuln_file_path)  # If the file already exists remove it to use a clean file for the test.
+        with open(vuln_file_path, "wt") as file:
+            file.write(json.dumps({"key": "wordpress", "producer": "fakeproducer", "vulnerabilities": [{
+                                   "id": "cve-2016-6635", "title": "Title", "references": [{"type": "cve", "id": "2016-6635"}]}]},
+                                  indent=4, sort_keys=True))
+        bugtraq_id = "92355"
+        vuln_entry = {
+            "id": bugtraq_id,
+            "info_parser": InfoTabParser(),
+            "references_parser": ReferenceTabParser(),
+        }
+        vuln_entry["info_parser"].set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab.html"))
+        vuln_entry["references_parser"].set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
+        reader = SecurityFocusReader(storage, vulnerability_manager)
+        vuln = reader.read_one(vuln_entry)
+        self.assertEqual(os.path.isfile(os.path.join(path, "wordpress/vuln-securityfocus.json")), False)
+        self.assertEqual(vuln.references[1].type, "bugtraqid")
+        self.assertEqual(vuln.references[1].id, bugtraq_id)
