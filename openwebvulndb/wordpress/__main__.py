@@ -23,7 +23,7 @@ from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
-from ..common.securityfocus.securityfocusdatabase import update_securityfocus_database, create_securityfocus_database
+from ..common.securityfocus.securityfocusdatabase import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
@@ -88,22 +88,28 @@ operations = dict(list_themes=list_themes,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
-                  create_securityfocus_database=create_securityfocus_database
+                  create_securityfocus_database=create_securityfocus_database,
+                  download_vulnerability_entry=download_vulnerability_entry
                   )
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
 parser.add_argument("action", choices=operations.keys())
+parser.add_argument("--dest-folder", dest="dest_folder")
+parser.add_argument("--id", dest="bugtraq_id", help="The bugtraq id of the vulnerability to fetch.")
 parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
 parser.add_argument('-f', '--input-file', dest='input_file',
                     help='Cached input file')
+
 args = parser.parse_args()
 
 try:
     local = app.sub(repository=WordPressRepository,
                     vane_importer=VaneImporter,
                     input_path=args.input_path,
-                    input_file=args.input_file)
+                    input_file=args.input_file,
+                    bugtraq_id=args.bugtraq_id,
+                    dest_folder=args.dest_folder)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass

@@ -23,14 +23,16 @@ class SecurityFocusReader:
         self.reference_manager = ReferenceManager()
 
     def read_file(self, file_name):
-        file = open(file_name, 'r')
-        data = json.load(file)
-        for entry in data:
-            self.read_one(entry)
+        with open(file_name, 'r') as file:
+            data = json.load(file)
+            for entry in data:
+                self.read_one(entry)
 
+    #todo
     def read_api(self, url):
         pass
 
+    #todo check if cve exists, add info to cve file if it exists.
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
@@ -71,7 +73,7 @@ class SecurityFocusReader:
         ref_manager = self.reference_manager.for_list(vuln.references)
         ref_manager.include_normalized("bugtraqid", entry['info_parser'].get_bugtraq_id())
         for cve in entry['info_parser'].get_cve_id():
-            ref_manager.include_normalized("cve", cve[4:])  # Remove the "CVE-" and the beginning of the cve id string
+            ref_manager.include_normalized("cve", cve[4:])  # Remove the "CVE-" at the beginning of the cve id string
         for reference in entry['references_parser'].get_references():
             ref_manager.include_url(reference["url"])
 
@@ -88,6 +90,8 @@ class SecurityFocusReader:
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
+    #todo add plugin existence validation
+    #todo add theme identification
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
