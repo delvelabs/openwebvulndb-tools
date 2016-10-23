@@ -23,7 +23,7 @@ from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
-from ..common.securityfocus.securityfocusdatabase import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
+from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())

@@ -1,6 +1,6 @@
 from io import StringIO
 from lxml import etree
-from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParser, ReferenceTabParser, \
+from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser, \
     DiscussionTabParser, SolutionTabParser, ExploitTabParser
 import re
 from openwebvulndb.common.logs import logger

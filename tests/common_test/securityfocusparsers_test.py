@@ -1,12 +1,12 @@
 import unittest
 from datetime import datetime
-from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParser, ReferenceTabParser, \
+from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser, \
     DiscussionTabParser, ExploitTabParser, SolutionTabParser
 from fixtures import file_path
 
 
 class InfoTabParserTest(unittest.TestCase):
-    """The unit tests for the InfoTabParser class in securityfocusparsers.py. Uses 5 samples for the test."""
+    """The unit tests for the InfoTabParser class in parsers.py. Uses 5 samples for the test."""
     
     def test_parse_wordpress_vuln_no_cve(self):
         parser = InfoTabParser()

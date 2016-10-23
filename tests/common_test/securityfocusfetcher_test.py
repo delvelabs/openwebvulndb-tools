@@ -1,6 +1,6 @@
 import unittest
 from fixtures import file_path, async_test
-from openwebvulndb.common.securityfocus.securityfocusfetcher import SecurityFocusFetcher
+from openwebvulndb.common.securityfocus.fetcher import SecurityFocusFetcher
 
 
 class SecurityFocusFetcherTest(unittest.TestCase):

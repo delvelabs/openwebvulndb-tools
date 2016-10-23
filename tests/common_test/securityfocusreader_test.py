@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock
-from openwebvulndb.common.securityfocus.securityfocusparsers import InfoTabParser, ReferenceTabParser
+from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser
 from fixtures import file_path
-from openwebvulndb.common.securityfocus.securityfocus import SecurityFocusReader
+from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 from openwebvulndb.common.storage import Storage
 from openwebvulndb.common.manager import VulnerabilityManager
 from openwebvulndb.common.errors import VulnerabilityNotFound

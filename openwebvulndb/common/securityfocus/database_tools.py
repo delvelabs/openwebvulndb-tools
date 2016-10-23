@@ -1,5 +1,5 @@
-from openwebvulndb.common.securityfocus.securityfocusfetcher import SecurityFocusFetcher
-from openwebvulndb.common.securityfocus.securityfocus import SecurityFocusReader
+from openwebvulndb.common.securityfocus.fetcher import SecurityFocusFetcher
+from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 import aiohttp
 
 
