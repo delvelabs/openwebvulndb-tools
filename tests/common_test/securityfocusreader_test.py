@@ -19,7 +19,7 @@ class TargetIdentificationTest(unittest.TestCase):
         self.storage = MagicMock()
         self.reader = SecurityFocusReader(self.storage)
 
-    def test_identify_target_from_url(self):
+    def test_identify_plugin_from_url(self):
         entry = dict()
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/73931/references_tab.html"))
@@ -30,7 +30,20 @@ class TargetIdentificationTest(unittest.TestCase):
         entry['references_parser'] = parser
         self.assertEqual(self.reader.identify_target(entry), "plugins/wassup")
 
-    def test_identify_target_from_title(self):
+    def test_identify_theme_from_url(self):
+        ref_parser = ReferenceTabParser()
+        ref_parser.set_html_page(file_path(__file__, "samples/92142/references_tab.html"))
+        info_parser = MagicMock()
+        info_parser.get_cve_id.return_value = None
+        entry = {
+            'info_parser': info_parser,
+            'references_parser': ref_parser
+        }
+        self.assertEqual(self.reader.identify_target(entry), "themes/colorway")
+
+    def test_identify_plugin_from_title(self):
+        storage = Storage(file_path(__file__, "samples/fake_data"))
+        reader = SecurityFocusReader(storage)
         info_parser = InfoTabParser()
         info_parser.set_html_page(file_path(__file__, "samples/73931/info_tab.html"))
         references_parser = MagicMock()
@@ -39,7 +52,21 @@ class TargetIdentificationTest(unittest.TestCase):
         entry = dict()
         entry['info_parser'] = info_parser
         entry['references_parser'] = references_parser
-        self.assertEqual(self.reader.identify_target(entry), "plugins/wassup")
+        self.assertEqual(reader.identify_target(entry), "plugins/wassup")
+
+    def test_identify_theme_from_title(self):
+        storage = Storage(file_path(__file__, "samples/fake_data"))
+        reader = SecurityFocusReader(storage)
+        info_parser = InfoTabParser()
+        info_parser.set_html_page(file_path(__file__, "samples/92142/info_tab.html"))
+        references_parser = MagicMock()
+        get_references_function = MagicMock(return_value=list())
+        references_parser.attach_mock(get_references_function, "get_references")
+        entry = {
+            'info_parser': info_parser,
+            'references_parser': references_parser
+        }
+        self.assertEqual(reader.identify_target(entry), "themes/colorway")
 
     def test_identify_target_fallback_to_wordpress(self):
         info_parser = InfoTabParser()
@@ -178,11 +205,14 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(references[3].type, "other")
         self.assertEqual(references[3].url, "http://wordpress.org/extend/plugins/wassup/")
 
+    # fixme some plugins are not identify correctly because the name in the db is not the expected one.
     def test_add_multiple_vulnerabilities_to_database(self):
         """Test the security focus reader with a lot of samples."""
         self.storage.reset_mock()
         self.storage.list_vulnerabilities.return_value = list()
         self.storage.read_vulnerabilities.side_effect = FileNotFoundError()
+        self.storage.list_directories.return_value = {"wassup", "onelogin-saml-sso",
+                                                         "welcart-ecommerce", "nofollow-links", "w3-total-cache"}
         reader = SecurityFocusReader(self.storage)
         bugtraq_id_list = ["73931", "82355", "91076", "91405", "92077", "92355", "92572", "92841", "93104"]
         for bugtraq_id in bugtraq_id_list:

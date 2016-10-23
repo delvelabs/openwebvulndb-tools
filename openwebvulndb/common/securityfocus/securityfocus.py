@@ -35,7 +35,7 @@ class SecurityFocusReader:
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
-            logger.info("No suitable target found for %s.", entry)
+            logger.info("No suitable target found for %s.", entry["id"])
             return
         v = self._get_existing_vulnerability(entry, target)
         if v is None:
@@ -91,11 +91,20 @@ class SecurityFocusReader:
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
+        if self._is_theme(entry):
+            return self._get_theme_name(entry)
         if self._is_wordpress(entry):
             return "wordpress"
 
     def _is_plugin(self, entry):
-        match = re.search("Word[Pp]ress [\w\s-]* Plugin", entry['info_parser'].get_title())
+        match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Pp]lugin", entry['info_parser'].get_title())
+        if match is None or len(match.group()) == 0:
+            return False
+        else:
+            return True
+
+    def _is_theme(self, entry):
+        match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Tt]heme", entry['info_parser'].get_title())
         if match is None or len(match.group()) == 0:
             return False
         else:
@@ -104,21 +113,35 @@ class SecurityFocusReader:
     def _is_wordpress(self, entry):
         match = re.search("([Pp]lugin[s?]|[Tt]heme[s?])", entry['info_parser'].get_title())
         if match is None:
-            match = re.search("WordPress", entry['info_parser'].get_title())
+            match = re.search("^[Ww]ord[Pp]ress", entry['info_parser'].get_title())
             if match is not None:
                 if len(match.group()) != 0:
                     return True
         return False
 
     def _get_plugin_name(self, entry):
-        match = re.search("Word[Pp]ress [\w\s-]* Plugin", entry['info_parser'].get_title())
+        match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Pp]lugin", entry['info_parser'].get_title())
         if len(match.group()) != 0:
-            plugin_name = (match.group())
-            plugin_name = re.sub("WordPress ", '', plugin_name)
-            plugin_name = re.sub(" Plugin", '', plugin_name)
-            plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
+            plugin_name = match.group()
             plugin_name = plugin_name.lower()
-            return "plugins/" + plugin_name
+            plugin_name = re.sub("wordpress ", '', plugin_name)
+            plugin_name = re.sub(" plugin", '', plugin_name)
+            plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
+            logger.debug(plugin_name)
+            if plugin_name in self.storage.list_directories("plugins"):
+                return "plugins/" + plugin_name
+        return None
+
+    def _get_theme_name(self, entry):
+        match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Tt]heme", entry['info_parser'].get_title())
+        if len(match.group()) != 0:
+            theme_name = match.group()
+            theme_name = theme_name.lower()
+            theme_name = re.sub("wordpress ", '', theme_name)
+            theme_name = re.sub(" theme", '', theme_name)
+            theme_name = re.sub(" ", '-', theme_name)  # replace spaces with '-'.
+            if theme_name in self.storage.list_directories("themes"):
+                return "themes/" + theme_name
         return None
 
     def _get_last_modified(self, entry):

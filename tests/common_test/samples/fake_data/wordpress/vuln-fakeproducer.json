@@ -1,0 +1,36 @@
+{
+    "key": "wordpress",
+    "producer": "fakeproducer",
+    "vulnerabilities": [
+        {
+            "id": "cve-2016-6635",
+            "title": "WordPress 'ajax-actions.php' Cross Site Request Forgery Vulnerability",
+            "reported_type": "Input Validation Error",
+            "created_at": "2016-04-12T00:00:00+00:00",
+            "updated_at": "2016-10-10T11:04:00+00:00",
+            "affected_versions": [
+                {
+                    "fixed_in": "4.5"
+                }
+            ],
+            "references": [
+                {
+                    "type": "cve",
+                    "id": "2016-6635"
+                },
+                {
+                    "type": "bugtraqid",
+                    "id": "92355"
+                },
+                {
+                    "type": "other",
+                    "url": "https://github.com/WordPress/WordPress/commit/9b7a7754133c50b82bd9d976fb5b24094f658aab"
+                },
+                {
+                    "type": "other",
+                    "url": "http://wordpress.com/"
+                }
+            ]
+        }
+    ]
+}
