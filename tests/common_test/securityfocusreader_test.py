@@ -244,3 +244,37 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(os.path.isfile(os.path.join(path, "wordpress/vuln-securityfocus.json")), False)
         self.assertEqual(vuln.references[1].type, "bugtraqid")
         self.assertEqual(vuln.references[1].id, bugtraq_id)
+
+    def test_bugtraqid_reference_already_exists_as_other(self):
+        """Test if the security focus reader finds vuln with a reference to security focus with type "other" and the url
+        and replace it with the new bugtraqid reference."""
+        path = file_path(__file__, "samples/fake_data")
+        storage = Storage(path)
+        vulnerability_manager = VulnerabilityManager(storage=storage)
+        vuln_file_path = os.path.join(path, "wordpress/vuln-fakeproducer2.json")
+        if os.path.isfile(vuln_file_path):
+            os.remove(vuln_file_path)  # If the file already exists remove it to use a clean file for the test.
+        with open(vuln_file_path, "wt") as file:
+            file.write(json.dumps({"key": "wordpress", "producer": "fakeproducer2", "vulnerabilities": [{
+                                   "id": "cve-2016-6897", "title": "Title", "references": [{"type": "other",
+                                   "url": "http://www.securityfocus.com/bid/92572"}]}]}, indent=4, sort_keys=True))
+        bugtraq_id = "92572"
+        vuln_entry = {
+            "id": bugtraq_id,
+            "info_parser": InfoTabParser(),
+            "references_parser": ReferenceTabParser(),
+        }
+        vuln_entry["info_parser"].set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab.html"))
+        vuln_entry["references_parser"].set_html_page(
+            file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
+        reader = SecurityFocusReader(storage, vulnerability_manager)
+        vuln = reader.read_one(vuln_entry)
+        self.assertEqual(os.path.isfile(os.path.join(path, "wordpress/vuln-securityfocus.json")), False)
+        for ref in vuln.references:
+            if ref.type == "bugtraqid" and ref.id == bugtraq_id:
+                break
+        else:
+            self.fail("bugtraqid not added to vuln references.")
+        for ref in vuln.references:
+            if ref.type == "other" and ref.url is not None:
+                self.assertNotIn("securityfocus", ref.url)

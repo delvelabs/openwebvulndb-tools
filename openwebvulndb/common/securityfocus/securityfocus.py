@@ -37,14 +37,10 @@ class SecurityFocusReader:
         if target is None:
             logger.info("No suitable target found for %s.", entry)
             return
-        v = self._get_vuln_from_cve(entry, target)
+        v = self._get_existing_vulnerability(entry, target)
         if v is None:
-            this_ref = Reference(type="bugtraqid", id=entry['id'])
-            try:
-                v = self.vulnerability_manager.find_vulnerability(target, match_reference=this_ref)
-            except VulnerabilityNotFound:
-                producer = self.vulnerability_manager.get_producer_list("securityfocus", target)
-                v = producer.get_vulnerability(entry['id'], create_missing=True)
+            producer = self.vulnerability_manager.get_producer_list("securityfocus", target)
+            v = producer.get_vulnerability(entry['id'], create_missing=True)
         last_modified = self._get_last_modified(entry)
         updated_at = v.updated_at.replace(tzinfo=None) if v.updated_at else None
         allow_override = last_modified is None or updated_at is None or last_modified > updated_at
@@ -71,7 +67,7 @@ class SecurityFocusReader:
             vuln.add_affected_version(version_range)
 
         ref_manager = self.reference_manager.for_list(vuln.references)
-        ref_manager.include_normalized("bugtraqid", entry['info_parser'].get_bugtraq_id())
+        self._add_bugtraqid_reference(ref_manager, entry["id"])
         for cve in entry['info_parser'].get_cve_id():
             ref_manager.include_normalized("cve", cve[4:])  # Remove the "CVE-" at the beginning of the cve id string
         for reference in entry['references_parser'].get_references():
@@ -139,15 +135,30 @@ class SecurityFocusReader:
         else:
             return None
 
-    def _get_vuln_from_cve(self, entry, target):
-        if len(entry["info_parser"].get_cve_id()) != 0:
-            cve_id = entry["info_parser"].get_cve_id()[0][4:]  # Remove the "CVE-" before the id.
-            logger.debug(cve_id)
-            ref = Reference(type="cve", id=cve_id)
+    def _get_existing_vulnerability(self, entry, target):
+        for ref in self._get_possible_existing_references(entry):
             try:
                 vuln = self.vulnerability_manager.find_vulnerability(target, match_reference=ref)
                 return vuln
             except VulnerabilityNotFound:
-                logger.debug("vuln not found")
                 pass
-        return
+
+    def _get_possible_existing_references(self, entry):
+        possible_references = []
+        securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["info_parser"].get_bugtraq_id())
+        possible_references.append(Reference(type="other", url=securityfocus_url))
+        if len(entry["info_parser"].get_cve_id()) != 0:
+            cve_id = entry["info_parser"].get_cve_id()[0][4:]  # Remove the "CVE-" before the id.
+            possible_references.append(Reference(type="cve", id=cve_id))
+        possible_references.append(Reference(type="bugtraqid", id=entry["id"]))
+        return possible_references
+
+    def _add_bugtraqid_reference(self, references_manager, bugtraq_id):
+        """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references, replace it with the bugtraqid."""
+        for ref in references_manager.references:
+            if ref.type == "other" and ref.url is not None and "securityfocus" in ref.url:
+                ref.type = "bugtraqid"
+                ref.id = bugtraq_id
+                ref.url = None
+                return
+        references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
