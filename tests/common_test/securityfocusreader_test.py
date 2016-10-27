@@ -54,6 +54,20 @@ class TargetIdentificationTest(unittest.TestCase):
         entry['references_parser'] = references_parser
         self.assertEqual(reader.identify_target(entry), "plugins/wassup")
 
+    def test_identify_plugin_from_meta(self):
+        storage = Storage(file_path(__file__, "samples/fake_data"))
+        reader = SecurityFocusReader(storage)
+        info_parser = InfoTabParser()
+        info_parser.set_html_page(file_path(__file__, "samples/91405/info_tab.html"))
+        references_parser = MagicMock()
+        references_parser.get_references.return_value = []
+        entry = {
+            'id': "91405",
+            'info_parser': info_parser,
+            'references_parser': references_parser,
+        }
+        self.assertEqual(reader.identify_target(entry), "plugins/welcart")
+
     def test_identify_theme_from_title(self):
         storage = Storage(file_path(__file__, "samples/fake_data"))
         reader = SecurityFocusReader(storage)
@@ -205,16 +219,14 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(references[3].type, "other")
         self.assertEqual(references[3].url, "http://wordpress.org/extend/plugins/wassup/")
 
-    # fixme some plugins are not identify correctly because the name in the db is not the expected one.
     def test_add_multiple_vulnerabilities_to_database(self):
         """Test the security focus reader with a lot of samples."""
         self.storage.reset_mock()
         self.storage.list_vulnerabilities.return_value = list()
         self.storage.read_vulnerabilities.side_effect = FileNotFoundError()
-        self.storage.list_directories.return_value = {"wassup", "onelogin-saml-sso",
-                                                         "welcart-ecommerce", "nofollow-links", "w3-total-cache"}
+        self.storage.list_directories.return_value = {"wassup", "onelogin-saml-sso", "nofollow-links", "w3-total-cache"}
         reader = SecurityFocusReader(self.storage)
-        bugtraq_id_list = ["73931", "82355", "91076", "91405", "92077", "92355", "92572", "92841", "93104"]
+        bugtraq_id_list = ["73931", "82355", "91076", "92077", "92355", "92572", "92841", "93104"]
         for bugtraq_id in bugtraq_id_list:
             entry = dict()
             entry['id'] = bugtraq_id

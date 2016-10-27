@@ -20,6 +20,7 @@ class SecurityFocusReader:
             self.vulnerability_manager = vulnerability_manager
         self.aiohttp_session = aiohttp_session
         self.cpe_mapper = CPEMapper(storage=storage)
+        self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()
 
     def read_file(self, file_name):
@@ -35,7 +36,7 @@ class SecurityFocusReader:
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
-            logger.info("No suitable target found for %s.", entry["id"])
+            logger.info("No suitable target found for %s (%s).", entry["id"], entry["info_parser"].get_title())
             return
         v = self._get_existing_vulnerability(entry, target)
         if v is None:
@@ -128,6 +129,8 @@ class SecurityFocusReader:
             logger.debug(plugin_name)
             if plugin_name in self.storage.list_directories("plugins"):
                 return "plugins/" + plugin_name
+            else:
+                return self.meta_mapper.lookup_id(entry["id"])
         return None
 
     def _get_theme_name(self, entry):
@@ -140,6 +143,8 @@ class SecurityFocusReader:
             theme_name = re.sub(" ", '-', theme_name)  # replace spaces with '-'.
             if theme_name in self.storage.list_directories("themes"):
                 return "themes/" + theme_name
+            else:
+                return self.meta_mapper.lookup_id(entry["id"])
         return None
 
     def _get_last_modified(self, entry):
@@ -183,3 +188,35 @@ class SecurityFocusReader:
                 ref.url = None
                 return
         references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+
+
+class MetaMapper:
+
+    def __init__(self, storage):
+        self.storage = storage
+        self.hints = dict()
+        self.loaded = False
+
+    def load_meta(self, meta):
+        hint_mapping = {ref.id: meta.key for ref in meta.hints or [] if ref.id is not None and ref.type == "bugtraqid"}
+        for k, v in hint_mapping.items():
+            if k in self.hints:
+                raise KeyError(k, "Hint already defined")
+            else:
+                self.hints[k] = v
+        self.loaded = True
+
+    def lookup_id(self, id):
+        if not self.loaded:
+            self.load_from_storage()
+        logger.info(self.hints)
+        logger.info(id)
+        if id in self.hints:
+            logger.info("yes")
+            return self.hints[id]
+
+    def load_from_storage(self):
+        logger.info("Loading Meta mapping.")
+        for meta in self.storage.list_meta():
+            self.load_meta(meta)
+        logger.info("Meta Mapping loaded.")
