@@ -86,8 +86,6 @@ class SecurityFocusReader:
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
-    #todo add plugin existence validation
-    #todo add theme identification
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)

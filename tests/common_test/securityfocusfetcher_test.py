@@ -18,5 +18,5 @@ class SecurityFocusFetcherTest(unittest.TestCase):
                                             "http://www.securityfocus.com/bid/92077",
                                             "http://www.securityfocus.com/bid/82355",
                                             "http://www.securityfocus.com/bid/91405",
-                                            "http://www.securityfocus.com/bid/91076"
+                                            "http://www.securityfocus.com/bid/91076",
                                            ])

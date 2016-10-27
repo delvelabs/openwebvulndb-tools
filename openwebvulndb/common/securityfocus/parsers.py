@@ -1,6 +1,7 @@
 from lxml import etree
 from datetime import datetime
 import re
+from openwebvulndb.common.logs import logger
 
 # %b = abbreviated month (Jan), %d = zero-padded day of month, %Y = year with century (2016), %I = hour in 12h format, %M = zero-padded minutes, %p = AM or PM.
 securityfocus_date_format = "%b %d %Y %I:%M%p"
@@ -61,15 +62,14 @@ class InfoTabParser:
         cve = td_element.text.strip()
         if len(cve) == 0:
             return list()
-        cve_ids = [cve]
+        cve_ids = {cve}  # Use a set to remove duplicate cve ids.
         for br_tag in td_element:
             cve = br_tag.tail
             if cve is not None:
                 cve = cve.strip()
-                if len(cve) != 0 and cve not in cve_ids:  # Prevent the same cve id to be listed mutliple times if it appears more than once in the vulnerability page (see sample 82355).
-                    cve_ids.append(cve)
-
-        return cve_ids
+                if len(cve) != 0:
+                    cve_ids.add(cve)
+        return list(cve_ids)
         
     def is_vuln_remote(self):
         return self._parse_element("Remote:")
@@ -90,25 +90,19 @@ class InfoTabParser:
     def get_credit(self):
         return self._parse_element("Credit:")
 
-    # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
     def get_vulnerable_versions(self):
-        vuln_versions_list = self.html_tree.xpath('//span[text() = "Vulnerable:"]/../../td[2]/text()')
-        for i in range(len(vuln_versions_list)):
-            vuln_versions_list[i] = vuln_versions_list[i].strip()
-        # removes the empty string added at the end of the versions list because of the <br> tag.
-        for version in vuln_versions_list:
-            if len(version) == 0:
-                vuln_versions_list.remove(version)
-        return vuln_versions_list
+        return self._get_version_list(True)
 
     def get_not_vulnerable_versions(self):
-        versions_list = self.html_tree.xpath('//span[text() = "Not Vulnerable:"]/../../td[2]/text()')
-        for i in range(len(versions_list)):
-            versions_list[i] = versions_list[i].strip()
-        # removes the empty string added at the end of the versions list because of the <br> tag.
-        for version in versions_list:
-            if len(version) == 0:
-                versions_list.remove(version)
+        return self._get_version_list(False)
+
+    # FIXME precision about versions (like the Gentoo linux in wordpress_vuln_no_cve.html) are not parsed.
+    def _get_version_list(self, get_vulnerable_versions):
+        if get_vulnerable_versions:
+            versions_list = self.html_tree.xpath('//span[text() = "Vulnerable:"]/../../td[2]/text()')
+        else:
+            versions_list = self.html_tree.xpath('//span[text() = "Not Vulnerable:"]/../../td[2]/text()')
+        versions_list = [version.strip() for version in versions_list if len(version.strip()) > 0]
         return versions_list
 
 
@@ -157,10 +151,7 @@ class DiscussionTabParser:
                 br_text = br_tag.tail
                 if br_text is not None:
                     discussion_text += br_text
-        # replace multiple spaces, \t and \n with one space
-        discussion_text = re.sub('\s\s+', ' ', discussion_text)
-        discussion_text = discussion_text.strip()  # Remove spaces at the beginning and at the end of the string.
-        return discussion_text
+        return strip_whitespaces(discussion_text)
 
 
 class ExploitTabParser:
@@ -183,9 +174,7 @@ class ExploitTabParser:
                     if "Currently, we are not aware of any working exploits." in text:
                         return None
                     exploit_description += text
-        exploit_description = re.sub(' {2,}', ' ', exploit_description)  # replace multiple white spaces with one space.
-        exploit_description = exploit_description.strip()  # Remove \n, \t, etc.
-        return exploit_description
+        return strip_whitespaces(exploit_description)
 
 
 class SolutionTabParser:
@@ -208,6 +197,11 @@ class SolutionTabParser:
                     if "Currently we are not aware of any" in text:
                         return None
                     solution_description += text
-        solution_description = re.sub(' {2,}', ' ', solution_description)  # replace multiple white spaces with one space.
-        solution_description = solution_description.strip()  # Remove \n, \t, etc.
-        return solution_description
+        return strip_whitespaces(solution_description)
+
+
+def strip_whitespaces(string):
+    """Replace multiple spaces, \n and \t with single space and remove leading and trailing space in the string. Return the stripped string"""
+    stripped_string = re.sub('\s\s+', ' ', string)
+    stripped_string = stripped_string.strip()
+    return stripped_string
