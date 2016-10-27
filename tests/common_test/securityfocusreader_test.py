@@ -320,3 +320,23 @@ class SecurityFocusReaderTest(unittest.TestCase):
         for ref in vuln.references:
             if ref.type == "other" and ref.url is not None:
                 self.assertNotIn("securityfocus", ref.url)
+
+    def test_get_lowest_version_when_multiple_fixed_in(self):
+        """Test that the fixed_in version put in the vuln file by the reader is the lowest one when there is more than one not vuln version"""
+        self.storage.reset_mock()
+        self.storage.list_directories.return_value = {"wassup"}
+        self.vulnerability_manager.find_vulnerability.side_effect = VulnerabilityNotFound()
+        self.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="security-focus", key="plugins/wassup")
+        info_parser = MagicMock()
+        info_parser.get_not_vulnerable_versions.return_value = ["WordPress WassUp 1.7.2", "WordPress WassUp 1.7.1", "WordPress WassUp 1.6.9"]
+        info_parser.get_title.return_value = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
+        info_parser.get_bugtraq_id.return_value = "12345"
+        references_parser = MagicMock()
+        references_parser.get_references.return_value = []
+        entry = {
+            "id": info_parser.get_bugtraq_id(),
+            "info_parser": info_parser,
+            "references_parser": references_parser,
+        }
+        vuln = self.reader.read_one(entry)
+        self.assertEqual(vuln.affected_versions[0].fixed_in, "1.6.9")

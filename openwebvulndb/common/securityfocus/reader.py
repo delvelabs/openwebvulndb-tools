@@ -5,6 +5,7 @@ from openwebvulndb.common.models import Reference, VersionRange
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
+from openwebvulndb.common.version import parse
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -28,10 +29,6 @@ class SecurityFocusReader:
             data = json.load(file)
             for entry in data:
                 self.read_one(entry)
-
-    #todo
-    def read_api(self, url):
-        pass
 
     def read_one(self, entry):
         target = self.identify_target(entry)
@@ -126,7 +123,6 @@ class SecurityFocusReader:
             plugin_name = re.sub("wordpress ", '', plugin_name)
             plugin_name = re.sub(" plugin", '', plugin_name)
             plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
-            logger.debug(plugin_name)
             if plugin_name in self.storage.list_directories("plugins"):
                 return "plugins/" + plugin_name
             else:
@@ -151,15 +147,23 @@ class SecurityFocusReader:
         return entry['info_parser'].get_last_update_date()
 
     def _get_fixed_in(self, entry):
-        # TODO if more than one not vulnerable version, find the older one and return it as the fixed_in.
-        if len(entry['info_parser'].get_not_vulnerable_versions()) == 0:
+        not_vuln_versions = entry['info_parser'].get_not_vulnerable_versions()
+        if len(not_vuln_versions) == 0:
             return None
-        version_str = entry['info_parser'].get_not_vulnerable_versions()[0]
-        if version_str is not None:
-            version = re.sub("WordPress (\D)*", '', version_str)
-            return version
-        else:
-            return None
+        elif len(not_vuln_versions) == 1:
+            return self._strip_version(not_vuln_versions[0])
+        else:  # If there is more than one fixed_in, return the lowest version:
+            not_vuln_versions = [self._strip_version(version) for version in not_vuln_versions]
+            not_vuln_parsed_versions = []
+            for version in not_vuln_versions:
+                not_vuln_parsed_versions.append(parse(version))
+            for version in not_vuln_parsed_versions:
+                if version < not_vuln_parsed_versions[0]:
+                    not_vuln_parsed_versions[0] = version
+            return str(not_vuln_parsed_versions[0])
+
+    def _strip_version(self, version):
+        return re.sub("WordPress (\D)*", '', version)
 
     def _get_existing_vulnerability(self, entry, target):
         for ref in self._get_possible_existing_references(entry):
@@ -209,10 +213,7 @@ class MetaMapper:
     def lookup_id(self, id):
         if not self.loaded:
             self.load_from_storage()
-        logger.info(self.hints)
-        logger.info(id)
         if id in self.hints:
-            logger.info("yes")
             return self.hints[id]
 
     def load_from_storage(self):
