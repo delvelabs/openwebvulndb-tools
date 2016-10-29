@@ -1,0 +1,9 @@
+{
+    "key": "plugins/welcart",
+    "hints": [
+        {
+            "type": "bugtraqid",
+            "id": "91405"
+        }
+    ]
+}

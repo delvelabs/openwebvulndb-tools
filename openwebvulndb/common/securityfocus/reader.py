@@ -50,11 +50,11 @@ class SecurityFocusReader:
         def apply_value(field, value):
             if allow_override or getattr(vuln, field) is None:
                 setattr(vuln, field, value)
-
+        # todo if title is not none check if title from securityfocus is better instead of doing blind override.
         if vuln.title is None or allow_override:
             apply_value("title", entry['info_parser'].get_title())
 
-        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown" or allow_override:
+        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
             vuln.reported_type = entry['info_parser'].get_vuln_class()
 
         apply_value('updated_at', self._get_last_modified(entry))
@@ -68,7 +68,8 @@ class SecurityFocusReader:
         self._add_bugtraqid_reference(ref_manager, entry["id"])
         for cve in entry['info_parser'].get_cve_id():
             ref_manager.include_normalized("cve", cve[4:])  # Remove the "CVE-" at the beginning of the cve id string
-        for reference in entry['references_parser'].get_references():
+        useful_references = self._remove_useless_references(entry['references_parser'].get_references())
+        for reference in useful_references:
             ref_manager.include_url(reference["url"])
 
     def identify_target(self, entry):
@@ -192,6 +193,15 @@ class SecurityFocusReader:
                 ref.url = None
                 return
         references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+
+    def _remove_useless_references(self, references_list):
+        """Remove the useless references that the references tab of a vuln in the security focuse db usually contains, like a link to wordpress/the plugin homepage."""
+        useful_references = []
+        for reference in references_list:
+            url = reference["url"]
+            if not match_website.search(url):
+                useful_references.append(reference)
+        return useful_references
 
 
 class MetaMapper:

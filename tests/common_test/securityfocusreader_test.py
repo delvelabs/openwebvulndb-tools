@@ -140,10 +140,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
-        self.assertEqual(references[2].type, "other")
-        self.assertEqual(references[2].url, "http://wordpress.org/extend/plugins/wassup/changelog/")
-        self.assertEqual(references[3].type, "other")
-        self.assertEqual(references[3].url, "http://wordpress.org/extend/plugins/wassup/")
 
     def test_add_vuln_to_database_allow_override(self):
         """Test if a more recent vuln entry allow to override an old one."""
@@ -167,7 +163,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
         self.assertEqual(vuln_entry.id, bugtraq_id)
         self.assertEqual(vuln_entry.title, "WordPress WassUp Plugin 'main.php' Fake Title")
-        self.assertEqual(vuln_entry.reported_type, "Random Vuln Class")
+        self.assertEqual(vuln_entry.reported_type, "Input Validation Error")  # Reported type is not overwritten.
         self.assertEqual(vuln_entry.updated_at, datetime(2016, 9, 4, 20, 0))
         self.assertEqual(vuln_entry.created_at, datetime(2009, 12, 7, 0, 0))
         self.assertEqual(vuln_entry.affected_versions[0].fixed_in, "1.7.2.1")
@@ -176,13 +172,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
-        self.assertEqual(references[2].type, "other")
-        self.assertEqual(references[2].url, "http://wordpress.org/extend/plugins/wassup/changelog/")
-        self.assertEqual(references[3].type, "other")
-        self.assertEqual(references[3].url, "http://wordpress.org/extend/plugins/wassup/")
 
     def test_add_vuln_to_database_no_override(self):
-        """Test if a less recent vuln entry can't override a newer one, but can still add new references."""
+        """Test if a less recent vuln entry can't override a newer one."""
         self.storage.reset_mock()
         bugtraq_id = "73931"
         previous_vuln_entry = Vulnerability(id=bugtraq_id,
@@ -214,10 +206,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(references[0].id, bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
-        self.assertEqual(references[2].type, "other")
-        self.assertEqual(references[2].url, "http://wordpress.org/extend/plugins/wassup/changelog/")
-        self.assertEqual(references[3].type, "other")
-        self.assertEqual(references[3].url, "http://wordpress.org/extend/plugins/wassup/")
 
     def test_add_multiple_vulnerabilities_to_database(self):
         """Test the security focus reader with a lot of samples."""
@@ -257,10 +245,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
                 self.assertEqual(references[reference_index].type, "cve")
                 self.assertEqual(references[reference_index].id, cve_id[4:])
                 reference_index += 1
-            self.assertEqual(len(references_parser.get_references()), len(references) - reference_index)
-            for entry_ref, parser_ref in zip(references[reference_index:], references_parser.get_references()):
-                self.assertEqual(entry_ref.type, "other")
-                self.assertEqual(entry_ref.url, parser_ref["url"])
 
     def test_cve_reference_already_exists(self):
         path = file_path(__file__, "samples/fake_data")
@@ -340,3 +324,22 @@ class SecurityFocusReaderTest(unittest.TestCase):
         }
         vuln = self.reader.read_one(entry)
         self.assertEqual(vuln.affected_versions[0].fixed_in, "1.6.9")
+
+    def test_remove_useless_references(self):
+        self.storage.reset_mock()
+        self.storage.list_directories.return_value = {"wassup"}
+        self.vulnerability_manager.find_vulnerability.side_effect = VulnerabilityNotFound()
+        self.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="security-focus",
+                                                                                      key="plugins/wassup")
+        info_parser = MagicMock()
+        info_parser.get_title.return_value = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
+        info_parser.get_bugtraq_id.return_value = "73931"
+        references_parser = ReferenceTabParser()
+        references_parser.set_html_page(file_path(__file__, "samples/73931/references_tab.html"))
+        entry = {
+            "id": info_parser.get_bugtraq_id(),
+            "info_parser": info_parser,
+            "references_parser": references_parser,
+        }
+        vuln = self.reader.read_one(entry)
+        self.assertEqual(len(vuln.references), 2)  # Only the bugtraqid and the first reference should be in the list.<
