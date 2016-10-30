@@ -178,8 +178,8 @@ class SecurityFocusReader:
         possible_references = []
         securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["info_parser"].get_bugtraq_id())
         possible_references.append(Reference(type="other", url=securityfocus_url))
-        if len(entry["info_parser"].get_cve_id()) != 0:
-            cve_id = entry["info_parser"].get_cve_id()[0][4:]  # Remove the "CVE-" before the id.
+        for cve_id in entry["info_parser"].get_cve_id():
+            cve_id = cve_id[4:]  # Remove the "CVE-" before the id.
             possible_references.append(Reference(type="cve", id=cve_id))
         possible_references.append(Reference(type="bugtraqid", id=entry["id"]))
         return possible_references
@@ -199,7 +199,7 @@ class SecurityFocusReader:
         useful_references = []
         for reference in references_list:
             url = reference["url"]
-            if not match_website.search(url):
+            if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or match_website.search(url)):
                 useful_references.append(reference)
         return useful_references
 

@@ -335,11 +335,11 @@ class SecurityFocusReaderTest(unittest.TestCase):
         info_parser.get_title.return_value = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
         info_parser.get_bugtraq_id.return_value = "73931"
         references_parser = ReferenceTabParser()
-        references_parser.set_html_page(file_path(__file__, "samples/73931/references_tab.html"))
+        references_parser.set_html_page(file_path(__file__, "samples/securityfocus_references_tab_with_useless_references.html"))
         entry = {
             "id": info_parser.get_bugtraq_id(),
             "info_parser": info_parser,
             "references_parser": references_parser,
         }
         vuln = self.reader.read_one(entry)
-        self.assertEqual(len(vuln.references), 2)  # Only the bugtraqid and the first reference should be in the list.<
+        self.assertEqual(len(vuln.references), 3)  # Only the bugtraqid and the first two references should be in the list.

@@ -5,6 +5,7 @@ from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceT
 import re
 from openwebvulndb.common.logs import logger
 import os
+from aiohttp import ClientResponseError
 
 
 class SecurityFocusFetcher:
@@ -70,16 +71,20 @@ class SecurityFocusFetcher:
             "solution_parser": SolutionTabParser()
         }
         for page, parser_name in zip(pages_to_fetch, parsers_name):
-            async with self.http_session.get(url + '/' + page) as html_response:
-                if html_response.status != 200:
-                    logger.info("Error when getting {0}. Skipping to next page.".format(url + '/' + page))
-                    continue
-                raw_html_page = await html_response.text()
-                vuln_entry[parser_name].set_html_page(StringIO(raw_html_page))
-                # If the file doesn't already exists, save it in dest_folder.
-                if dest_folder is not None and not os.path.isfile(os.path.join(dest_folder, page + "tab.html")):
-                    with open(os.path.join(dest_folder, page + "_tab.html"), 'wt') as file:
-                        file.write(raw_html_page)
+            try:
+                async with self.http_session.get(url + '/' + page) as html_response:
+                    if html_response.status != 200:
+                        logger.info("Error when getting {0}. Skipping to next page.".format(url + '/' + page))
+                        continue
+                    raw_html_page = await html_response.text()
+                    vuln_entry[parser_name].set_html_page(StringIO(raw_html_page))
+                    # If the file doesn't already exists, save it in dest_folder.
+                    if dest_folder is not None and not os.path.isfile(os.path.join(dest_folder, page + "tab.html")):
+                        with open(os.path.join(dest_folder, page + "_tab.html"), 'wt') as file:
+                            file.write(raw_html_page)
+            except ClientResponseError:
+                logger.info("Error when getting vuln {0}, page {1}.".format(bugtraq_id, page))
+                return None
         return vuln_entry
 
     def _parse_page_with_vuln_list(self, html_page):

@@ -8,7 +8,8 @@ def update_securityfocus_database(loop, storage, vulnerability_manager):
         vulnerability_list = await fetcher.get_list_of_vuln_on_first_page()
         for vuln_url in vulnerability_list:
             vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
-            reader.read_one(vuln_entry)
+            if vuln_entry is not None:
+                reader.read_one(vuln_entry)
     with aiohttp.ClientSession(loop=loop) as aiohttp_session:
         fetcher = SecurityFocusFetcher(aiohttp_session, vulnerability_manager)
         reader = SecurityFocusReader(storage, vulnerability_manager, aiohttp_session)
