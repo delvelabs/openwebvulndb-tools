@@ -32,3 +32,12 @@ class ReferenceManagerTest(TestCase):
         manager.include_url("http://example.com")
 
         self.assertEqual(len(my_list), 2)
+
+    def test_security_focus_url_are_normalized_to_bugtraqid(self):
+        reference_list = []
+        manager = ReferenceManager.for_list(reference_list)
+
+        manager.include_url("http://www.securityfocus.com/bid/98765")
+
+        self.assertEqual(reference_list[0].type, "bugtraqid")
+        self.assertEqual(reference_list[0].id, "98765")

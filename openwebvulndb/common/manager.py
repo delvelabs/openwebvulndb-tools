@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from collections import defaultdict
+import re
 
 from .models import VulnerabilityList, Reference
 from .errors import VulnerabilityNotFound
@@ -72,7 +73,7 @@ class VulnerabilityManager:
 
 class ReferenceManager:
 
-    normalized_sources = ["cve", "exploitdb", "secunia", "metasploit", "osvdb", "wpvulndb"]
+    normalized_sources = ["cve", "exploitdb", "secunia", "metasploit", "osvdb", "wpvulndb", "bugtraqid"]
 
     def __init__(self):
         self.references = None
@@ -97,10 +98,22 @@ class ReferenceManager:
             self.references.append(ref)
             return ref
 
+    def include_bugtraqid(self, url):
+        match = re.search("\d+", url)
+        if match:
+            bugtraqid = match.group()
+            if len(bugtraqid) > 0:
+                return self.include_normalized("bugtraqid", bugtraqid)
+        return None
+
     def include_url(self, url):
         try:
             return next(x for x in self.references if x.url == url)
         except StopIteration:
+            if "securityfocus" in url:
+                ref = self.include_bugtraqid(url)
+                if ref is not None:
+                    return ref
             ref = Reference()
             ref.type = "other"
             ref.url = url

@@ -44,8 +44,8 @@ class VaneImportTest(TestCase):
                          "http://packetstormsecurity.com/files/127302/")
         self.assertEqual(theme_my_login.vulnerabilities[0].references[2].url,
                          "http://seclists.org/fulldisclosure/2014/Jun/172")
-        self.assertEqual(theme_my_login.vulnerabilities[0].references[3].url,
-                         "http://www.securityfocus.com/bid/68254")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[3].type, "bugtraqid")
+        self.assertEqual(theme_my_login.vulnerabilities[0].references[3].id, "68254")
         self.assertEqual(theme_my_login.vulnerabilities[0].references[4].url,
                          "https://security.dxw.com/advisories/lfi-in-theme-my-login/")
         self.assertEqual(theme_my_login.vulnerabilities[0].references[0].url, None)
