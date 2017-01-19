@@ -17,13 +17,15 @@
 
 from argparse import ArgumentParser
 from random import shuffle
-from os.path import join
+from os.path import join, dirname
 
 from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
+from .vane2 import Vane2VersionRebuild
+
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
@@ -50,6 +52,31 @@ def vane_export(vane_importer, storage, input_path):
     rebuild = VaneVersionRebuild(join(input_path, "wp_versions.xml"))
     rebuild.update(storage.read_versions("wordpress"))
     rebuild.write()
+
+def get_files_for_wordpress_version_identification(storage, input_path):
+    if not input_path:
+        raise Exception("Option required: input_path")
+    input_path = join(dirname(__file__), input_path)
+    filename = join(input_path, "files_for_wordpress_versions_identification")
+
+    rebuild = Vane2VersionRebuild(storage)
+    files = rebuild.get_files_for_versions_identification(storage.read_versions("wordpress"))
+    with open(filename, "w") as fp:
+        for file in files:
+            fp.write(file + "\n")
+
+def vane2_export(storage, input_path):
+    if not input_path:
+        raise Exception("Option required: input_path")
+    input_path = join(dirname(__file__), input_path)
+    filename = join(input_path, "vane2_versions.json")
+
+    rebuild = Vane2VersionRebuild(storage)
+    rebuild.load_files_for_versions_signatures(join(input_path, "versions_signature_files"))
+    rebuild.update("wordpress")
+    rebuild.check_for_equal_version_signatures()
+    with open(filename, "w") as fp:
+        fp.write(rebuild.dump())
 
 
 def populate_versions(loop, repository_hasher, storage):
@@ -85,6 +112,8 @@ operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
                   vane_export=vane_export,
+                  vane2_export=vane2_export,
+                  get_files_for_wordpress_version_identification=get_files_for_wordpress_version_identification,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
