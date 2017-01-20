@@ -96,7 +96,7 @@ class Vane2VersionRebuildTest(TestCase):
         version2 = VersionDefinition(version="2.0", signatures=[readme2_signature, style_css_signature, button_js_signature])
         self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(Exception):
             self.version_rebuild.check_for_equal_version_signatures()
 
     def test_check_for_equal_version_signatures_do_nothing_if_two_versions_from_same_major_have_the_same_signatures(self):
@@ -111,7 +111,7 @@ class Vane2VersionRebuildTest(TestCase):
 
         try:
             self.version_rebuild.check_for_equal_version_signatures()
-        except ValueError:
+        except Exception:
             self.fail("Unexpected error raised.")
 
     def test_check_for_equal_version_signatures_dont_raise_error_if_versions_have_different_signatures(self):
@@ -127,7 +127,7 @@ class Vane2VersionRebuildTest(TestCase):
 
         try:
             self.version_rebuild.check_for_equal_version_signatures()
-        except ValueError:
+        except Exception:
             self.fail("Unexpected error raised.")
 
     def test_check_for_equal_version_signatures_raise_error_if_two_recent_minor_have_same_signature(self):
@@ -138,7 +138,7 @@ class Vane2VersionRebuildTest(TestCase):
         version2 = VersionDefinition(version="4.1.1", signatures=[readme1_signature, style_css_signature])
         self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(Exception):
             self.version_rebuild.check_for_equal_version_signatures()
 
     def test_check_for_equal_version_signatures_dont_raise_error_if_two_old_minor_have_same_signature(self):
@@ -151,40 +151,57 @@ class Vane2VersionRebuildTest(TestCase):
 
         try:
             self.version_rebuild.check_for_equal_version_signatures()
-        except ValueError:
+        except Exception:
             self.fail("Unexpected error raised.")
 
-    def test_get_diff_with_other_version_return_files_with_different_hash(self):
+    def test_compare_signatures_return_files_with_different_hash(self):
         common_file = Signature(path="style.css", hash=1234)
         button_file1 = Signature(path="button.js", hash=2345)
         readme_file1 = Signature(path="readme.html", hash=3456)
         button_file2 = Signature(path="button.js", hash=4567)
         readme_file2 = Signature(path="readme.html", hash=6789)
 
-        version1 = VersionDefinition(version="1.0", signatures=[common_file, readme_file1, button_file1])
-        version2 = VersionDefinition(version="1.1", signatures=[common_file, readme_file2, button_file2])
+        signatures0 = [common_file, readme_file1, button_file1]
+        signatures1 = [common_file, readme_file2, button_file2]
 
-        files = self.version_rebuild._get_diff_with_other_version(version1, version2)
+        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
         self.assertNotIn("style.css", files)
 
-    def test_get_diff_with_other_version_return_files_not_in_other_version(self):
+    def test_compare_signatures_return_files_not_in_other_version(self):
         common_file = Signature(path="style.css", hash=1234)
         file1 = Signature(path="file1.js", hash=2345)
         readme_file1 = Signature(path="readme.html", hash=3456)
         file2 = Signature(path="file2.js", hash=4567)
         readme_file2 = Signature(path="readme.html", hash=6789)
 
-        version1 = VersionDefinition(version="1.0", signatures=[common_file, readme_file1, file1])
-        version2 = VersionDefinition(version="1.1", signatures=[common_file, readme_file2, file2])
+        signatures0 = [common_file, readme_file1, file1]
+        signatures1 = [common_file, readme_file2, file2]
 
-        files = self.version_rebuild._get_diff_with_other_version(version1, version2)
+        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
 
         self.assertIn("file1.js", files)
         self.assertIn("file2.js", files)
         self.assertIn("readme.html", files)
+        self.assertNotIn("style.css", files)
+
+    def test_compare_signatures_ignore_exclude_files(self):
+        common_file = Signature(path="style.css", hash=1234)
+        file1 = Signature(path="file1.js", hash=2345)
+        readme_file1 = Signature(path="readme.html", hash=3456)
+        file2 = Signature(path="file2.js", hash=4567)
+        readme_file2 = Signature(path="readme.html", hash=6789)
+
+        signatures0 = [common_file, readme_file1, file1]
+        signatures1 = [common_file, readme_file2, file2]
+
+        files = self.version_rebuild.compare_signatures(signatures0, signatures1, exclude_file=readme_file1.path)
+
+        self.assertIn("file1.js", files)
+        self.assertIn("file2.js", files)
+        self.assertNotIn("readme.html", files)
         self.assertNotIn("style.css", files)
 
     def test_get_files_for_versions_identification_return_minimum_files_required_to_make_each_version_unique(self):
@@ -204,24 +221,13 @@ class Vane2VersionRebuildTest(TestCase):
 
         version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1, version2, version3])
 
-        files = self.version_rebuild.get_files_for_versions_identification(version_list)
+        files, versions_without_diff = self.version_rebuild.get_files_for_versions_identification_major_minor_algo(version_list)
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
         self.assertNotIn("style.css", files)
         self.assertNotIn("style2.css", files)
         self.assertNotIn("button.css", files)
-
-    def test_create_version_without_file_in_signature(self):
-        file1_signature = Signature(path="file1", hash=1234)
-        file2_signature = Signature(path="file2", hash=2345)
-        version = VersionDefinition(version="1.0", signatures=[file1_signature, file2_signature])
-
-        new_version = self.version_rebuild._create_version_without_files_in_signature(version, ["file2"])
-
-        self.assertEqual(new_version.version, version.version)
-        self.assertIn(file1_signature, new_version.signatures)
-        self.assertNotIn(file2_signature, new_version.signatures)
 
     def test_is_recent_version(self):
         version3 = "3.1.1"
@@ -271,12 +277,72 @@ class Vane2VersionRebuildTest(TestCase):
         readme2 = Signature(path="readme.html", hash=2)
         common_file = Signature(path="button.js", hash=3)
 
-        major = "4.7"
+        major = ["4.7"]
         version4_7_1 = VersionDefinition(version="4.7.1", signatures=[readme1, common_file])
         version4_7_2 = VersionDefinition(version="4.7.2", signatures=[readme2, common_file])
-        version_list = [version4_7_1, version4_7_2]
+        version_list = VersionList(key="", producer="", versions=[version4_7_1, version4_7_2])
 
-        files = self.version_rebuild.get_diff_between_minor_versions(version_list)
+        files, versions_without_diff = self.version_rebuild.get_files_to_identify_minor_versions(version_list, major)
 
         self.assertIn("readme.html", files)
         self.assertNotIn("button.js", files)
+
+    def test_is_version_greater_than_other_version(self):
+        version1 = "1.2.3"
+        version2 = "2.0"
+        version3 = "1.3"
+        version4 = "1.2.3.1"
+
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version1))
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version3, version1))
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version4, version1))
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version3))
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version4))
+        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version3, version4))
+
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version2))
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version3))
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version4))
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version3, version2))
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version4, version2))
+        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version4, version3))
+
+    def test_sort_versions(self):
+        version0 = VersionDefinition(version="3.7.16")
+        version1 = VersionDefinition(version="3.8.16")
+        version2 = VersionDefinition(version="3.9.14")
+        version3 = VersionDefinition(version="4.0.13")
+        version4 = VersionDefinition(version="4.1.13")
+        version5 = VersionDefinition(version="4.2.10")
+        version6 = VersionDefinition(version="4.5.2")
+        version7 = VersionDefinition(version="4.5.3")
+
+        versions_list = VersionList(key="", producer="", versions=[version4, version1, version6, version0, version2,
+                                                                   version7, version5, version3])
+        sorted_versions = self.version_rebuild.sort_versions(versions_list)
+
+        self.assertEqual(sorted_versions[0], version0)
+        self.assertEqual(sorted_versions[1], version1)
+        self.assertEqual(sorted_versions[2], version2)
+        self.assertEqual(sorted_versions[3], version3)
+        self.assertEqual(sorted_versions[4], version4)
+        self.assertEqual(sorted_versions[5], version5)
+        self.assertEqual(sorted_versions[6], version6)
+        self.assertEqual(sorted_versions[7], version7)
+
+    def test_compare_signatures(self):
+        readme_signature = Signature(path="readme.html", hash=1234)
+        button_signature = Signature(path="button.js", hash=2345)
+        style_signature = Signature(path="style.css", hash=3456)
+        other_readme_signature = Signature(path="readme.html", hash=4567)
+        common_file = Signature(path="login.js", hash=5678)
+
+        signatures0 = [readme_signature, button_signature, common_file]
+        signatures1 = [style_signature, other_readme_signature, common_file]
+
+        diff = self.version_rebuild.compare_signatures(signatures0, signatures1)
+
+        self.assertIn("readme.html", diff)
+        self.assertIn("button.js", diff)
+        self.assertIn("style.css", diff)
+        self.assertNotIn("login.js", diff)

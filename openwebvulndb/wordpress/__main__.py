@@ -58,13 +58,36 @@ def get_files_for_wordpress_version_identification(storage, input_path):
     if not input_path:
         raise Exception("Option required: input_path")
     input_path = join(dirname(__file__), input_path)
-    filename = join(input_path, "files_for_wordpress_versions_identification")
+    filename = join(input_path, "wordpress_id_files")
 
     rebuild = Vane2VersionRebuild(storage)
-    files = rebuild.get_files_for_versions_identification(storage.read_versions("wordpress"))
-    with open(filename, "w") as fp:
+    files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo(storage.read_versions("wordpress"))
+    with open(filename + "_major_minor", "w") as fp:
         for file in files:
             fp.write(file + "\n")
+        for string in versions_without_diff:
+            fp.write(string + "\n")
+
+    files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo_without_readme(storage.read_versions("wordpress"))
+    with open(filename + "_major_minor_no_readme", "w") as fp:
+        for file in files:
+            fp.write(file + "\n")
+        for string in versions_without_diff:
+            fp.write(string + "\n")
+
+    files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo(storage.read_versions("wordpress"))
+    with open(filename + "_chronological_diff", "w") as fp:
+        for file in files:
+            fp.write(file + "\n")
+        for string in versions_without_diff:
+            fp.write(string + "\n")
+
+    files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo_without_readme(storage.read_versions("wordpress"))
+    with open(filename + "_chronological_diff_no_readme", "w") as fp:
+        for file in files:
+            fp.write(file + "\n")
+        for string in versions_without_diff:
+            fp.write(string + "\n")
 
 
 def vane2_export(storage, input_path):
