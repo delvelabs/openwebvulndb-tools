@@ -265,3 +265,18 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertIn("style.css", files)
         self.assertIn("button.js", files)
         self.assertEqual(len(files), 2)
+
+    def test_get_diff_between_minor_versions(self):
+        readme1 = Signature(path="readme.html", hash=1)
+        readme2 = Signature(path="readme.html", hash=2)
+        common_file = Signature(path="button.js", hash=3)
+
+        major = "4.7"
+        version4_7_1 = VersionDefinition(version="4.7.1", signatures=[readme1, common_file])
+        version4_7_2 = VersionDefinition(version="4.7.2", signatures=[readme2, common_file])
+        version_list = [version4_7_1, version4_7_2]
+
+        files = self.version_rebuild.get_diff_between_minor_versions(version_list)
+
+        self.assertIn("readme.html", files)
+        self.assertNotIn("button.js", files)

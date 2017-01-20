@@ -152,17 +152,11 @@ class Vane2VersionRebuild:
                 minor_versions.append(version)
         return minor_versions
 
+    # TODO merge with other methods
     def get_diff_between_minor_versions(self, minor_versions):
-        diff = set()
-        for version in minor_versions:
-            for other_version in minor_versions:
-                if version != other_version:
-                    diff = self._get_diff_with_other_version(version, other_version)
-                    if len(diff) == 0:
-                        print("version {0} and version {1} have the same signature.")
-                    diff |= diff
-        return self._remove_redundant_diff_between_versions(minor_versions, diff)
+        return self.get_diff_between_major_versions(minor_versions)
 
+    # TODO rename and refactor
     def get_diff_between_major_versions(self, major_versions):
         diff_list = []
         for index, version in enumerate(major_versions):
@@ -227,8 +221,6 @@ class Vane2VersionRebuild:
         return common_files
 
     def get_files_for_versions_identification(self, versions_list):
-        files = set()
-        version_done = 0
         major_versions = self._get_major_versions(versions_list)
         major_versions_definition = []
         for version in major_versions:
@@ -239,8 +231,9 @@ class Vane2VersionRebuild:
         files = self.get_diff_between_major_versions(major_versions_definition)
         print("files to identify major versions:")
         print(files)
-        #for major in major_versions:
-            #print("getting files to identify minor versions in %s" % major)
-            #minor_versions = self.get_minor_versions_in_major_version(versions_list, major)
-            #files |= self.get_diff_between_minor_versions(minor_versions)
-        return files
+
+        for major in major_versions:
+            print("getting files to identify minor versions in %s" % major)
+            minor_versions = self.get_minor_versions_in_major_version(versions_list, major)
+            files.extend(self.get_diff_between_minor_versions(minor_versions))
+        return set(files)

@@ -53,6 +53,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.update(storage.read_versions("wordpress"))
     rebuild.write()
 
+
 def get_files_for_wordpress_version_identification(storage, input_path):
     if not input_path:
         raise Exception("Option required: input_path")
@@ -65,6 +66,7 @@ def get_files_for_wordpress_version_identification(storage, input_path):
         for file in files:
             fp.write(file + "\n")
 
+
 def vane2_export(storage, input_path):
     if not input_path:
         raise Exception("Option required: input_path")
@@ -72,7 +74,7 @@ def vane2_export(storage, input_path):
     filename = join(input_path, "vane2_versions.json")
 
     rebuild = Vane2VersionRebuild(storage)
-    rebuild.load_files_for_versions_signatures(join(input_path, "versions_signature_files"))
+    rebuild.load_files_for_versions_signatures(join(input_path, "files_for_wordpress_versions_identification"))
     rebuild.update("wordpress")
     rebuild.check_for_equal_version_signatures()
     with open(filename, "w") as fp:
