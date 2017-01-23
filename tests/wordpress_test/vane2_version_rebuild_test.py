@@ -4,24 +4,12 @@ from openwebvulndb.wordpress.vane2 import Vane2VersionRebuild
 from openwebvulndb.common.schemas import VersionListSchema, SignatureSchema
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList
 from fixtures import file_path
-import re
 
 
 class Vane2VersionRebuildTest(TestCase):
 
     def setUp(self):
         self.version_rebuild = Vane2VersionRebuild(MagicMock())
-
-    def test_update_load_wordpress_version_signature_from_repository(self):
-        versions = '{"key": "wordpress", "producer": "unittest", "versions": [{"version": "1.4", "signatures": [{"path": "readme.html", "algo": "md5", "hash": "12345"}]}]}'
-        schema = VersionListSchema()
-        versions_list = schema.loads(versions).data
-        self.version_rebuild.storage.read_versions.return_value = versions_list
-        self.version_rebuild._cleanup_signatures = MagicMock()
-
-        self.version_rebuild.update("wordpress")
-        self.version_rebuild.storage.read_versions.assert_called_once_with("wordpress")
-        self.assertEqual(re.sub("\s", "", self.version_rebuild.dump()), re.sub("\s", "", versions))
 
     def test_update_cleanup_signatures(self):
         versions = {"key": "wordpress", "producer": "unittest", "versions": [
@@ -31,32 +19,25 @@ class Vane2VersionRebuildTest(TestCase):
         self.version_rebuild.storage.read_versions.return_value = schema.load(versions).data
         self.version_rebuild._cleanup_signatures = MagicMock()
 
-        self.version_rebuild.update("wordpress")
+        self.version_rebuild.update("wordpress", [])
 
-        self.version_rebuild._cleanup_signatures.assert_called_once_with(self.version_rebuild.version_list.versions[0].signatures)
+        self.version_rebuild._cleanup_signatures.assert_called_once_with(
+            self.version_rebuild.version_list.versions[0].signatures, [])
 
     def test_cleanup_signatures_only_keep_specified_files(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "wp-admin/js/common.js"]
+        signatures_files = ["readme.html", "wp-admin/js/common.js"]
         signatures = [{"path": "readme.html", "algo": "md5", "hash": "12345"},
                       {"path": "wp-admin/js/common.js", "algo": "md5", "hash": "23456"},
                       {"path": "other_file.js", "algo": "md5", "hash": "34567"}]
         schema = SignatureSchema()
         signatures = [schema.load(signature).data for signature in signatures]
 
-        self.version_rebuild._cleanup_signatures(signatures)
+        self.version_rebuild._cleanup_signatures(signatures, signatures_files)
 
         signature_paths = [signature.path for signature in signatures]
         self.assertIn("readme.html", signature_paths)
         self.assertIn("wp-admin/js/common.js", signature_paths)
         self.assertNotIn("other_file.js", signature_paths)
-
-    def test_load_files_for_signatures_from_file(self):
-        filename = file_path(__file__, "samples/versions_signature_files")
-
-        self.version_rebuild.load_files_for_versions_signatures(filename)
-
-        self.assertEqual(self.version_rebuild.get_files_to_use_for_signature(), ["readme.html", "file1.js", "style.css",
-                                                                                 "another_file.js"])
 
     def test_versions_equal_return_true_if_two_versions_have_same_file_with_same_hash(self):
         readme_signature = Signature(path="readme.html", hash=1234)
@@ -164,7 +145,7 @@ class Vane2VersionRebuildTest(TestCase):
         signatures0 = [common_file, readme_file1, button_file1]
         signatures1 = [common_file, readme_file2, button_file2]
 
-        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
@@ -180,7 +161,7 @@ class Vane2VersionRebuildTest(TestCase):
         signatures0 = [common_file, readme_file1, file1]
         signatures1 = [common_file, readme_file2, file2]
 
-        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
         self.assertIn("file1.js", files)
         self.assertIn("file2.js", files)
@@ -197,7 +178,7 @@ class Vane2VersionRebuildTest(TestCase):
         signatures0 = [common_file, readme_file1, file1]
         signatures1 = [common_file, readme_file2, file2]
 
-        files = self.version_rebuild.compare_signatures(signatures0, signatures1, exclude_file=readme_file1.path)
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1, exclude_file=readme_file1.path)
 
         self.assertIn("file1.js", files)
         self.assertIn("file2.js", files)
@@ -214,7 +195,7 @@ class Vane2VersionRebuildTest(TestCase):
         signatures0 = [file0, readme_file1, file1]
         signatures1 = [readme_file2, file2]
 
-        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
         self.assertIn("readme.html", files)
         self.assertNotIn("wp-content/plugins/my-plugin/style.css", files)
@@ -238,7 +219,7 @@ class Vane2VersionRebuildTest(TestCase):
 
         version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1, version2, version3])
 
-        files, versions_without_diff = self.version_rebuild.get_files_for_versions_identification_major_minor_algo(version_list)
+        files = self.version_rebuild.get_files_for_versions_identification(version_list)
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
@@ -257,72 +238,25 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertFalse(self.version_rebuild._is_recent_version(version2))
         self.assertFalse(self.version_rebuild._is_recent_version(version1))
 
-    def test_get_minor_version_in_major_version(self):
-        major = "4.7"
-        minor1 = VersionDefinition(version="4.7.1")
-        minor2 = VersionDefinition(version="4.7.2")
-        minor_not_in_major = VersionDefinition(version="4.6.1")
-        version_list = VersionList(key="wordpress", producer="", versions=[minor1, minor2, minor_not_in_major])
-
-        minor_versions = self.version_rebuild.get_minor_versions_in_major_version(version_list, major)
-
-        self.assertIn(minor1, minor_versions)
-        self.assertIn(minor2, minor_versions)
-        self.assertNotIn(minor_not_in_major, minor_versions)
-
-    def test_create_version_definition_for_major_version(self):
-        readme1 = Signature(path="readme.html", hash=1)
-        readme2 = Signature(path="readme.html", hash=2)
-        button = Signature(path="button.js", hash=3)
-        style_version_4_7 = Signature(path="style.css", hash=47)
-        style_other_versions = Signature(path="style.css", hash=0)
-
-        major = "4.7"
-        version4_7_1 = VersionDefinition(version="4.7.1", signatures=[readme1, button, style_version_4_7])
-        version4_7_2 = VersionDefinition(version="4.7.2", signatures=[readme2, button, style_version_4_7])
-        version3 = VersionDefinition(version="3.4.1", signatures=[button, style_other_versions])
-        version_list = VersionList(key="wordpress", producer="", versions=[version4_7_1, version4_7_2, version3])
-
-        version_definition = self.version_rebuild.create_version_definition_for_major_version(version_list, major)
-
-        self.assertIn(style_version_4_7, version_definition.signatures)
-        self.assertIn(button, version_definition.signatures)
-        self.assertEqual(len(version_definition.signatures), 2)
-
-    def test_get_diff_between_minor_versions(self):
-        readme1 = Signature(path="readme.html", hash=1)
-        readme2 = Signature(path="readme.html", hash=2)
-        common_file = Signature(path="button.js", hash=3)
-
-        major = ["4.7"]
-        version4_7_1 = VersionDefinition(version="4.7.1", signatures=[readme1, common_file])
-        version4_7_2 = VersionDefinition(version="4.7.2", signatures=[readme2, common_file])
-        version_list = VersionList(key="", producer="", versions=[version4_7_1, version4_7_2])
-
-        files, versions_without_diff = self.version_rebuild.get_files_to_identify_minor_versions(version_list, major)
-
-        self.assertIn("readme.html", files)
-        self.assertNotIn("button.js", files)
-
     def test_is_version_greater_than_other_version(self):
         version1 = "1.2.3"
         version2 = "2.0"
         version3 = "1.3"
         version4 = "1.2.3.1"
 
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version1))
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version3, version1))
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version4, version1))
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version3))
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version2, version4))
-        self.assertTrue(self.version_rebuild.is_version_greater_than_other_version(version3, version4))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version1))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version3, version1))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version4, version1))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version3))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version4))
+        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version3, version4))
 
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version2))
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version3))
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version1, version4))
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version3, version2))
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version4, version2))
-        self.assertFalse(self.version_rebuild.is_version_greater_than_other_version(version4, version3))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version2))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version3))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version4))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version3, version2))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version4, version2))
+        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version4, version3))
 
     def test_sort_versions(self):
         version0 = VersionDefinition(version="3.7.16")
@@ -336,7 +270,7 @@ class Vane2VersionRebuildTest(TestCase):
 
         versions_list = VersionList(key="", producer="", versions=[version4, version1, version6, version0, version2,
                                                                    version7, version5, version3])
-        sorted_versions = self.version_rebuild.sort_versions(versions_list)
+        sorted_versions = self.version_rebuild._sort_versions(versions_list)
 
         self.assertEqual(sorted_versions[0], version0)
         self.assertEqual(sorted_versions[1], version1)
@@ -357,7 +291,7 @@ class Vane2VersionRebuildTest(TestCase):
         signatures0 = [readme_signature, button_signature, common_file]
         signatures1 = [style_signature, other_readme_signature, common_file]
 
-        diff = self.version_rebuild.compare_signatures(signatures0, signatures1)
+        diff = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
         self.assertIn("readme.html", diff)
         self.assertIn("button.js", diff)
@@ -373,7 +307,7 @@ class Vane2VersionRebuildTest(TestCase):
         diff5 = ["file.js", "image.png"]  # choose arbitrary what it keeps
         diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
 
-        self.version_rebuild.keep_most_common_file_in_all_diff_for_each_diff(diff_list)
+        self.version_rebuild._keep_most_common_file_in_all_diff_for_each_diff(diff_list)
 
         self.assertEqual(diff0, ["readme.html"])
         self.assertEqual(diff1, ["readme.html"])
@@ -390,7 +324,7 @@ class Vane2VersionRebuildTest(TestCase):
         diff5 = ["file.js", "image.png"]  # all files are kept
         diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
 
-        self.version_rebuild.keep_most_common_file_in_all_diff_for_each_diff(diff_list, 2)
+        self.version_rebuild._keep_most_common_file_in_all_diff_for_each_diff(diff_list, 2)
 
         self.assertIn("readme.html", diff0)
         self.assertIn("style.css", diff0)

@@ -18,6 +18,7 @@
 from argparse import ArgumentParser
 from random import shuffle
 from os.path import join, dirname
+import json
 
 from openwebvulndb import app
 from .repository import WordPressRepository
@@ -54,93 +55,6 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def get_files_for_wordpress_version_identification(storage, input_path):
-    if not input_path:
-        raise Exception("Option required: input_path")
-    input_path = join(dirname(__file__), input_path)
-    filename = join(input_path, "wordpress_id_files")
-
-    rebuild = Vane2VersionRebuild(storage)
-    files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo(storage.read_versions("wordpress"))
-    with open(filename + "_major_minor", "w") as fp:
-        fp.write("Files to identify wordpress version when the readme.html file is present. Files choices done by the "
-                 "major-minor algorithm. Creates a signature for each major version with the identical files of the "
-                 "minor versions, then find the diff between all the major versions. After, find the diff between each "
-                 "minor versions in the same major version. For all diff, only the file that is the most common for all"
-                 "diff is kept, others are discarded.\n\n")
-        fp.write("%d files:\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        _files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo(storage.read_versions("wordpress"), 2)
-        files = _files - files
-        fp.write("\nFiles added if we keep two files per diff instead of one (%d new files):\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        fp.write("\nNo differences between these versions were found:\n")
-        for string in versions_without_diff:
-            fp.write(string + "\n")
-
-    files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo_without_readme(storage.read_versions("wordpress"))
-    with open(filename + "_major_minor_no_readme", "w") as fp:
-        fp.write("Files to identify wordpress version when the readme.html file is not present. Files choices done by "
-                 "the major-minor algorithm. See the wordpress_id_files_major_minor for a complete description.\n\n")
-        fp.write("%d files:\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        _files, versions_without_diff = rebuild.get_files_for_versions_identification_major_minor_algo_without_readme(storage.read_versions("wordpress"), 2)
-        files = _files - files
-        fp.write("\nFiles added if we keep two files per diff instead of one (%d new files):\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        fp.write("\nNo differences between these versions were found:\n")
-        for string in versions_without_diff:
-            fp.write(string + "\n")
-
-    files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo(storage.read_versions("wordpress"))
-    with open(filename + "_chronological_diff", "w") as fp:
-        fp.write("Files to identify wordpress version when the readme.html file is present. Files choices done by a "
-                 "chronological diff algorithm: Each version signature is compared with the signature of the next "
-                 "version, and the differences are stored. When all diff for all versions are stored, the most common "
-                 "file in all diff that appear in a diff is the one kept, all others are discarded.\n\n")
-        fp.write("%d files:\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        _files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo(
-            storage.read_versions("wordpress"), 2)
-        files = _files - files
-        fp.write("\nFiles added if we keep two files per diff instead of one (%d new files):\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        fp.write("\nNo differences between these versions were found:\n")
-        for string in versions_without_diff:
-            fp.write(string + "\n")
-
-    files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo_without_readme(storage.read_versions("wordpress"))
-    with open(filename + "_chronological_diff_no_readme", "w") as fp:
-        fp.write("Files to identify wordpress version when the readme.html file is not present. Files choices done by a"
-                 " chronological diff algorithm, see description in wordpress_id_files_chronological_diff.\n\n")
-        fp.write("%d files:\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        _files, versions_without_diff = rebuild.get_files_for_versions_identification_chronological_diff_algo_without_readme(
-            storage.read_versions("wordpress"), 2)
-        files = _files - files
-        fp.write("\nFiles added if we keep two files per diff instead of one (%d new files):\n" % len(files))
-        for file in files:
-            fp.write(file + "\n")
-
-        fp.write("\nNo differences between these versions were found:\n")
-        for string in versions_without_diff:
-            fp.write(string + "\n")
-
-
 def vane2_export(storage, input_path):
     if not input_path:
         raise Exception("Option required: input_path")
@@ -148,11 +62,16 @@ def vane2_export(storage, input_path):
     filename = join(input_path, "vane2_versions.json")
 
     rebuild = Vane2VersionRebuild(storage)
-    rebuild.load_files_for_versions_signatures(join(input_path, "files_for_wordpress_versions_identification"))
-    rebuild.update("wordpress")
+    versions_list = storage.read_versions("wordpress")
+    files = rebuild.get_files_for_versions_identification(versions_list, files_to_keep_per_diff=2)
+    files |= rebuild.get_files_for_versions_identification(versions_list, exclude_file="readme.html",
+                                                           files_to_keep_per_diff=2)
+    rebuild.update("wordpress", files)
     rebuild.check_for_equal_version_signatures()
     with open(filename, "w") as fp:
-        fp.write(rebuild.dump())
+        obj = rebuild.dump()
+        obj["signatures_files"] = list(files)
+        fp.write(json.dumps(obj, indent=4))
 
 
 def populate_versions(loop, repository_hasher, storage):
@@ -189,7 +108,6 @@ operations = dict(list_themes=list_themes,
                   vane_import=vane_import,
                   vane_export=vane_export,
                   vane2_export=vane2_export,
-                  get_files_for_wordpress_version_identification=get_files_for_wordpress_version_identification,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
