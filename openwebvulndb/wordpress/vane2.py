@@ -61,10 +61,13 @@ class Vane2VersionRebuild:
             if signature.path == file_path:
                 return signature
 
+    def _is_plugin_or_theme_file(self, file_path):
+        return re.match("wp-content/((plugins)|(themes))", file_path) is not None
+
     def compare_signatures(self, signatures0, signatures1, exclude_file=None):
         diff = []
         for signature in signatures0:
-            if signature.path != exclude_file:
+            if signature.path != exclude_file and not self._is_plugin_or_theme_file(signature.path):
                 other_signature = self._find_file_signature_in_signatures(signature.path, signatures1)
                 if other_signature is not None:
                     if signature.hash != other_signature.hash:
@@ -73,7 +76,7 @@ class Vane2VersionRebuild:
                     diff.append(signature.path)
         # Check for files in other_version not present in version:
         for signature in signatures1:
-            if signature.path != exclude_file:
+            if signature.path != exclude_file and not self._is_plugin_or_theme_file(signature.path):
                 if self._find_file_signature_in_signatures(signature.path, signatures0) is None:
                     diff.append(signature.path)
         return diff
@@ -91,13 +94,17 @@ class Vane2VersionRebuild:
                 versions.append(version)
         return versions
 
-    def get_major_version_signature(self, versions_list, major_version):
+    def create_version_definition_for_major_version(self, versions_list, major_version):
         signatures = []
-        common_files = self.get_common_file_for_major_version(major_version, versions_list)
         minor_versions = self.get_minor_versions_in_major_version(versions_list, major_version)
-        for file in common_files:
-            signatures.append(self._find_file_signature_in_signatures(file, minor_versions[0].signatures))
-        return signatures
+        if len(minor_versions) > 1:
+            common_files = self.get_common_files_for_versions(minor_versions)
+            for signature in minor_versions[0].signatures:
+                if signature.path in common_files:
+                    signatures.append(signature)
+        else:
+            signatures = minor_versions[0].signatures
+        return VersionDefinition(version=major_version, signatures=signatures)
 
     def get_minor_versions_in_major_version(self, versions_list, major_version):
         minor_versions = []
@@ -106,7 +113,7 @@ class Vane2VersionRebuild:
                 minor_versions.append(version)
         return minor_versions
 
-    def get_diff_between_versions(self, versions, exclude_file=None):
+    def get_diff_between_versions(self, versions, exclude_file=None, files_to_keep_per_diff=1):
         diff_list = []
         versions_without_diff = []
         for index, version in enumerate(versions):
@@ -119,33 +126,39 @@ class Vane2VersionRebuild:
                 else:
                     diff_list.append(diff)
 
+        self.keep_most_common_file_in_all_diff_for_each_diff(diff_list, files_to_keep_per_diff)
+        return set(file for diff in diff_list for file in diff), versions_without_diff
+
+    def keep_most_common_file_in_all_diff_for_each_diff(self, diff_list, files_to_keep_per_diff=1):
         files_count_in_all_diff = Counter([file for diff in diff_list for file in diff])
         for diff in diff_list:
+            new_diff = []
             for file_count in files_count_in_all_diff.most_common():
                 file = file_count[0]
                 if file in diff:
-                    diff.clear()  # Keep only the most common file from all diff as the difference for that version.
-                    diff.append(file)
-            # Update the counter with the removed files.
+                    new_diff.append(file)
+                    if len(new_diff) == files_to_keep_per_diff:
+                        break  # Done for this diff, proceed with the next.
+            diff.clear()
+            diff.extend(new_diff)
+            # Update the counter with the removed files, so the files kept by the previous diffs are taken into
+            # account for the choices of the next diffs.
             files_count_in_all_diff = Counter([file for diff in diff_list for file in diff])
-        return set(file for diff in diff_list for file in diff), versions_without_diff
 
-    def get_files_to_identify_major_versions(self, versions_list, exclude_file=None):
+    def get_files_to_identify_major_versions(self, versions_list, exclude_file=None, files_to_keep_per_diff=1):
         major_versions = self._list_different_versions_from_pattern(versions_list, self.major_version_pattern)
         major_versions_definition = []
         for version in major_versions:
-            signatures = self.get_major_version_signature(versions_list, version)
-            version_definition = VersionDefinition(version=version, signatures=signatures)
+            version_definition = self.create_version_definition_for_major_version(versions_list, version)
             major_versions_definition.append(version_definition)
-        return self.get_diff_between_versions(major_versions_definition, exclude_file)
+        return self.get_diff_between_versions(major_versions_definition, exclude_file, files_to_keep_per_diff)
 
-    def get_files_to_identify_minor_versions(self, versions_list, major_versions, exclude_file=None):
+    def get_files_to_identify_minor_versions(self, versions_list, major_versions, exclude_file=None, files_to_keep_per_diff=1):
         files = set()
         versions_without_diff = []
         for version in major_versions:
-            #print("getting files to identify minor versions in %s" % version)
             minor_versions = self.get_minor_versions_in_major_version(versions_list, version)
-            _files, _versions_without_diff = self.get_diff_between_versions(minor_versions, exclude_file)
+            _files, _versions_without_diff = self.get_diff_between_versions(minor_versions, exclude_file, files_to_keep_per_diff)
             files |= _files
             versions_without_diff.extend(_versions_without_diff)
         return files, versions_without_diff
@@ -177,12 +190,6 @@ class Vane2VersionRebuild:
                         common_files = set(identical_files)
         return common_files
 
-    def get_common_file_for_major_version(self, major_version, versions_list):
-        minor_versions = self.get_minor_versions_in_major_version(versions_list, major_version)
-        if len(minor_versions) == 1:
-            return set((signature.path for signature in minor_versions[0].signatures))
-        return self.get_common_files_for_versions(minor_versions)
-
     def is_version_greater_than_other_version(self, version, other_version):
         _version = re.split("\.", version)
         _other_version = re.split("\.", other_version)
@@ -209,30 +216,30 @@ class Vane2VersionRebuild:
                 sorted_versions.append(version)
         return sorted_versions
 
-    def get_files_for_versions_identification_major_minor_algo(self, versions_list):
-        files, versions_without_diff = self.get_files_to_identify_major_versions(versions_list)
+    def get_files_for_versions_identification_major_minor_algo(self, versions_list, files_to_keep_per_diff=1):
+        files, versions_without_diff = self.get_files_to_identify_major_versions(versions_list, files_to_keep_per_diff=files_to_keep_per_diff)
 
         major_versions = self._list_different_versions_from_pattern(versions_list, self.major_version_pattern)
-        _files, _versions_without_diff = self.get_files_to_identify_minor_versions(versions_list, major_versions)
+        _files, _versions_without_diff = self.get_files_to_identify_minor_versions(versions_list, major_versions, files_to_keep_per_diff=files_to_keep_per_diff)
         files |= _files
         versions_without_diff.extend(_versions_without_diff)
         return files, versions_without_diff
 
-    def get_files_for_versions_identification_major_minor_algo_without_readme(self, versions_list):
-        files, versions_without_diff = self.get_files_to_identify_major_versions(versions_list, exclude_file="readme.html")
+    def get_files_for_versions_identification_major_minor_algo_without_readme(self, versions_list, files_to_keep_per_diff=1):
+        files, versions_without_diff = self.get_files_to_identify_major_versions(versions_list, exclude_file="readme.html", files_to_keep_per_diff=files_to_keep_per_diff)
 
         major_versions = self._list_different_versions_from_pattern(versions_list, self.major_version_pattern)
-        _files, _versions_without_diff = self.get_files_to_identify_minor_versions(versions_list, major_versions, exclude_file="readme.html")
+        _files, _versions_without_diff = self.get_files_to_identify_minor_versions(versions_list, major_versions, exclude_file="readme.html", files_to_keep_per_diff=files_to_keep_per_diff)
         files |= _files
         versions_without_diff.extend(_versions_without_diff)
         return files, versions_without_diff
 
-    def get_files_for_versions_identification_chronological_diff_algo(self, versions_list):
+    def get_files_for_versions_identification_chronological_diff_algo(self, versions_list, files_to_keep_per_diff=1):
         versions = self.sort_versions(versions_list)
-        files, versions_without_diff = self.get_diff_between_versions(versions)
+        files, versions_without_diff = self.get_diff_between_versions(versions, files_to_keep_per_diff=files_to_keep_per_diff)
         return files, versions_without_diff
 
-    def get_files_for_versions_identification_chronological_diff_algo_without_readme(self, versions_list):
+    def get_files_for_versions_identification_chronological_diff_algo_without_readme(self, versions_list, files_to_keep_per_diff=1):
         versions = self.sort_versions(versions_list)
-        files, versions_without_diff = self.get_diff_between_versions(versions, exclude_file="readme.html")
+        files, versions_without_diff = self.get_diff_between_versions(versions, exclude_file="readme.html", files_to_keep_per_diff=files_to_keep_per_diff)
         return files, versions_without_diff

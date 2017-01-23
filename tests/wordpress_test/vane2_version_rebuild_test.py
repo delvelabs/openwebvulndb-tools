@@ -204,6 +204,23 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertNotIn("readme.html", files)
         self.assertNotIn("style.css", files)
 
+    def test_compare_signatures_ignore_exclude_files_ignore_plugin_and_themes_files_by_default(self):
+        file0 = Signature(path="wp-content/plugins/my-plugin/style.css", hash=1234)
+        file1 = Signature(path="file1.js", hash=2345)
+        readme_file1 = Signature(path="readme.html", hash=3456)
+        file2 = Signature(path="wp-content/themes/my-theme/file2.js", hash=4567)
+        readme_file2 = Signature(path="readme.html", hash=6789)
+
+        signatures0 = [file0, readme_file1, file1]
+        signatures1 = [readme_file2, file2]
+
+        files = self.version_rebuild.compare_signatures(signatures0, signatures1)
+
+        self.assertIn("readme.html", files)
+        self.assertNotIn("wp-content/plugins/my-plugin/style.css", files)
+        self.assertIn("file1.js", files)
+        self.assertNotIn("wp-content/themes/my-theme/file2.js", files)
+
     def test_get_files_for_versions_identification_return_minimum_files_required_to_make_each_version_unique(self):
         common_file = Signature(path="style.css", hash=1234)  # useless for version identification
         button_file_version1 = Signature(path="button.js", hash=2345)  # Unique to 1.0
@@ -253,7 +270,7 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertIn(minor2, minor_versions)
         self.assertNotIn(minor_not_in_major, minor_versions)
 
-    def test_get_common_file_for_major_version(self):
+    def test_create_version_definition_for_major_version(self):
         readme1 = Signature(path="readme.html", hash=1)
         readme2 = Signature(path="readme.html", hash=2)
         button = Signature(path="button.js", hash=3)
@@ -266,11 +283,11 @@ class Vane2VersionRebuildTest(TestCase):
         version3 = VersionDefinition(version="3.4.1", signatures=[button, style_other_versions])
         version_list = VersionList(key="wordpress", producer="", versions=[version4_7_1, version4_7_2, version3])
 
-        files = self.version_rebuild.get_common_file_for_major_version(major, version_list)
+        version_definition = self.version_rebuild.create_version_definition_for_major_version(version_list, major)
 
-        self.assertIn("style.css", files)
-        self.assertIn("button.js", files)
-        self.assertEqual(len(files), 2)
+        self.assertIn(style_version_4_7, version_definition.signatures)
+        self.assertIn(button, version_definition.signatures)
+        self.assertEqual(len(version_definition.signatures), 2)
 
     def test_get_diff_between_minor_versions(self):
         readme1 = Signature(path="readme.html", hash=1)
@@ -346,3 +363,50 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertIn("button.js", diff)
         self.assertIn("style.css", diff)
         self.assertNotIn("login.js", diff)
+
+    def test_keep_most_common_file_in_all_diff_for_each_diff(self):
+        diff0 = ["readme.html", "test.js", "style.css"]  # should keep readme
+        diff1 = ["readme.html", "myfile.html", "login.html"]  # should keep readme
+        diff2 = ["button.js", "file.js", "homepage.css"]  # should keep file.js
+        diff3 = ["readme.html", "login.js"]  # should keep readme.html
+        diff4 = ["somefile.html", "image.png"]  # should keep image.png
+        diff5 = ["file.js", "image.png"]  # choose arbitrary what it keeps
+        diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
+
+        self.version_rebuild.keep_most_common_file_in_all_diff_for_each_diff(diff_list)
+
+        self.assertEqual(diff0, ["readme.html"])
+        self.assertEqual(diff1, ["readme.html"])
+        self.assertEqual(diff2, ["file.js"])
+        self.assertEqual(diff3, ["readme.html"])
+        self.assertEqual(diff4, ["image.png"])
+
+    def test_keep_most_common_file_in_all_diff_for_each_diff_keep_specified_amount_of_files_per_diff(self):
+        diff0 = ["readme.html", "test.js", "style.css"]  # should keep readme and style.css
+        diff1 = ["readme.html", "myfile.html", "login.js"]  # should keep readme and login
+        diff2 = ["button.js", "file.js", "style.css"]  # should keep file.js and style.css
+        diff3 = ["readme.html", "login.js", "index.html"]  # should keep readme.html and login
+        diff4 = ["somefile.html", "image.png"]  # should keep image.png and somefile.html
+        diff5 = ["file.js", "image.png"]  # all files are kept
+        diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
+
+        self.version_rebuild.keep_most_common_file_in_all_diff_for_each_diff(diff_list, 2)
+
+        self.assertIn("readme.html", diff0)
+        self.assertIn("style.css", diff0)
+        self.assertEqual(len(diff0), 2)
+        self.assertIn("readme.html", diff1)
+        self.assertIn("login.js", diff1)
+        self.assertEqual(len(diff1), 2)
+        self.assertIn("file.js", diff2)
+        self.assertIn("style.css", diff2)
+        self.assertEqual(len(diff2), 2)
+        self.assertIn("readme.html", diff3)
+        self.assertIn("login.js", diff3)
+        self.assertEqual(len(diff3), 2)
+        self.assertIn("somefile.html", diff4)
+        self.assertIn("image.png", diff4)
+        self.assertEqual(len(diff4), 2)
+        self.assertIn("file.js", diff5)
+        self.assertIn("image.png", diff5)
+        self.assertEqual(len(diff5), 2)

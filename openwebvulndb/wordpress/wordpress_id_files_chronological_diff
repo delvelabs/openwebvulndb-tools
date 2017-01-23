@@ -1,0 +1,56 @@
+Files to identify wordpress version when the readme.html file is present. Files choices done by a chronological diff algorithm: Each version signature is compared with the signature of the next version, and the differences are stored. When all diff for all versions are stored, the most common file in all diff that appear in a diff is the one kept, all others are discarded.
+
+14 files:
+wp-admin/wp-admin.css
+wp-includes/js/scriptaculous/wp-scriptaculous.js
+wp-admin/list-manipulation.js
+wp-includes/js/tinymce/themes/advanced/color_picker.htm
+wp-includes/images/wlw/wp-watermark.png
+wp-includes/js/tinymce/plugins/wordpress/langs/en.js
+wp-admin/js/common.js
+wp-admin/quicktags.js
+wp-admin/css/press-this-ie.css
+wp-includes/js/tinymce/plugins/wordpress/wordpress.css
+wp-includes/js/tinymce/wp-tinymce.js.gz
+wp-admin/rtl.css
+readme.html
+wp-admin/js/post.js
+
+Files added if we keep two files per diff instead of one (23 new files):
+wp-includes/js/swfupload/plugins/swfupload.speed.js
+wp-includes/js/wp-emoji-loader.min.js
+wp-admin/widgets-rtl.css
+wp-admin/css/plugin-install.css
+wp-includes/js/plupload/plupload.silverlight.xap
+wp-admin/css/install.css
+wp-includes/js/tinymce/tiny_mce.js
+wp-admin/css/customize-nav-menus-rtl.min.css
+wp-includes/js/tinymce/plugins/wpeditimage/editor_plugin.js
+wp-admin/xfn.js
+wp-includes/js/autosave.js
+wp-admin/js/nav-menu.min.js
+wp-admin/js/editor.js
+wp-admin/widgets.css
+wp-admin/css/ie-rtl.css
+wp-includes/js/tinymce/langs/en.js
+wp-admin/css/ie.css
+wp-includes/css/editor.css
+wp-admin/js/user-profile.js
+wp-includes/js/plupload/plupload.flash.swf
+wp-admin/images/box-bg-left.gif
+wp-includes/wlwmanifest.xml
+wp-includes/js/tinymce/plugins/inlinepopups/editor_plugin.js
+
+No differences between these versions were found:
+version 1.5.1.2 and version 1.5.1.3 have the same signature.
+version 1.5.1.3 and version 1.5.2 have the same signature.
+version 2.0.6 and version 2.0.7 have the same signature.
+version 2.0.9 and version 2.0.10 have the same signature.
+version 2.0.10 and version 2.0.11 have the same signature.
+version 2.1.1 and version 2.1.2 have the same signature.
+version 2.1.2 and version 2.1.3 have the same signature.
+version 2.2.1 and version 2.2.2 have the same signature.
+version 2.3.1 and version 2.3.2 have the same signature.
+version 2.3.2 and version 2.3.3 have the same signature.
+version 2.6.2 and version 2.6.3 have the same signature.
+version 2.6.3 and version 2.6.5 have the same signature.
