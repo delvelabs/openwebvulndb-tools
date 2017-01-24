@@ -4,6 +4,7 @@ from openwebvulndb.wordpress.vane2 import Vane2VersionRebuild
 from openwebvulndb.common.schemas import VersionListSchema, SignatureSchema
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList
 from fixtures import file_path
+from collections import OrderedDict
 
 
 class Vane2VersionRebuildTest(TestCase):
@@ -219,7 +220,7 @@ class Vane2VersionRebuildTest(TestCase):
 
         version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1, version2, version3])
 
-        files = self.version_rebuild.get_files_for_versions_identification(version_list)
+        files, versions_without_diff = self.version_rebuild.get_files_for_versions_identification(version_list)
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
@@ -344,3 +345,44 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertIn("file.js", diff5)
         self.assertIn("image.png", diff5)
         self.assertEqual(len(diff5), 2)
+
+    def test_dump_export_versions_list_to_vane2_models(self):
+        readme_signature_1 = Signature(path="readme.html", algo="SHA256", hash="12345")
+        readme_signature_2 = Signature(path="readme.html", algo="SHA256", hash="98765")
+        other_file_js_signature = Signature(path="other_file.js", algo="SHA256", hash="34567")
+        common_file_js_signature = Signature(path="wp-admin/js/common.js", algo="SHA256", hash="23456")
+        signatures1 = [readme_signature_1, other_file_js_signature]
+        signatures2 = [readme_signature_2, other_file_js_signature, common_file_js_signature]
+        version1 = VersionDefinition(version="1.0", signatures=signatures1)
+        version2 = VersionDefinition(version="2.0", signatures=signatures2)
+        versions_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
+        self.version_rebuild.version_list = versions_list
+
+        exported_data = self.version_rebuild.dump("wordpress", ["readme.html", "other_file.js", "wp-admin/js/common.js"])
+
+        expected_data = {"key": "wordpress", "producer": "Vane2 Export", "files": [
+            {"path": "readme.html", "signatures": [
+                                        {"algo": "SHA256", "hash": "12345", "versions": ["1.0"]},
+                                        {"algo": "SHA256", "hash": "98765", "versions": ["2.0"]}
+                                    ]
+            },
+            {"path": "other_file.js", "signatures": [{"algo": "SHA256", "hash": "34567", "versions": ["1.0", "2.0"]}]},
+            {"path": "wp-admin/js/common.js", "signatures": [{"algo": "SHA256", "hash": "23456", "versions": ["2.0"]}]},
+        ]}
+        def to_normal_dict(ordered_dict):
+            if type(ordered_dict) == OrderedDict:
+                normal_dict = {}
+                for items in ordered_dict.items():
+                    key, value = items
+                    normal_dict[key] = to_normal_dict(value)
+                return normal_dict
+            elif type(ordered_dict) == list:
+                li = []
+                for item in ordered_dict:
+                    li.append(to_normal_dict(item))
+                return li
+            else:
+                return ordered_dict
+
+        exported_data = to_normal_dict(exported_data)
+        self.assertEqual(exported_data, expected_data)

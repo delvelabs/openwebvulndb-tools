@@ -1,6 +1,8 @@
 from openwebvulndb.common.schemas import VersionListSchema
 import re
 from collections import Counter
+from .vane2models import File, Signature, FilesList
+from .vane2schemas import FilesListSchema
 
 
 class Vane2VersionRebuild:
@@ -9,6 +11,7 @@ class Vane2VersionRebuild:
         self.storage = storage
         self.version_list = []
         self.major_version_pattern = "\d+\.\d+"
+        self.recent_version_pattern = "[34]\.\d"
 
     def update(self, key, files_to_use_for_version_signatures):
         self.version_list = self.storage.read_versions(key)
@@ -19,23 +22,27 @@ class Vane2VersionRebuild:
         versions = self._sort_versions(versions_list)
         files, versions_without_diff = self._get_diff_between_versions(versions, exclude_file=exclude_file,
                                                                        files_to_keep_per_diff=files_to_keep_per_diff)
-        return files
+        return files, versions_without_diff
 
-    def dump(self):
-        schema = VersionListSchema(exclude=("versions.signatures.contains_version",))
-        return schema.dump(self.version_list).data
+    def dump(self, key, files_to_use_for_version_signatures):
+        files_list = FilesList(key=key, producer="Vane2 Export")
+        for file_path in files_to_use_for_version_signatures:
+            file = File(path=file_path)
+            signatures = self._get_all_signatures_for_file(file_path)
+            file.signatures = signatures
+            files_list.files.append(file)
+        schema = FilesListSchema()
+        return schema.dump(files_list).data
 
     def check_for_equal_version_signatures(self):
         equal_versions = []
-        for index, version in enumerate(self.version_list.versions):
-            if index + 1 < len(self.version_list.versions):
-                other_version = self.version_list.versions[index + 1]
-                if self._versions_equal(version, other_version):
-                    if not self._is_same_major_version(version.version, other_version.version) or \
-                            self._is_recent_version(version.version):
-                        message = "Version {0} has the same signature as version {1}.".format(version.version,
-                                                                                              other_version.version)
-                        equal_versions.append(message)
+        for version, next_version in self._pair_list_iteration(self.version_list.versions):
+            if self._versions_equal(version, next_version):
+                if not self._is_same_major_version(version.version, next_version.version) or \
+                        self._is_recent_version(version.version):
+                    message = "Version {0} has the same signature as version {1}.".format(version.version,
+                                                                                          next_version.version)
+                    equal_versions.append(message)
         if len(equal_versions) > 0:
             message = ""
             for _version in equal_versions:
@@ -89,19 +96,16 @@ class Vane2VersionRebuild:
     def _get_diff_between_versions(self, versions, exclude_file=None, files_to_keep_per_diff=1):
         diff_list = []
         versions_without_diff = []
-        for index, version in enumerate(versions):
-            if index + 1 < len(versions):
-                other_version = versions[index + 1]
-                diff = self._compare_signatures(version.signatures, other_version.signatures, exclude_file)
-                if len(diff) == 0:
-                    versions_without_diff.append(
-                        "version {0} and version {1} have the same signature.".format(version.version,
-                                                                                      other_version.version))
-                else:
-                    diff_list.append(diff)
+        for version, next_version in self._pair_list_iteration(versions):
+            diff = self._compare_signatures(version.signatures, next_version.signatures, exclude_file)
+            if len(diff) == 0:
+                versions_without_diff.append(
+                    "version {0} and version {1} have the same signature.".format(version.version, next_version.version))
+            else:
+                diff_list.append(diff)
 
         self._keep_most_common_file_in_all_diff_for_each_diff(diff_list, files_to_keep_per_diff)
-        return set(file for diff in diff_list for file in diff), versions_without_diff
+        return set(file for diff in diff_list for file in diff), set(versions_without_diff)
 
     def _keep_most_common_file_in_all_diff_for_each_diff(self, diff_list, files_to_keep_per_diff=1):
         files_count_in_all_diff = Counter([file for diff in diff_list for file in diff])
@@ -120,7 +124,7 @@ class Vane2VersionRebuild:
             files_count_in_all_diff = Counter([file for diff in diff_list for file in diff])
 
     def _is_recent_version(self, version):
-        return re.match("[34]\.\d", version) is not None
+        return re.match(self.recent_version_pattern, version) is not None
 
     def _is_version_greater_than_other_version(self, version, other_version):
         _version = re.split("\.", version)
@@ -144,3 +148,21 @@ class Vane2VersionRebuild:
             else:
                 sorted_versions.append(version)
         return sorted_versions
+
+    def _pair_list_iteration(self, _list):
+        """Iterates over all element in the list and return the element and the next element in the list in a tuple."""
+        for index in range(0, len(_list) - 1):
+            yield _list[index], _list[index + 1]
+
+    def _get_all_signatures_for_file(self, file_path):
+        signatures = {}
+        for version in self.version_list.versions:
+            signature = self._find_file_signature_in_signatures(file_path, version.signatures)
+            if signature is not None:
+                if signature.hash in signatures:
+                    signatures[signature.hash].versions.append(version.version)
+                else:
+                    file_signature = Signature(hash=signature.hash, algo=signature.algo)
+                    file_signature.versions.append(version.version)
+                    signatures[signature.hash] = file_signature
+        return [file_signature for file_signature in signatures.values()]

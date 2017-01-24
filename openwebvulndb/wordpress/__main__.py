@@ -26,6 +26,7 @@ from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 from .vane2 import Vane2VersionRebuild
+from ..common.logs import logger
 
 
 def list_plugins(loop, repository):
@@ -61,17 +62,21 @@ def vane2_export(storage, input_path):
     input_path = join(dirname(__file__), input_path)
     filename = join(input_path, "vane2_versions.json")
 
+    key = "wordpress"
     rebuild = Vane2VersionRebuild(storage)
-    versions_list = storage.read_versions("wordpress")
-    files = rebuild.get_files_for_versions_identification(versions_list, files_to_keep_per_diff=2)
-    files |= rebuild.get_files_for_versions_identification(versions_list, exclude_file="readme.html",
-                                                           files_to_keep_per_diff=2)
-    rebuild.update("wordpress", files)
+    versions_list = storage.read_versions(key)
+    files, versions_without_diff = rebuild.get_files_for_versions_identification(versions_list, files_to_keep_per_diff=2)
+    _files, _versions_without_diff = rebuild.get_files_for_versions_identification(versions_list,
+                                                                                   exclude_file="readme.html",
+                                                                                   files_to_keep_per_diff=2)
+    files |= _files
+    versions_without_diff &= _versions_without_diff
+    for version in versions_without_diff:
+        logger.info(version)
+    rebuild.update(key, files)
     rebuild.check_for_equal_version_signatures()
     with open(filename, "w") as fp:
-        obj = rebuild.dump()
-        obj["signatures_files"] = list(files)
-        fp.write(json.dumps(obj, indent=4))
+        fp.write(json.dumps(rebuild.dump(key, files), indent=4))
 
 
 def populate_versions(loop, repository_hasher, storage):
