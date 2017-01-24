@@ -380,9 +380,24 @@ class Vane2VersionRebuildTest(TestCase):
                 li = []
                 for item in ordered_dict:
                     li.append(to_normal_dict(item))
-                return li
+                return self.UnorderedList(li)
             else:
                 return ordered_dict
 
         exported_data = to_normal_dict(exported_data)
         self.assertEqual(exported_data, expected_data)
+
+    class UnorderedList:
+        """Wrapper for a list, used for equality assertion so the element order doesn't matter."""
+
+        def __init__(self, list):
+            self.list = list
+
+        def __eq__(self, other):
+            if type(other) == list:
+                for element in self.list:
+                    if element in other:
+                        return True
+                    else:
+                        return False
+            return False

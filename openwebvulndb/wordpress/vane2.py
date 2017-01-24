@@ -1,4 +1,3 @@
-from openwebvulndb.common.schemas import VersionListSchema
 import re
 from collections import Counter
 from .vane2models import File, Signature, FilesList
