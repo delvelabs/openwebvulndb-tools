@@ -18,14 +18,13 @@
 from argparse import ArgumentParser
 from random import shuffle
 from os.path import join, dirname
-import json
 
 from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
-from .vane2 import Vane2VersionRebuild
+from .vane2.versionrebuild import VersionRebuild
 from ..common.logs import logger
 
 
@@ -62,7 +61,7 @@ def vane2_export(storage, input_path):
     input_path = join(dirname(__file__), input_path)
 
     key = "wordpress"
-    rebuild = Vane2VersionRebuild(storage)
+    rebuild = VersionRebuild(storage)
 
     equal_versions = rebuild.update(key)
     for version in equal_versions:

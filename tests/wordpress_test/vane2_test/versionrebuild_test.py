@@ -2,7 +2,6 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 from openwebvulndb.wordpress.vane2.versionrebuild import VersionRebuild
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList
-from fixtures import file_path
 
 
 class VersionRebuildTest(TestCase):
@@ -21,8 +20,8 @@ class VersionRebuildTest(TestCase):
         versions_list = VersionList(key="wordpress", producer="", versions=[version1, version2])
         self.version_rebuild.storage.read_versions.return_value = versions_list
         self.version_rebuild.get_files_for_versions_identification = MagicMock()
-        self.version_rebuild.get_files_for_versions_identification.return_value = (self.files_for_versions_identification, set())
-        self.version_rebuild.check_for_equal_version_signatures = MagicMock()  # Would raise exception otherwise.
+        self.version_rebuild.get_files_for_versions_identification.return_value = (
+            self.files_for_versions_identification, set())
 
         self.version_rebuild.update(signatures)
 
@@ -44,7 +43,7 @@ class VersionRebuildTest(TestCase):
 
         self.assertIn("button.js", files)
         self.assertIn("readme.html", files)
-        self.assertNotIn("style.css", files)
+        self.assertNotIn(self.common_js_signature.path, files)
 
     def test_compare_signatures_return_files_not_in_other_version(self):
         signatures0 = [self.readme_signature, self.common_js_signature]
@@ -58,7 +57,7 @@ class VersionRebuildTest(TestCase):
         signatures0 = [self.readme_signature, self.common_js_signature]
         signatures1 = [self.common_js_signature]
 
-        files = self.version_rebuild._compare_signatures(signatures0, signatures1, exclude_file="readme.html")
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1, excluded_file="readme.html")
 
         self.assertNotIn("readme.html", files)
 
@@ -81,14 +80,20 @@ class VersionRebuildTest(TestCase):
         common_file2 = Signature(path="style2.css", hash=5678)  # useless for version identification
         readme_file2 = Signature(path="readme.html", hash=6789)  # unique to 2.0
         readme_file3 = Signature(path="readme.html", hash=7890)  # unique to 3.0
-        common_file_version_2_3 = Signature(path="button.css", hash=8901)  # Unique to 2.0 and 3.0, but useless for version identification
+        # Unique to 2.0 and 3.0, but useless for version identification
+        common_file_version_2_3 = Signature(path="button.css", hash=8901)
 
-        version1 = VersionDefinition(version="1.0", signatures=[common_file, common_file2, readme_file1, button_file_version1])
-        version1_1 = VersionDefinition(version="1.1", signatures=[common_file, common_file2, readme_file1, button_file_other_version])
-        version2 = VersionDefinition(version="2.0", signatures=[common_file, common_file2, readme_file2, button_file_other_version, common_file_version_2_3])
-        version3 = VersionDefinition(version="3.0", signatures=[common_file, common_file2, readme_file3, button_file_other_version, common_file_version_2_3])
+        version1 = VersionDefinition(version="1.0", signatures=[
+            common_file, common_file2, readme_file1, button_file_version1])
+        version1_1 = VersionDefinition(version="1.1", signatures=[
+            common_file, common_file2, readme_file1, button_file_other_version])
+        version2 = VersionDefinition(version="2.0", signatures=[
+            common_file, common_file2, readme_file2, button_file_other_version, common_file_version_2_3])
+        version3 = VersionDefinition(version="3.0", signatures=[
+            common_file, common_file2, readme_file3, button_file_other_version, common_file_version_2_3])
 
-        version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1, version2, version3])
+        version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1, version2,
+                                                                                   version3])
 
         files, versions_without_diff = self.version_rebuild.get_files_for_versions_identification(version_list)
 
@@ -178,7 +183,8 @@ class VersionRebuildTest(TestCase):
         versions_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
         self.version_rebuild.storage.read_versions.return_value = versions_list
         self.version_rebuild.get_files_for_versions_identification = MagicMock()
-        self.version_rebuild.get_files_for_versions_identification.return_value = (self.files_for_versions_identification, set())
+        self.version_rebuild.get_files_for_versions_identification.return_value = (
+            self.files_for_versions_identification, set())
 
         self.version_rebuild.update("wordpress")
 

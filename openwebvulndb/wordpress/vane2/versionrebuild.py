@@ -51,24 +51,21 @@ class VersionRebuild:
     def _is_plugin_or_theme_file(self, file_path):
         return re.match("wp-content/((plugins)|(themes))", file_path) is not None
 
-    def _signatures_equal(self, signature, other_signature):
-        if signature is not None and other_signature is not None:
-            return signature.hash == other_signature.hash
-        return False
+    def _compare_signatures(self, signatures0, signatures1, excluded_file=None):
+        def exclude_file(file_path):
+            return file_path == excluded_file or self._is_plugin_or_theme_file(file_path)
 
-    def _compare_signatures(self, signatures0, signatures1, exclude_file=None):
-        diff = set()
-        for signature in signatures0:
-            if signature.path != exclude_file and not self._is_plugin_or_theme_file(signature.path):
-                other_signature = self._find_file_signature_in_signatures(signature.path, signatures1)
-                if not self._signatures_equal(signature, other_signature):
-                    diff.add(signature.path)
+        files_in_signatures0 = set(signature.path for signature in signatures0 if not exclude_file(signature.path))
+        files_in_signatures1 = set(signature.path for signature in signatures1 if not exclude_file(signature.path))
 
-        # Check for files in other_version not present in version:
-        for signature in signatures1:
-            if signature.path != exclude_file and not self._is_plugin_or_theme_file(signature.path):
-                if self._find_file_signature_in_signatures(signature.path, signatures0) is None:
-                    diff.add(signature.path)
+        diff = files_in_signatures0 ^ files_in_signatures1
+        common_files = files_in_signatures0 & files_in_signatures1
+
+        for file_path in common_files:
+            signature0 = self._find_file_signature_in_signatures(file_path, signatures0)
+            signature1 = self._find_file_signature_in_signatures(file_path, signatures1)
+            if signature0.hash != signature1.hash:
+                diff.add(file_path)
         return diff
 
     def _get_diff_between_versions(self, versions, exclude_file=None, files_to_keep_per_diff=1):
@@ -77,8 +74,8 @@ class VersionRebuild:
         for version, next_version in self._pair_list_iteration(versions):
             diff = self._compare_signatures(version.signatures, next_version.signatures, exclude_file)
             if len(diff) == 0:
-                versions_without_diff.add(
-                    "version {0} and version {1} have the same signature.".format(version.version, next_version.version))
+                versions_without_diff.add("version {0} and version {1} have the same signature.".format(
+                    version.version, next_version.version))
             else:
                 diff_list.append(diff)
 
