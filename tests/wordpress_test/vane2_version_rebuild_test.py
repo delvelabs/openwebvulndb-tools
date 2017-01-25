@@ -1,150 +1,44 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 from openwebvulndb.wordpress.vane2 import Vane2VersionRebuild
-from openwebvulndb.common.schemas import VersionListSchema, SignatureSchema
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList
 from fixtures import file_path
-from collections import OrderedDict
 
 
 class Vane2VersionRebuildTest(TestCase):
 
     def setUp(self):
         self.version_rebuild = Vane2VersionRebuild(MagicMock())
+        self.files_for_versions_identification = {"readme.html", "wp-admin/js/common.js"}
+        self.readme_signature = Signature(path="readme.html", hash="12345")
+        self.common_js_signature = Signature(path="wp-admin/js/common.js", hash="23456")
+        self.other_file_signature = Signature(path="other_file.js", hash="34567")
 
-    def test_update_cleanup_signatures(self):
-        versions = {"key": "wordpress", "producer": "unittest", "versions": [
-            {"version": "1.4", "signatures": [{"path": "readme.html", "algo": "md5", "hash": "12345"}]}
-        ]}
-        schema = VersionListSchema()
-        self.version_rebuild.storage.read_versions.return_value = schema.load(versions).data
-        self.version_rebuild._cleanup_signatures = MagicMock()
+    def test_update_only_keep_specified_files_signatures_from_versions_list(self):
+        signatures = [self.readme_signature, self.common_js_signature, self.other_file_signature]
+        version1 = VersionDefinition(version="1.0", signatures=signatures)
+        version2 = VersionDefinition(version="2.0", signatures=signatures)
+        versions_list = VersionList(key="wordpress", producer="", versions=[version1, version2])
+        self.version_rebuild.storage.read_versions.return_value = versions_list
+        self.version_rebuild.get_files_for_versions_identification = MagicMock()
+        self.version_rebuild.get_files_for_versions_identification.return_value = (self.files_for_versions_identification, set())
+        self.version_rebuild.check_for_equal_version_signatures = MagicMock()  # Would raise exception otherwise.
 
-        self.version_rebuild.update("wordpress", [])
+        self.version_rebuild.update(signatures)
 
-        self.version_rebuild._cleanup_signatures.assert_called_once_with(
-            self.version_rebuild.version_list.versions[0].signatures, [])
-
-    def test_cleanup_signatures_only_keep_specified_files(self):
-        signatures_files = ["readme.html", "wp-admin/js/common.js"]
-        signatures = [{"path": "readme.html", "algo": "md5", "hash": "12345"},
-                      {"path": "wp-admin/js/common.js", "algo": "md5", "hash": "23456"},
-                      {"path": "other_file.js", "algo": "md5", "hash": "34567"}]
-        schema = SignatureSchema()
-        signatures = [schema.load(signature).data for signature in signatures]
-
-        self.version_rebuild._cleanup_signatures(signatures, signatures_files)
-
-        signature_paths = [signature.path for signature in signatures]
-        self.assertIn("readme.html", signature_paths)
-        self.assertIn("wp-admin/js/common.js", signature_paths)
-        self.assertNotIn("other_file.js", signature_paths)
-
-    def test_versions_equal_return_true_if_two_versions_have_same_file_with_same_hash(self):
-        readme_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        version1 = VersionDefinition(version="1.0", signatures=[readme_signature, style_css_signature, button_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[readme_signature, style_css_signature, button_js_signature])
-
-        self.assertTrue(self.version_rebuild._versions_equal(version1, version2))
-
-    def test_versions_equal_return_false_if_two_versions_have_same_file_with_different_hashes(self):
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        readme2_signature = Signature(path="readme.html", hash=2345)
-        version1 = VersionDefinition(version="1.0", signatures=[readme1_signature, style_css_signature, button_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[readme2_signature, style_css_signature, button_js_signature])
-
-        self.assertFalse(self.version_rebuild._versions_equal(version1, version2))
-
-    def test_versions_equal_return_false_if_two_versions_have_different_files(self):
-        readme_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        version1 = VersionDefinition(version="1.0", signatures=[readme_signature, button_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[readme_signature, button_js_signature, style_css_signature])
-
-        self.assertFalse(self.version_rebuild._versions_equal(version1, version2))
-
-    def test_check_for_equal_version_signatures_raises_error_if_two_different_major_versions_have_the_same_signatures(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "style.css", "button.js"]
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        readme2_signature = Signature(path="readme.html", hash=1234)
-        version1 = VersionDefinition(version="1.0", signatures=[readme1_signature, style_css_signature, button_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[readme2_signature, style_css_signature, button_js_signature])
-        self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
-
-        with self.assertRaises(Exception):
-            self.version_rebuild.check_for_equal_version_signatures()
-
-    def test_check_for_equal_version_signatures_do_nothing_if_two_versions_from_same_major_have_the_same_signatures(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "style.css", "button.js"]
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        readme1_1_signature = Signature(path="readme.html", hash=1234)
-        version1 = VersionDefinition(version="1.0.1", signatures=[readme1_signature, style_css_signature, button_js_signature])
-        version1_1 = VersionDefinition(version="1.0.1", signatures=[readme1_1_signature, style_css_signature, button_js_signature])
-        self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version1_1])
-
-        try:
-            self.version_rebuild.check_for_equal_version_signatures()
-        except Exception:
-            self.fail("Unexpected error raised.")
-
-    def test_check_for_equal_version_signatures_dont_raise_error_if_versions_have_different_signatures(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "style.css", "button.js"]
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        button_js_signature = Signature(path="button.js", hash=9101112)
-        readme2_signature = Signature(path="readme.html", hash=2345)
-        version1 = VersionDefinition(version="1.0", signatures=[readme1_signature, style_css_signature, button_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[readme2_signature, style_css_signature, button_js_signature])
-        version3 = VersionDefinition(version="3.0", signatures=[readme1_signature, style_css_signature])
-        self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2, version3])
-
-        try:
-            self.version_rebuild.check_for_equal_version_signatures()
-        except Exception:
-            self.fail("Unexpected error raised.")
-
-    def test_check_for_equal_version_signatures_raise_error_if_two_recent_minor_have_same_signature(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "style.css", "button.js"]
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        version1 = VersionDefinition(version="4.1.0", signatures=[readme1_signature, style_css_signature])
-        version2 = VersionDefinition(version="4.1.1", signatures=[readme1_signature, style_css_signature])
-        self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
-
-        with self.assertRaises(Exception):
-            self.version_rebuild.check_for_equal_version_signatures()
-
-    def test_check_for_equal_version_signatures_dont_raise_error_if_two_old_minor_have_same_signature(self):
-        self.version_rebuild._versions_signature_files = ["readme.html", "style.css", "button.js"]
-        readme1_signature = Signature(path="readme.html", hash=1234)
-        style_css_signature = Signature(path="style.css", hash=5678)
-        version1 = VersionDefinition(version="1.5.0", signatures=[readme1_signature, style_css_signature])
-        version2 = VersionDefinition(version="1.5.1", signatures=[readme1_signature, style_css_signature])
-        self.version_rebuild.version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
-
-        try:
-            self.version_rebuild.check_for_equal_version_signatures()
-        except Exception:
-            self.fail("Unexpected error raised.")
+        files = [file.path for file in self.version_rebuild.files_list.files]
+        self.assertIn("readme.html", files)
+        self.assertIn("wp-admin/js/common.js", files)
+        self.assertNotIn("other_file.js", files)
 
     def test_compare_signatures_return_files_with_different_hash(self):
-        common_file = Signature(path="style.css", hash=1234)
         button_file1 = Signature(path="button.js", hash=2345)
         readme_file1 = Signature(path="readme.html", hash=3456)
         button_file2 = Signature(path="button.js", hash=4567)
         readme_file2 = Signature(path="readme.html", hash=6789)
 
-        signatures0 = [common_file, readme_file1, button_file1]
-        signatures1 = [common_file, readme_file2, button_file2]
+        signatures0 = [self.common_js_signature, readme_file1, button_file1]
+        signatures1 = [self.common_js_signature, readme_file2, button_file2]
 
         files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
@@ -153,55 +47,31 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertNotIn("style.css", files)
 
     def test_compare_signatures_return_files_not_in_other_version(self):
-        common_file = Signature(path="style.css", hash=1234)
-        file1 = Signature(path="file1.js", hash=2345)
-        readme_file1 = Signature(path="readme.html", hash=3456)
-        file2 = Signature(path="file2.js", hash=4567)
-        readme_file2 = Signature(path="readme.html", hash=6789)
-
-        signatures0 = [common_file, readme_file1, file1]
-        signatures1 = [common_file, readme_file2, file2]
+        signatures0 = [self.readme_signature, self.common_js_signature]
+        signatures1 = [self.readme_signature, self.other_file_signature, self.common_js_signature]
 
         files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
-        self.assertIn("file1.js", files)
-        self.assertIn("file2.js", files)
-        self.assertIn("readme.html", files)
-        self.assertNotIn("style.css", files)
+        self.assertIn("other_file.js", files)
 
     def test_compare_signatures_ignore_exclude_files(self):
-        common_file = Signature(path="style.css", hash=1234)
-        file1 = Signature(path="file1.js", hash=2345)
-        readme_file1 = Signature(path="readme.html", hash=3456)
-        file2 = Signature(path="file2.js", hash=4567)
-        readme_file2 = Signature(path="readme.html", hash=6789)
+        signatures0 = [self.readme_signature, self.common_js_signature]
+        signatures1 = [self.common_js_signature]
 
-        signatures0 = [common_file, readme_file1, file1]
-        signatures1 = [common_file, readme_file2, file2]
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1, exclude_file="readme.html")
 
-        files = self.version_rebuild._compare_signatures(signatures0, signatures1, exclude_file=readme_file1.path)
-
-        self.assertIn("file1.js", files)
-        self.assertIn("file2.js", files)
         self.assertNotIn("readme.html", files)
-        self.assertNotIn("style.css", files)
 
     def test_compare_signatures_ignore_exclude_files_ignore_plugin_and_themes_files_by_default(self):
         file0 = Signature(path="wp-content/plugins/my-plugin/style.css", hash=1234)
-        file1 = Signature(path="file1.js", hash=2345)
-        readme_file1 = Signature(path="readme.html", hash=3456)
-        file2 = Signature(path="wp-content/themes/my-theme/file2.js", hash=4567)
-        readme_file2 = Signature(path="readme.html", hash=6789)
+        file1 = Signature(path="wp-content/themes/my-theme/file2.js", hash=4567)
 
-        signatures0 = [file0, readme_file1, file1]
-        signatures1 = [readme_file2, file2]
+        signatures0 = [file0, self.readme_signature]
+        signatures1 = [file1, self.readme_signature]
 
         files = self.version_rebuild._compare_signatures(signatures0, signatures1)
 
-        self.assertIn("readme.html", files)
-        self.assertNotIn("wp-content/plugins/my-plugin/style.css", files)
-        self.assertIn("file1.js", files)
-        self.assertNotIn("wp-content/themes/my-theme/file2.js", files)
+        self.assertEqual(len(files), 0)
 
     def test_get_files_for_versions_identification_return_minimum_files_required_to_make_each_version_unique(self):
         common_file = Signature(path="style.css", hash=1234)  # useless for version identification
@@ -228,37 +98,6 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertNotIn("style2.css", files)
         self.assertNotIn("button.css", files)
 
-    def test_is_recent_version(self):
-        version3 = "3.1.1"
-        version4 = "4.3.2"
-        version2 = "2.5.1"
-        version1 = "1.5.3"
-
-        self.assertTrue(self.version_rebuild._is_recent_version(version3))
-        self.assertTrue(self.version_rebuild._is_recent_version(version4))
-        self.assertFalse(self.version_rebuild._is_recent_version(version2))
-        self.assertFalse(self.version_rebuild._is_recent_version(version1))
-
-    def test_is_version_greater_than_other_version(self):
-        version1 = "1.2.3"
-        version2 = "2.0"
-        version3 = "1.3"
-        version4 = "1.2.3.1"
-
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version1))
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version3, version1))
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version4, version1))
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version3))
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version2, version4))
-        self.assertTrue(self.version_rebuild._is_version_greater_than_other_version(version3, version4))
-
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version2))
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version3))
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version1, version4))
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version3, version2))
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version4, version2))
-        self.assertFalse(self.version_rebuild._is_version_greater_than_other_version(version4, version3))
-
     def test_sort_versions(self):
         version0 = VersionDefinition(version="3.7.16")
         version1 = VersionDefinition(version="3.8.16")
@@ -282,47 +121,30 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertEqual(sorted_versions[6], version6)
         self.assertEqual(sorted_versions[7], version7)
 
-    def test_compare_signatures(self):
-        readme_signature = Signature(path="readme.html", hash=1234)
-        button_signature = Signature(path="button.js", hash=2345)
-        style_signature = Signature(path="style.css", hash=3456)
-        other_readme_signature = Signature(path="readme.html", hash=4567)
-        common_file = Signature(path="login.js", hash=5678)
-
-        signatures0 = [readme_signature, button_signature, common_file]
-        signatures1 = [style_signature, other_readme_signature, common_file]
-
-        diff = self.version_rebuild._compare_signatures(signatures0, signatures1)
-
-        self.assertIn("readme.html", diff)
-        self.assertIn("button.js", diff)
-        self.assertIn("style.css", diff)
-        self.assertNotIn("login.js", diff)
-
     def test_keep_most_common_file_in_all_diff_for_each_diff(self):
-        diff0 = ["readme.html", "test.js", "style.css"]  # should keep readme
-        diff1 = ["readme.html", "myfile.html", "login.html"]  # should keep readme
-        diff2 = ["button.js", "file.js", "homepage.css"]  # should keep file.js
-        diff3 = ["readme.html", "login.js"]  # should keep readme.html
-        diff4 = ["somefile.html", "image.png"]  # should keep image.png
-        diff5 = ["file.js", "image.png"]  # choose arbitrary what it keeps
+        diff0 = {"readme.html", "test.js", "style.css"}  # should keep readme
+        diff1 = {"readme.html", "myfile.html", "login.html"}  # should keep readme
+        diff2 = {"button.js", "file.js", "homepage.css"}  # should keep file.js
+        diff3 = {"readme.html", "login.js"}  # should keep readme.html
+        diff4 = {"somefile.html", "image.png"}  # should keep image.png
+        diff5 = {"file.js", "image.png"}  # choose arbitrary what it keeps
         diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
 
         self.version_rebuild._keep_most_common_file_in_all_diff_for_each_diff(diff_list)
 
-        self.assertEqual(diff0, ["readme.html"])
-        self.assertEqual(diff1, ["readme.html"])
-        self.assertEqual(diff2, ["file.js"])
-        self.assertEqual(diff3, ["readme.html"])
-        self.assertEqual(diff4, ["image.png"])
+        self.assertEqual(diff0, {"readme.html"})
+        self.assertEqual(diff1, {"readme.html"})
+        self.assertEqual(diff2, {"file.js"})
+        self.assertEqual(diff3, {"readme.html"})
+        self.assertEqual(diff4, {"image.png"})
 
     def test_keep_most_common_file_in_all_diff_for_each_diff_keep_specified_amount_of_files_per_diff(self):
-        diff0 = ["readme.html", "test.js", "style.css"]  # should keep readme and style.css
-        diff1 = ["readme.html", "myfile.html", "login.js"]  # should keep readme and login
-        diff2 = ["button.js", "file.js", "style.css"]  # should keep file.js and style.css
-        diff3 = ["readme.html", "login.js", "index.html"]  # should keep readme.html and login
-        diff4 = ["somefile.html", "image.png"]  # should keep image.png and somefile.html
-        diff5 = ["file.js", "image.png"]  # all files are kept
+        diff0 = {"readme.html", "test.js", "style.css"}  # should keep readme and style.css
+        diff1 = {"readme.html", "myfile.html", "login.js"}  # should keep readme and login
+        diff2 = {"button.js", "file.js", "style.css"}  # should keep file.js and style.css
+        diff3 = {"readme.html", "login.js", "index.html"}  # should keep readme.html and login
+        diff4 = {"somefile.html", "image.png"}  # should keep image.png and somefile.html
+        diff5 = {"file.js", "image.png"}  # all files are kept
         diff_list = [diff0, diff1, diff2, diff3, diff4, diff5]
 
         self.version_rebuild._keep_most_common_file_in_all_diff_for_each_diff(diff_list, 2)
@@ -346,58 +168,34 @@ class Vane2VersionRebuildTest(TestCase):
         self.assertIn("image.png", diff5)
         self.assertEqual(len(diff5), 2)
 
-    def test_dump_export_versions_list_to_vane2_models(self):
+    def test_update_convert_versions_list_to_files_list(self):
         readme_signature_1 = Signature(path="readme.html", algo="SHA256", hash="12345")
         readme_signature_2 = Signature(path="readme.html", algo="SHA256", hash="98765")
-        other_file_js_signature = Signature(path="other_file.js", algo="SHA256", hash="34567")
-        common_file_js_signature = Signature(path="wp-admin/js/common.js", algo="SHA256", hash="23456")
-        signatures1 = [readme_signature_1, other_file_js_signature]
-        signatures2 = [readme_signature_2, other_file_js_signature, common_file_js_signature]
+        signatures1 = [readme_signature_1, self.other_file_signature]
+        signatures2 = [readme_signature_2, self.common_js_signature]
         version1 = VersionDefinition(version="1.0", signatures=signatures1)
         version2 = VersionDefinition(version="2.0", signatures=signatures2)
         versions_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
-        self.version_rebuild.version_list = versions_list
+        self.version_rebuild.storage.read_versions.return_value = versions_list
+        self.version_rebuild.get_files_for_versions_identification = MagicMock()
+        self.version_rebuild.get_files_for_versions_identification.return_value = (self.files_for_versions_identification, set())
 
-        exported_data = self.version_rebuild.dump("wordpress", ["readme.html", "other_file.js", "wp-admin/js/common.js"])
+        self.version_rebuild.update("wordpress")
 
-        expected_data = {"key": "wordpress", "producer": "Vane2 Export", "files": [
-            {"path": "readme.html", "signatures": [
-                                        {"algo": "SHA256", "hash": "12345", "versions": ["1.0"]},
-                                        {"algo": "SHA256", "hash": "98765", "versions": ["2.0"]}
-                                    ]
-            },
-            {"path": "other_file.js", "signatures": [{"algo": "SHA256", "hash": "34567", "versions": ["1.0", "2.0"]}]},
-            {"path": "wp-admin/js/common.js", "signatures": [{"algo": "SHA256", "hash": "23456", "versions": ["2.0"]}]},
-        ]}
-        def to_normal_dict(ordered_dict):
-            if type(ordered_dict) == OrderedDict:
-                normal_dict = {}
-                for items in ordered_dict.items():
-                    key, value = items
-                    normal_dict[key] = to_normal_dict(value)
-                return normal_dict
-            elif type(ordered_dict) == list:
-                li = []
-                for item in ordered_dict:
-                    li.append(to_normal_dict(item))
-                return self.UnorderedList(li)
-            else:
-                return ordered_dict
-
-        exported_data = to_normal_dict(exported_data)
-        self.assertEqual(exported_data, expected_data)
-
-    class UnorderedList:
-        """Wrapper for a list, used for equality assertion so the element order doesn't matter."""
-
-        def __init__(self, list):
-            self.list = list
-
-        def __eq__(self, other):
-            if type(other) == list:
-                for element in self.list:
-                    if element in other:
-                        return True
-                    else:
-                        return False
-            return False
+        readme_file = [file for file in self.version_rebuild.files_list.files if file.path == "readme.html"][0]
+        common_file = [file for file in self.version_rebuild.files_list.files if file.path == "wp-admin/js/common.js"][0]
+        # list should be empty because other_file.js is not in files_for_versions_identification.
+        other_file = [file for file in self.version_rebuild.files_list.files if file.path == "other_file.js"]
+        self.assertEqual(len(other_file), 0)
+        self.assertEqual(len(readme_file.signatures), 2)
+        self.assertEqual(len(common_file.signatures), 1)
+        self.assertEqual(common_file.signatures[0].hash, self.common_js_signature.hash)
+        self.assertEqual(common_file.signatures[0].algo, self.common_js_signature.algo)
+        self.assertEqual(common_file.signatures[0].versions, ["2.0"])
+        signatures = sorted(readme_file.signatures, key=lambda signature: signature.hash)
+        self.assertEqual(signatures[0].hash, "12345")
+        self.assertEqual(signatures[0].algo, "SHA256")
+        self.assertEqual(signatures[0].versions, ["1.0"])
+        self.assertEqual(signatures[1].hash, "98765")
+        self.assertEqual(signatures[1].algo, "SHA256")
+        self.assertEqual(signatures[1].versions, ["2.0"])

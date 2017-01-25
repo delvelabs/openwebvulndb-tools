@@ -1,4 +1,4 @@
-from ..common.models import Model
+from .models import Model
 
 
 class FilesList(Model):

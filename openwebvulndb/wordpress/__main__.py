@@ -60,23 +60,20 @@ def vane2_export(storage, input_path):
     if not input_path:
         raise Exception("Option required: input_path")
     input_path = join(dirname(__file__), input_path)
-    filename = join(input_path, "vane2_versions.json")
 
     key = "wordpress"
     rebuild = Vane2VersionRebuild(storage)
-    versions_list = storage.read_versions(key)
-    files, versions_without_diff = rebuild.get_files_for_versions_identification(versions_list, files_to_keep_per_diff=2)
-    _files, _versions_without_diff = rebuild.get_files_for_versions_identification(versions_list,
-                                                                                   exclude_file="readme.html",
-                                                                                   files_to_keep_per_diff=2)
-    files |= _files
-    versions_without_diff &= _versions_without_diff
-    for version in versions_without_diff:
+
+    equal_versions = rebuild.update(key)
+    for version in equal_versions:
         logger.info(version)
-    rebuild.update(key, files)
-    rebuild.check_for_equal_version_signatures()
+
+    filename = join(input_path, key + "_vane2_versions.json")
     with open(filename, "w") as fp:
-        fp.write(json.dumps(rebuild.dump(key, files), indent=4))
+        data, errors = rebuild.dump()
+        if errors:
+            raise Exception(errors)
+        fp.write(data)
 
 
 def populate_versions(loop, repository_hasher, storage):
