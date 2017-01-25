@@ -1,12 +1,12 @@
 import re
 from collections import Counter
-from ..common.vane2models import File, Signature, FilesList
-from ..common.vane2schemas import FilesListSchema
-from ..common.serialize import serialize
+from ...common.vane2models import File, Signature, FilesList
+from ...common.vane2schemas import FilesListSchema
+from ...common.serialize import serialize
 import packaging.version
 
 
-class Vane2VersionRebuild:
+class VersionRebuild:
 
     def __init__(self, storage):
         self.storage = storage

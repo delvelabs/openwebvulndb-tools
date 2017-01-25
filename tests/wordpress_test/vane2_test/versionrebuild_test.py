@@ -1,14 +1,14 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
-from openwebvulndb.wordpress.vane2 import Vane2VersionRebuild
+from openwebvulndb.wordpress.vane2.versionrebuild import VersionRebuild
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList
 from fixtures import file_path
 
 
-class Vane2VersionRebuildTest(TestCase):
+class VersionRebuildTest(TestCase):
 
     def setUp(self):
-        self.version_rebuild = Vane2VersionRebuild(MagicMock())
+        self.version_rebuild = VersionRebuild(MagicMock())
         self.files_for_versions_identification = {"readme.html", "wp-admin/js/common.js"}
         self.readme_signature = Signature(path="readme.html", hash="12345")
         self.common_js_signature = Signature(path="wp-admin/js/common.js", hash="23456")
