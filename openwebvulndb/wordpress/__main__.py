@@ -17,13 +17,16 @@
 
 from argparse import ArgumentParser
 from random import shuffle
-from os.path import join
+from os.path import join, dirname
 
 from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
+from .vane2.versionrebuild import VersionRebuild
+from ..common.logs import logger
+
 
 def list_plugins(loop, repository):
     loop.run_until_complete(repository.perform_plugin_lookup())
@@ -50,6 +53,26 @@ def vane_export(vane_importer, storage, input_path):
     rebuild = VaneVersionRebuild(join(input_path, "wp_versions.xml"))
     rebuild.update(storage.read_versions("wordpress"))
     rebuild.write()
+
+
+def vane2_export(storage, input_path):
+    if not input_path:
+        raise Exception("Option required: input_path")
+    input_path = join(dirname(__file__), input_path)
+
+    key = "wordpress"
+    rebuild = VersionRebuild(storage)
+
+    equal_versions = rebuild.update(key)
+    for version in equal_versions:
+        logger.info(version)
+
+    filename = join(input_path, key + "_vane2_versions.json")
+    with open(filename, "w") as fp:
+        data, errors = rebuild.dump()
+        if errors:
+            raise Exception(errors)
+        fp.write(data)
 
 
 def populate_versions(loop, repository_hasher, storage):
@@ -85,6 +108,7 @@ operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
                   vane_export=vane_export,
+                  vane2_export=vane2_export,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
