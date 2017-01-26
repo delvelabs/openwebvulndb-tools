@@ -1,7 +1,7 @@
 import re
 from collections import Counter
-from ...common.vane2models import File, Signature, FilesList
-from ...common.vane2schemas import FilesListSchema
+from ...common.models import File, FileSignature, FilesList
+from ...common.schemas import FilesListSchema
 from ...common.serialize import serialize
 import packaging.version
 
@@ -114,7 +114,7 @@ class VersionRebuild:
                 if signature.hash in signatures:
                     signatures[signature.hash].versions.append(version.version)
                 else:
-                    file_signature = Signature(hash=signature.hash, algo=signature.algo)
+                    file_signature = FileSignature(hash=signature.hash, algo=signature.algo)
                     file_signature.versions.append(version.version)
                     signatures[signature.hash] = file_signature
         return [file_signature for file_signature in signatures.values()]
