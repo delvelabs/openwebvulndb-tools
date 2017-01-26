@@ -1,7 +1,7 @@
 import re
 from collections import Counter
-from ...common.models import File, FileSignature, FilesList
-from ...common.schemas import FilesListSchema
+from ...common.models import File, FileSignature, FileList
+from ...common.schemas import FileListSchema
 from ...common.serialize import serialize
 import packaging.version
 
@@ -11,7 +11,7 @@ class VersionRebuild:
     def __init__(self, storage):
         self.storage = storage
         self.version_list = None
-        self.files_list = None
+        self.file_list = None
 
     def update(self, key):
         self.version_list = self.storage.read_versions(key)
@@ -22,26 +22,26 @@ class VersionRebuild:
         files_to_use_for_version_signatures = files | _files
         equal_versions &= _equal_versions
 
-        self._create_files_list(key, files_to_use_for_version_signatures)
+        self._create_file_list(key, files_to_use_for_version_signatures)
 
         return equal_versions
 
-    def _create_files_list(self, key, files_to_use_for_version_signatures):
-        self.files_list = FilesList(key=key, producer="Vane2 Export")
+    def _create_file_list(self, key, files_to_use_for_version_signatures):
+        self.file_list = FileList(key=key, producer="Vane2 Export")
         for file_path in files_to_use_for_version_signatures:
             file = File(path=file_path)
             signatures = self._get_all_signatures_for_file(file_path)
             file.signatures = signatures
-            self.files_list.files.append(file)
+            self.file_list.files.append(file)
 
-    def get_files_for_versions_identification(self, versions_list, exclude_file=None, files_to_keep_per_diff=1):
-        versions = self._sort_versions(versions_list)
+    def get_files_for_versions_identification(self, version_list, exclude_file=None, files_to_keep_per_diff=1):
+        versions = self._sort_versions(version_list)
         files, versions_without_diff = self._get_diff_between_versions(versions, exclude_file=exclude_file,
                                                                        files_to_keep_per_diff=files_to_keep_per_diff)
         return files, versions_without_diff
 
     def dump(self):
-        return serialize(FilesListSchema(), self.files_list)
+        return serialize(FileListSchema(), self.file_list)
 
     def _find_file_signature_in_signatures(self, file_path, signatures):
         for signature in signatures:
@@ -97,8 +97,8 @@ class VersionRebuild:
             # account for the choices of the next diffs.
             files_count_in_all_diff = Counter(file for diff in diff_list for file in diff)
 
-    def _sort_versions(self, versions_list):
-        sorted_versions = sorted(versions_list.versions, key=lambda v: packaging.version.parse(v.version))
+    def _sort_versions(self, version_list):
+        sorted_versions = sorted(version_list.versions, key=lambda v: packaging.version.parse(v.version))
         return sorted_versions
 
     def _pair_list_iteration(self, _list):

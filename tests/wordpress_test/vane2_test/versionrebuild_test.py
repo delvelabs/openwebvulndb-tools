@@ -13,19 +13,19 @@ class VersionRebuildTest(TestCase):
         self.common_js_signature = Signature(path="wp-admin/js/common.js", hash="23456")
         self.other_file_signature = Signature(path="other_file.js", hash="34567")
 
-    def test_update_only_keep_specified_files_signatures_from_versions_list(self):
+    def test_update_only_keep_specified_files_signatures_from_version_list(self):
         signatures = [self.readme_signature, self.common_js_signature, self.other_file_signature]
         version1 = VersionDefinition(version="1.0", signatures=signatures)
         version2 = VersionDefinition(version="2.0", signatures=signatures)
-        versions_list = VersionList(key="wordpress", producer="", versions=[version1, version2])
-        self.version_rebuild.storage.read_versions.return_value = versions_list
+        version_list = VersionList(key="wordpress", producer="", versions=[version1, version2])
+        self.version_rebuild.storage.read_versions.return_value = version_list
         self.version_rebuild.get_files_for_versions_identification = MagicMock()
         self.version_rebuild.get_files_for_versions_identification.return_value = (
             self.files_for_versions_identification, set())
 
         self.version_rebuild.update(signatures)
 
-        files = [file.path for file in self.version_rebuild.files_list.files]
+        files = [file.path for file in self.version_rebuild.file_list.files]
         self.assertIn("readme.html", files)
         self.assertIn("wp-admin/js/common.js", files)
         self.assertNotIn("other_file.js", files)
@@ -113,9 +113,9 @@ class VersionRebuildTest(TestCase):
         version6 = VersionDefinition(version="4.5.2")
         version7 = VersionDefinition(version="4.5.3")
 
-        versions_list = VersionList(key="", producer="", versions=[version4, version1, version6, version0, version2,
+        version_list = VersionList(key="", producer="", versions=[version4, version1, version6, version0, version2,
                                                                    version7, version5, version3])
-        sorted_versions = self.version_rebuild._sort_versions(versions_list)
+        sorted_versions = self.version_rebuild._sort_versions(version_list)
 
         self.assertEqual(sorted_versions[0], version0)
         self.assertEqual(sorted_versions[1], version1)
@@ -173,25 +173,25 @@ class VersionRebuildTest(TestCase):
         self.assertIn("image.png", diff5)
         self.assertEqual(len(diff5), 2)
 
-    def test_update_convert_versions_list_to_files_list(self):
+    def test_update_convert_version_list_to_file_list(self):
         readme_signature_1 = Signature(path="readme.html", algo="SHA256", hash="12345")
         readme_signature_2 = Signature(path="readme.html", algo="SHA256", hash="98765")
         signatures1 = [readme_signature_1, self.other_file_signature]
         signatures2 = [readme_signature_2, self.common_js_signature]
         version1 = VersionDefinition(version="1.0", signatures=signatures1)
         version2 = VersionDefinition(version="2.0", signatures=signatures2)
-        versions_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
-        self.version_rebuild.storage.read_versions.return_value = versions_list
+        version_list = VersionList(key="wordpress", producer="unittest", versions=[version1, version2])
+        self.version_rebuild.storage.read_versions.return_value = version_list
         self.version_rebuild.get_files_for_versions_identification = MagicMock()
         self.version_rebuild.get_files_for_versions_identification.return_value = (
             self.files_for_versions_identification, set())
 
         self.version_rebuild.update("wordpress")
 
-        readme_file = [file for file in self.version_rebuild.files_list.files if file.path == "readme.html"][0]
-        common_file = [file for file in self.version_rebuild.files_list.files if file.path == "wp-admin/js/common.js"][0]
+        readme_file = [file for file in self.version_rebuild.file_list.files if file.path == "readme.html"][0]
+        common_file = [file for file in self.version_rebuild.file_list.files if file.path == "wp-admin/js/common.js"][0]
         # list should be empty because other_file.js is not in files_for_versions_identification.
-        other_file = [file for file in self.version_rebuild.files_list.files if file.path == "other_file.js"]
+        other_file = [file for file in self.version_rebuild.file_list.files if file.path == "other_file.js"]
         self.assertEqual(len(other_file), 0)
         self.assertEqual(len(readme_file.signatures), 2)
         self.assertEqual(len(common_file.signatures), 1)

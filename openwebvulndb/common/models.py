@@ -231,7 +231,7 @@ class Signature(Model):
         self.contains_version = contains_version
 
 
-class FilesList(Model):
+class FileList(Model):
 
     def init(self, *, producer, key, files=None):
         self.producer = producer

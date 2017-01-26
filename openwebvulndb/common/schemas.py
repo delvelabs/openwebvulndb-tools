@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from marshmallow import Schema, fields, post_load, validates_schema, ValidationError
-from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference, FilesList, File, \
+from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference, FileList, File, \
     FileSignature
 from .models import VersionList, VersionDefinition, Signature
 
@@ -186,7 +186,7 @@ class FileSchema(Schema):
         return File(**data)
 
 
-class FilesListSchema(Schema):
+class FileListSchema(Schema):
     class Meta:
         ordered = True
 
@@ -196,5 +196,5 @@ class FilesListSchema(Schema):
 
     @post_load
     def make(self, data):
-        return FilesList(**data)
+        return FileList(**data)
 
