@@ -145,3 +145,9 @@ class VersionChecker:
     def __call__(self, chunk):
         if self.version is not None and self.version in chunk:
             self.contains_version = True
+
+
+def hash_data(data, algo):
+    hasher = hashlib.new(algo)
+    hasher.update(data)
+    return hasher.hexdigest()
