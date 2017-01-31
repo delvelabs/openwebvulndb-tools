@@ -2,6 +2,7 @@ from lxml import etree
 from datetime import datetime
 import re
 from openwebvulndb.common.logs import logger
+import urllib
 
 # %b = abbreviated month (Jan), %d = zero-padded day of month, %Y = year with century (2016), %I = hour in 12h format, %M = zero-padded minutes, %p = AM or PM.
 securityfocus_date_format = "%b %d %Y %I:%M%p"
@@ -112,8 +113,9 @@ class ReferenceTabParser:
     The reference tab contains external references about the vulnerability. A reference is a description with an URL.
     """
 
-    def __init__(self):
+    def __init__(self, url=None):
         self.html_tree = None
+        self.url = url
 
     def set_html_page(self, filename):
         parser = etree.HTMLParser()
@@ -122,6 +124,9 @@ class ReferenceTabParser:
     def _get_reference_parent_tag(self):
         return self.html_tree.xpath('//div[@id="vulnerability"]/ul')[0]  # returns the first ul tag in div vulnerability
 
+    def _is_relative_url(self, url):
+        return len(urllib.parse.urlparse(url).netloc) == 0
+
     def get_references(self):
         references_list = []
         parent_ul_tag = self._get_reference_parent_tag()
@@ -129,6 +134,8 @@ class ReferenceTabParser:
             a_tag = li[0]
             description = a_tag.text + a_tag.tail
             url = li.xpath('a/@href')[0]
+            if self._is_relative_url(url) and self.url is not None:
+                url = urllib.parse.urljoin(self.url, url)
             references_list.append({"description": description, "url": url})
         return references_list
 

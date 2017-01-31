@@ -187,12 +187,15 @@ class SecurityFocusReader:
     def _add_bugtraqid_reference(self, references_manager, bugtraq_id):
         """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references, replace it with the bugtraqid."""
         for ref in references_manager.references:
-            if ref.type == "other" and ref.url is not None and "securityfocus" in ref.url:
-                ref.type = "bugtraqid"
-                ref.id = bugtraq_id
-                ref.url = None
+            if ref.type == "other" and ref.url is not None and references_manager.is_bugtraqid_url(ref.url):
+                self._replace_existing_securityfocus_reference_with_bugtraq_id(ref, bugtraq_id)
                 return
         references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+
+    def _replace_existing_securityfocus_reference_with_bugtraq_id(self, reference, bugtraq_id):
+        reference.type = "bugtraqid"
+        reference.id = bugtraq_id
+        reference.url = None
 
     def _remove_useless_references(self, references_list):
         """Remove the useless references that the references tab of a vuln in the security focuse db usually contains, like a link to wordpress/the plugin homepage."""

@@ -1,8 +1,10 @@
 import unittest
+from unittest.mock import MagicMock
 from datetime import datetime
 from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser, \
     DiscussionTabParser, ExploitTabParser, SolutionTabParser
 from fixtures import file_path
+from lxml import etree
 
 
 class InfoTabParserTest(unittest.TestCase):
@@ -150,6 +152,16 @@ class ReferenceTabParserTest(unittest.TestCase):
         self.assertEqual(reference["description"], "WordPress HomePage (WordPress)")
         self.assertEqual(reference["url"], "http://wordpress.com/")
 
+    def test_get_references_create_absolute_url_from_relative_url(self):
+        tag_with_references = \
+            etree.fromstring('<ul><li><a href="/archive/1/488734">Relative link</a> (Wordpress)<br/></li></ul>')
+        ref_parser = ReferenceTabParser(url="http://www.securityfocus.com")
+        ref_parser._get_reference_parent_tag = MagicMock()
+        ref_parser._get_reference_parent_tag.return_value = tag_with_references
+
+        references = ref_parser.get_references()
+
+        self.assertEqual(references[0]['url'], "http://www.securityfocus.com/archive/1/488734")
 
 class DiscussionTabParserTest(unittest.TestCase):
 

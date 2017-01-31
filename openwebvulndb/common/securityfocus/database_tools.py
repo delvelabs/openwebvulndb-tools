@@ -3,9 +3,15 @@ from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 import aiohttp
 
 
-def update_securityfocus_database(loop, storage, vulnerability_manager):
-    async def update_database(fetcher, reader):
-        vulnerability_list = await fetcher.get_list_of_vuln_on_first_page()
+securityfocus_base_url = "http://www.securityfocus.com/bid/"
+
+
+def update_securityfocus_database(loop, storage, vulnerability_manager, bugtraq_id=None):
+    async def update_database(fetcher, reader, bugtraq_id):
+        if bugtraq_id is None:
+            vulnerability_list = await fetcher.get_list_of_vuln_on_first_page()
+        else:
+            vulnerability_list = [securityfocus_base_url + bugtraq_id]
         for vuln_url in vulnerability_list:
             vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
             if vuln_entry is not None:
@@ -13,7 +19,7 @@ def update_securityfocus_database(loop, storage, vulnerability_manager):
     with aiohttp.ClientSession(loop=loop) as aiohttp_session:
         fetcher = SecurityFocusFetcher(aiohttp_session, vulnerability_manager)
         reader = SecurityFocusReader(storage, vulnerability_manager, aiohttp_session)
-        loop.run_until_complete(update_database(fetcher, reader))
+        loop.run_until_complete(update_database(fetcher, reader, bugtraq_id))
 
 
 def create_securityfocus_database(loop, storage, vulnerability_manager):

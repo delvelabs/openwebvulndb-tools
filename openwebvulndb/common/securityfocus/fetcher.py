@@ -65,7 +65,7 @@ class SecurityFocusFetcher:
         vuln_entry = {
             "id": bugtraq_id,
             "info_parser": InfoTabParser(),
-            "references_parser": ReferenceTabParser(),
+            "references_parser": ReferenceTabParser(url=url),
             "discussion_parser": DiscussionTabParser(),
             "exploit_parser": ExploitTabParser(),
             "solution_parser": SolutionTabParser()

@@ -106,11 +106,14 @@ class ReferenceManager:
                 return self.include_normalized("bugtraqid", bugtraqid)
         return None
 
+    def is_bugtraqid_url(self, url):
+        return "securityfocus.com/bid" in url
+
     def include_url(self, url):
         try:
             return next(x for x in self.references if x.url == url)
         except StopIteration:
-            if "securityfocus" in url:
+            if self.is_bugtraqid_url(url):
                 ref = self.include_bugtraqid(url)
                 if ref is not None:
                     return ref
