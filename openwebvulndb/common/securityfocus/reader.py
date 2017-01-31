@@ -6,6 +6,7 @@ from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
+from copy import deepcopy
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -47,23 +48,34 @@ class SecurityFocusReader:
         return v
 
     def apply_data(self, vuln, entry, allow_override=False):
+
+        added_new_value = False
+
         def apply_value(field, value):
             if allow_override or getattr(vuln, field) is None:
                 setattr(vuln, field, value)
+
         # todo if title is not none check if title from securityfocus is better instead of doing blind override.
         if vuln.title is None or allow_override:
-            apply_value("title", entry['info_parser'].get_title())
+            if vuln.title != entry['info_parser'].get_title():
+                vuln.title = entry['info_parser'].get_title()
+                added_new_value = True
 
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
-            vuln.reported_type = entry['info_parser'].get_vuln_class()
+            if entry['info_parser'].get_vuln_class() is not None:
+                vuln.reported_type = entry['info_parser'].get_vuln_class()
+                added_new_value = True
 
-        apply_value('updated_at', self._get_last_modified(entry))
         apply_value('created_at', entry['info_parser'].get_publication_date())
+
         fixed_in = self._get_fixed_in(entry)
         if fixed_in is not None:
             version_range = VersionRange(fixed_in=fixed_in)
-            vuln.add_affected_version(version_range)
+            if version_range not in vuln.affected_versions:
+                vuln.add_affected_version(version_range)
+                added_new_value = True
 
+        old_references = deepcopy(vuln.references)
         ref_manager = self.reference_manager.for_list(vuln.references)
         self._add_bugtraqid_reference(ref_manager, entry["id"])
         for cve in entry['info_parser'].get_cve_id():
@@ -71,6 +83,9 @@ class SecurityFocusReader:
         useful_references = self._remove_useless_references(entry['references_parser'].get_references())
         for reference in useful_references:
             ref_manager.include_url(reference["url"])
+
+        if added_new_value or old_references != vuln.references:
+            apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
         from_url = self._identify_from_url(entry['references_parser'])

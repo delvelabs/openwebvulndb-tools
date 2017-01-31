@@ -357,3 +357,46 @@ class SecurityFocusReaderTest(unittest.TestCase):
         }
         vuln = self.reader.read_one(entry)
         self.assertEqual(len(vuln.references), 3)  # Only the bugtraqid and the first two references should be in the list.
+
+    def test_apply_data_dont_override_updated_at_if_no_other_changes(self):
+        created_at = datetime(2017, 1, 10)
+        updated_at = datetime(2017, 1, 11, hour=8)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
+        vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id))
+
+        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['info_parser'].get_title.return_value = "Title"
+        entry['info_parser'].get_vuln_class.return_value = None
+        entry['info_parser'].get_publication_date.return_value = created_at
+        entry['info_parser'].get_not_vulnerable_versions.return_value = []
+        entry['info_parser'].get_cve_id.return_value = []
+        entry['info_parser'].get_last_update_date.return_value = updated_at
+        entry['references_parser'].get_references.return_value = []
+
+        reader = SecurityFocusReader(None, None)
+
+        reader.apply_data(vuln, entry, allow_override=True)
+
+        self.assertEqual(vuln.updated_at, created_at)
+
+    def test_apply_data_override_updated_at_if_new_references(self):
+        created_at = datetime(2017, 1, 10)
+        updated_at = datetime(2017, 1, 11, hour=8)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
+
+        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['info_parser'].get_title.return_value = "Title"
+        entry['info_parser'].get_vuln_class.return_value = None
+        entry['info_parser'].get_publication_date.return_value = created_at
+        entry['info_parser'].get_not_vulnerable_versions.return_value = []
+        entry['info_parser'].get_cve_id.return_value = []
+        entry['info_parser'].get_last_update_date.return_value = updated_at
+        entry['references_parser'].get_references.return_value = [{"url": "http://www.references.example/wordpress"}]
+
+        reader = SecurityFocusReader(None, None)
+
+        reader.apply_data(vuln, entry, allow_override=True)
+
+        self.assertEqual(vuln.updated_at, updated_at)
