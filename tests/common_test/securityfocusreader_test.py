@@ -11,6 +11,7 @@ from datetime import datetime
 import json
 import os
 import re
+from openwebvulndb.common.manager import ReferenceManager
 
 
 class TargetIdentificationTest(unittest.TestCase):
@@ -304,6 +305,19 @@ class SecurityFocusReaderTest(unittest.TestCase):
         for ref in vuln.references:
             if ref.type == "other" and ref.url is not None:
                 self.assertNotIn("securityfocus", ref.url)
+
+    def test_bugtraqid_reference_doesnt_overwrite_securityfocus_url_if_bugtraqid_doesnt_match(self):
+        references = [Reference(url="http://www.securityfocus.com/bid/12345", type="other")]
+        bugtraq_id = "98765"
+        reference_manager = ReferenceManager()
+        reference_manager.references = references
+        reader = SecurityFocusReader(None, None)
+
+        reader._add_bugtraqid_reference(reference_manager, bugtraq_id)
+
+        self.assertEqual(len(references), 2)
+        self.assertEqual(references[1].type, "bugtraqid")
+        self.assertEqual(references[1].id, bugtraq_id)
 
     def test_get_lowest_version_when_multiple_fixed_in(self):
         """Test that the fixed_in version put in the vuln file by the reader is the lowest one when there is more than one not vuln version"""
