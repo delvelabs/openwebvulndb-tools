@@ -23,7 +23,7 @@ class VersionRebuildTest(TestCase):
         self.version_rebuild.get_files_for_versions_identification.return_value = (
             self.files_for_versions_identification, set())
 
-        self.version_rebuild.update(signatures)
+        self.version_rebuild.update("wordpress")
 
         files = [file.path for file in self.version_rebuild.file_list.files]
         self.assertIn("readme.html", files)
@@ -57,20 +57,50 @@ class VersionRebuildTest(TestCase):
         signatures0 = [self.readme_signature, self.common_js_signature]
         signatures1 = [self.common_js_signature]
 
-        files = self.version_rebuild._compare_signatures(signatures0, signatures1, excluded_file="readme.html")
+        files = self.version_rebuild._compare_signatures(signatures0, signatures1, excluded_file=["readme\.html"])
 
         self.assertNotIn("readme.html", files)
 
-    def test_compare_signatures_ignore_exclude_files_ignore_plugin_and_themes_files_by_default(self):
+    def test_update_exclude_themes_and_plugins_files_if_key_is_wordpress(self):
         file0 = Signature(path="wp-content/plugins/my-plugin/style.css", hash=1234)
         file1 = Signature(path="wp-content/themes/my-theme/file2.js", hash=4567)
 
         signatures0 = [file0, self.readme_signature]
-        signatures1 = [file1, self.readme_signature]
+        signatures1 = [file1, self.common_js_signature]
 
-        files = self.version_rebuild._compare_signatures(signatures0, signatures1)
+        versions = [VersionDefinition(version="1.0", signatures=signatures0),
+                    VersionDefinition(version="2.0", signatures=signatures1)]
+        self.version_rebuild.storage.read_versions.return_value = VersionList(key="wordpress", producer="", versions=versions)
 
-        self.assertEqual(len(files), 0)
+        self.version_rebuild.update("wordpress")
+
+        files = self.version_rebuild.file_list.files
+
+        path_list = [file.path for file in files]
+        self.assertIn(self.readme_signature.path, path_list)
+        self.assertIn(self.common_js_signature.path, path_list)
+        self.assertNotIn(file0.path, path_list)
+        self.assertNotIn(file1.path, path_list)
+
+    def test_compare_signatures_dont_exclude_plugins_files_if_key_is_plugin(self):
+        file0 = Signature(path="wp-content/plugins/my-plugin/style.css", hash=1234)
+        file1 = Signature(path="wp-content/plugins/my-plugin/readme.html", hash=4567)
+
+        signatures0 = [file0]
+        signatures1 = [file1]
+
+        versions = [VersionDefinition(version="1.0", signatures=signatures0),
+                    VersionDefinition(version="2.0", signatures=signatures1)]
+        self.version_rebuild.storage.read_versions.return_value = VersionList(key="plugins/my-plugin", producer="",
+                                                                              versions=versions)
+
+        self.version_rebuild.update("plugins/my-plugin")
+
+        files = self.version_rebuild.file_list.files
+
+        path_list = [file.path for file in files]
+        self.assertIn(file0.path, path_list)
+        self.assertIn(file1.path, path_list)
 
     def test_get_files_for_versions_identification_return_minimum_files_required_to_make_each_version_unique(self):
         common_file = Signature(path="style.css", hash=1234)  # useless for version identification
@@ -102,6 +132,16 @@ class VersionRebuildTest(TestCase):
         self.assertNotIn("style.css", files)
         self.assertNotIn("style2.css", files)
         self.assertNotIn("button.css", files)
+
+    def test_get_files_for_versions_identification_return_files_if_no_diff_between_versions_exists(self):
+        version1 = VersionDefinition(version="1.0", signatures=[self.readme_signature, self.common_js_signature])
+        version2 = VersionDefinition(version="2.0", signatures=[self.readme_signature, self.common_js_signature])
+        version_list = VersionList(key="plugins/my-plugin", producer="", versions=[version1, version2])
+
+        files, _ = self.version_rebuild.get_files_for_versions_identification(version_list, files_to_keep_per_diff=2)
+
+        self.assertIn(self.readme_signature.path, files)
+        self.assertIn(self.common_js_signature.path, files)
 
     def test_sort_versions(self):
         version0 = VersionDefinition(version="3.7.16")

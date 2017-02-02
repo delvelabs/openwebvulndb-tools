@@ -13,12 +13,15 @@ class VersionRebuild:
         self.version_list = None
         self.file_list = None
 
-    def update(self, key):
+    def update(self, key, files_to_keep_per_diff=2):
         self.version_list = self.storage.read_versions(key)
-        files, equal_versions = self.get_files_for_versions_identification(self.version_list, files_to_keep_per_diff=2)
-        _files, _equal_versions = self.get_files_for_versions_identification(self.version_list,
-                                                                             exclude_file="readme.html",
-                                                                             files_to_keep_per_diff=2)
+
+        files, equal_versions = self.get_files_for_versions_identification(
+            self.version_list, exclude_file=self._get_files_to_exclude(key), files_to_keep_per_diff=files_to_keep_per_diff)
+        # Get a list of file signatures  without the readme, because we can't rely on it for version identification.
+        _files, _equal_versions = self.get_files_for_versions_identification(
+            self.version_list, exclude_file=self._get_files_to_exclude(key, exclude_readme=True),
+            files_to_keep_per_diff=files_to_keep_per_diff)
         files_to_use_for_version_signatures = files | _files
         equal_versions &= _equal_versions
 
@@ -27,7 +30,7 @@ class VersionRebuild:
         return equal_versions
 
     def _create_file_list(self, key, files_to_use_for_version_signatures):
-        self.file_list = FileList(key=key, producer="Vane2 Export")
+        self.file_list = FileList(key=key, producer="Vane2Export")
         for file_path in files_to_use_for_version_signatures:
             file = File(path=file_path)
             signatures = self._get_all_signatures_for_file(file_path)
@@ -38,6 +41,9 @@ class VersionRebuild:
         versions = self._sort_versions(version_list)
         files, versions_without_diff = self._get_diff_between_versions(versions, exclude_file=exclude_file,
                                                                        files_to_keep_per_diff=files_to_keep_per_diff)
+        # if no diff were found, (ex: plugin with only one version), return all the files:
+        if len(files) == 0 and len(versions) > 0:
+            files = set(signature.path for version in versions for signature in version.signatures)
         return files, versions_without_diff
 
     def dump(self):
@@ -48,12 +54,13 @@ class VersionRebuild:
             if signature.path == file_path:
                 return signature
 
-    def _is_plugin_or_theme_file(self, file_path):
-        return re.match("wp-content/((plugins)|(themes))", file_path) is not None
-
     def _compare_signatures(self, signatures0, signatures1, excluded_file=None):
         def exclude_file(file_path):
-            return file_path == excluded_file or self._is_plugin_or_theme_file(file_path)
+            if excluded_file is not None:
+                for file_pattern in excluded_file:
+                    if re.search(file_pattern, file_path) is not None:
+                        return True
+            return False
 
         files_in_signatures0 = set(signature.path for signature in signatures0 if not exclude_file(signature.path))
         files_in_signatures1 = set(signature.path for signature in signatures1 if not exclude_file(signature.path))
@@ -78,7 +85,6 @@ class VersionRebuild:
                     version.version, next_version.version))
             else:
                 diff_list.append(diff)
-
         self._keep_most_common_file_in_all_diff_for_each_diff(diff_list, files_to_keep_per_diff)
         return set(file for diff in diff_list for file in diff), versions_without_diff
 
@@ -118,3 +124,11 @@ class VersionRebuild:
                     file_signature.versions.append(version.version)
                     signatures[signature.hash] = file_signature
         return [file_signature for file_signature in signatures.values()]
+
+    def _get_files_to_exclude(self, key, exclude_readme=False):
+        files_to_exclude = []
+        if "plugins" not in key and "themes" not in key:
+            files_to_exclude.append("wp-content/((plugins)|(themes))")
+        if exclude_readme:
+            files_to_exclude.append("readme\.(html|txt)")
+        return files_to_exclude

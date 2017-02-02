@@ -25,6 +25,7 @@ from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 from .vane2.versionrebuild import VersionRebuild
+from .vane2.exporter import Exporter
 from ..common.logs import logger
 
 
@@ -75,6 +76,23 @@ def vane2_export(storage, input_path):
         fp.write(data)
 
 
+def vane2_export_plugins(storage, input_path):
+    if input_path:
+        input_path = join(dirname(__file__), input_path)
+    else:
+        input_path = dirname(__file__)
+
+    exporter = Exporter(storage)
+    exporter.export_plugins(True)
+
+    filename = join(input_path, "vane2_plugins_versions.json")
+    with open(filename, "w") as fp:
+        data, errors = exporter.dump_plugins()
+        if errors:
+            raise Exception(errors)
+        fp.write(data)
+
+
 def populate_versions(loop, repository_hasher, storage):
     async def load_input():
         worker = ParallelWorker(8, loop=loop, timeout_per_job=1800)  # Half an hour at most
@@ -109,6 +127,7 @@ operations = dict(list_themes=list_themes,
                   vane_import=vane_import,
                   vane_export=vane_export,
                   vane2_export=vane2_export,
+                  vane2_export_plugins=vane2_export_plugins,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
