@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 from openwebvulndb.common.models import VersionList, VersionDefinition, Signature, Meta
 from openwebvulndb.wordpress.vane2.exporter import Exporter
 from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
@@ -76,25 +76,22 @@ class ExporterTest(TestCase):
         self.exporter._list_keys = MagicMock()
 
         self.exporter.export_plugins("path", only_popular=True)
-
-        self.exporter._list_keys.assert_called_once_with("plugins", True, False)
-        self.exporter._list_keys.reset_mock()
-
         self.exporter.export_plugins("path", only_vulnerable=True)
 
-        self.exporter._list_keys.assert_called_once_with("plugins", False, True)
+        calls = [call("plugins", True, False), call("plugins", False, True)]
+        self.exporter._list_keys.assert_has_calls(calls, any_order=True)
 
     def test_export_plugins_call_dump_with_good_file_name(self):
         self.exporter.export_plugins("path")
-        args, kwargs = self.exporter._dump.call_args
-        self.assertEqual(args[0], "path/vane2_plugins_versions.json")
-
         self.exporter.export_plugins("path", only_popular=True)
-        args, kwargs = self.exporter._dump.call_args
-        self.assertEqual(args[0], "path/vane2_popular_plugins_versions.json")
-
         self.exporter.export_plugins("path", only_vulnerable=True)
-        args, kwargs = self.exporter._dump.call_args
+
+        calls = self.exporter._dump.mock_calls
+        name, args, kwargs = calls[0]
+        self.assertEqual(args[0], "path/vane2_plugins_versions.json")
+        name, args, kwargs = calls[1]
+        self.assertEqual(args[0], "path/vane2_popular_plugins_versions.json")
+        name, args, kwargs = calls[2]
         self.assertEqual(args[0], "path/vane2_vulnerable_plugins_versions.json")
 
     def test_export_themes_regroup_themes_in_one_file(self):
@@ -161,25 +158,22 @@ class ExporterTest(TestCase):
         self.exporter._list_keys = MagicMock()
 
         self.exporter.export_themes("path", only_popular=True)
-
-        self.exporter._list_keys.assert_called_once_with("themes", True, False)
-        self.exporter._list_keys.reset_mock()
-
         self.exporter.export_themes("path", only_vulnerable=True)
 
-        self.exporter._list_keys.assert_called_once_with("themes", False, True)
+        calls = [call("themes", True, False), call("themes", False, True)]
+        self.exporter._list_keys.assert_has_calls(calls, any_order=True)
 
     def test_export_themes_call_dump_with_good_file_name(self):
         self.exporter.export_themes("path")
-        args, kwargs = self.exporter._dump.call_args
-        self.assertEqual(args[0], "path/vane2_themes_versions.json")
-
         self.exporter.export_themes("path", only_popular=True)
-        args, kwargs = self.exporter._dump.call_args
-        self.assertEqual(args[0], "path/vane2_popular_themes_versions.json")
-
         self.exporter.export_themes("path", only_vulnerable=True)
-        args, kwargs = self.exporter._dump.call_args
+
+        calls = self.exporter._dump.mock_calls
+        name, args, kwargs = calls[0]
+        self.assertEqual(args[0], "path/vane2_themes_versions.json")
+        name, args, kwargs = calls[1]
+        self.assertEqual(args[0], "path/vane2_popular_themes_versions.json")
+        name, args, kwargs = calls[2]
         self.assertEqual(args[0], "path/vane2_vulnerable_themes_versions.json")
 
     def test_export_wordpress_dump_wordpress_versions(self):
