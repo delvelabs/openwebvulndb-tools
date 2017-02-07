@@ -1,6 +1,6 @@
 from openwebvulndb.common.models import FileListGroup
 from openwebvulndb.common.serialize import serialize
-from openwebvulndb.common.schemas import FileListGroupSchema
+from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
 from .versionrebuild import VersionRebuild
 from os.path import join
 
@@ -32,6 +32,13 @@ class Exporter:
 
         file_name = self._get_export_file_name(export_path, "themes", only_popular, only_vulnerable)
         self._dump(file_name, theme_list, FileListGroupSchema())
+
+    def export_wordpress(self, export_path):
+        equal_versions = self.version_rebuild.update("wordpress")
+        wordpress_file_list = self.version_rebuild.file_list
+        file_name = self._get_export_file_name(export_path, "wordpress", False, False)
+        self._dump(file_name, wordpress_file_list, FileListSchema())
+        return equal_versions
 
     def _dump(self, file_name, data, schema):
         data, errors = serialize(schema, data)

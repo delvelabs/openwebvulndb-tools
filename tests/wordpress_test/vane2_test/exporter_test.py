@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 from openwebvulndb.common.models import VersionList, VersionDefinition, Signature, Meta
 from openwebvulndb.wordpress.vane2.exporter import Exporter
-from openwebvulndb.common.schemas import FileListGroupSchema
+from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
 
 
 class ExporterTest(TestCase):
@@ -181,6 +181,37 @@ class ExporterTest(TestCase):
         self.exporter.export_themes("path", only_vulnerable=True)
         args, kwargs = self.exporter._dump.call_args
         self.assertEqual(args[0], "path/vane2_vulnerable_themes_versions.json")
+
+    def test_export_wordpress_dump_wordpress_versions(self):
+        versions = [VersionDefinition(version="1.0", signatures=[Signature(path="file.html", hash="a1b2c3")]),
+                    VersionDefinition(version="2.0", signatures=[Signature(path="file.html", hash="d4e5f6"),
+                                                                 Signature(path="style.css", hash="12345")])]
+        wordpress_version_list = VersionList(key="wordpress", producer="unittest", versions=versions)
+        self.exporter._list_keys = MagicMock()
+        self.exporter._list_keys.return_value = ["wordpress"]
+        self.storage.version_list = [wordpress_version_list]
+
+        self.exporter.export_wordpress("path")
+
+        args, kwargs = self.exporter._dump.call_args
+        file_name = args[0]
+        wordpress_file_list = args[1]
+        schema = args[2]
+        self.assertEqual(file_name, "path/vane2_wordpress_versions.json")
+        self.assertIsInstance(schema, FileListSchema)
+        self.assertEqual(wordpress_file_list.key, "wordpress")
+        self.assert_object_with_attribute_value_in_container("path", "file.html", wordpress_file_list.files)
+        self.assert_object_with_attribute_value_in_container("path", "style.css", wordpress_file_list.files)
+        path_file = self.get_object_with_attribute_value_in_container("path", "file.html", wordpress_file_list.files)
+        style_file = self.get_object_with_attribute_value_in_container("path", "style.css", wordpress_file_list.files)
+        path_version1_signature = self.get_object_with_attribute_value_in_container("hash", "a1b2c3",
+                                                                                    path_file.signatures)
+        path_version2_signature = self.get_object_with_attribute_value_in_container("hash", "d4e5f6",
+                                                                                    path_file.signatures)
+        style_signature = style_file.signatures[0]
+        self.assertEqual(path_version1_signature.versions, ["1.0"])
+        self.assertEqual(path_version2_signature.versions, ["2.0"])
+        self.assertEqual(style_signature.versions, ["2.0"])
 
     def test_walk_yield_keys_and_files_in_storage_if_versions_file_is_present(self):
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", ["META.json", "versions.json"]),
