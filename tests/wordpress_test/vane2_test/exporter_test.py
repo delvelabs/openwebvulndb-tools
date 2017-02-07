@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from openwebvulndb.common.models import VersionList, VersionDefinition, Signature, Meta
@@ -207,28 +224,25 @@ class ExporterTest(TestCase):
         self.assertEqual(path_version2_signature.versions, ["2.0"])
         self.assertEqual(style_signature.versions, ["2.0"])
 
-    def test_walk_yield_keys_and_files_in_storage_if_versions_file_is_present(self):
+    def test_list_all_keys_yield_key_if_versions_file_is_present(self):
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", ["META.json", "versions.json"]),
                                           ("plugins/plugin1", "dirpath", "dirnames", ["META.json"]),
                                           ("themes/theme0", "dirpath", "dirnames", ["META.json", "versions.json"]),
                                           ("themes/theme1", "dirpath", "dirnames", ["META.json"])]
 
-        for key, files in self.exporter._walk("plugins"):
+        for key in self.exporter._list_all_keys("plugins"):
             self.assertEqual(key, "plugins/plugin0")
-            self.assertEqual(files, ["META.json", "versions.json"])
 
-        for key, files in self.exporter._walk("themes"):
+        for key in self.exporter._list_all_keys("themes"):
             self.assertEqual(key, "themes/theme0")
-            self.assertEqual(files, ["META.json", "versions.json"])
 
     def test_list_vulnerable_list_keys_of_plugins_or_themes_with_vuln(self):
-        files = ["META.json", "versions.json"]
-        vuln_files0 = ["META.json", "versions.json", "vuln-cvereader.json"]
-        vuln_files1 = ["META.json", "versions.json", "vuln-securityfocus.json"]
+        files = ["versions.json"]
+        self.storage.keys_with_vulnerabilities = ["plugins/plugin1", "themes/theme1"]
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", files),
-                                ("plugins/plugin1", "dirpath", "dirnames", vuln_files0),
+                                ("plugins/plugin1", "dirpath", "dirnames", files),
                                 ("themes/theme0", "dirpath", "dirnames", files),
-                                ("themes/theme1", "dirpath", "dirnames", vuln_files1)]
+                                ("themes/theme1", "dirpath", "dirnames", files)]
 
         plugin_key = list(self.exporter._list_vulnerable("plugins"))
         theme_key = list(self.exporter._list_vulnerable("themes"))
@@ -251,22 +265,6 @@ class ExporterTest(TestCase):
         self.assertEqual(plugin_key, ["plugins/plugin0"])
         self.assertEqual(theme_key, ["themes/theme0"])
 
-    def test_list_all_keys_list_all_keys_within_key(self):
-        files = ["META.json", "versions.json"]
-        self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", files),
-                                ("plugins/plugin1", "dirpath", "dirnames", files),
-                                ("themes/theme0", "dirpath", "dirnames", files),
-                                ("themes/theme1", "dirpath", "dirnames", files)]
-
-        plugin_keys = list(self.exporter._list_all_keys("plugins"))
-        theme_keys = list(self.exporter._list_all_keys("themes"))
-        self.assertIn("plugins/plugin0", plugin_keys)
-        self.assertIn("plugins/plugin1", plugin_keys)
-        self.assertEqual(len(plugin_keys), 2)
-        self.assertIn("themes/theme0", theme_keys)
-        self.assertIn("themes/theme1", theme_keys)
-        self.assertEqual(len(theme_keys), 2)
-
     def assert_object_with_attribute_value_in_container(self, attribute, value, container):
         self.assertIsNotNone(self.get_object_with_attribute_value_in_container(attribute, value, container))
 
@@ -284,6 +282,17 @@ class FakeStorage:
         self.version_list = version_list or []
         self.meta_list = meta_list or []
         self.content = []
+        self.keys_with_vulnerabilities = []
+
+    def list_meta(self, key):
+        for meta in self.meta_list:
+            if key in meta.key:
+                yield meta
+
+    def list_vulnerabilities(self, key):
+        for _key, path, dirname, files in self.walk(key):
+            if _key in self.keys_with_vulnerabilities:
+                yield _key
 
     def walk(self, key):
         for _key, path, dirnames, files in self.content:

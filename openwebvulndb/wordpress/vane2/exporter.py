@@ -1,3 +1,20 @@
+# openwebvulndb-tools: A collection of tools to maintain vulnerability databases
+# Copyright (C) 2016-  Delve Labs inc.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 from openwebvulndb.common.models import FileListGroup
 from openwebvulndb.common.serialize import serialize
 from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
@@ -42,8 +59,6 @@ class Exporter:
 
     def _dump(self, file_name, data, schema):
         data, errors = serialize(schema, data)
-        if errors:
-            raise Exception(errors)
         with open(file_name, "w") as fp:
             fp.write(data)
 
@@ -56,35 +71,27 @@ class Exporter:
             yield from self._list_all_keys(key)
 
     def _list_vulnerable(self, key):
-        for _key, files in self._walk(key):
-            if self._contains_vuln_file(files):
+        for _key in self._list_all_keys(key):
+            if self._is_vulnerable(_key):
                 yield _key
 
     def _list_popular(self, key):
-        for _key, files in self._walk(key):
-            if self._is_popular(_key, files):
+        for _key in self._list_all_keys(key):
+            if self._is_popular(_key):
                 yield _key
 
     def _list_all_keys(self, key):
-        for _key, files in self._walk(key):
-            yield _key
+        for _key, path, dirnames, files in self.storage.walk(key):
+            if "versions.json" in files:
+                yield _key
 
-    def _is_popular(self, key, files):
-        if "META.json" in files:
-            meta = self.storage.read_meta(key)
+    def _is_popular(self, key):
+        for meta in self.storage.list_meta(key):
             return meta.is_popular
         return False
 
-    def _contains_vuln_file(self, files):
-        for file in files:
-            if file.startswith("vuln-") and file.endswith(".json"):
-                return True
-        return False
-
-    def _walk(self, key):
-        for _key, path, dirnames, files in self.storage.walk(key):
-            if "versions.json" in files:
-                yield _key, files
+    def _is_vulnerable(self, key):
+        return any(self.storage.list_vulnerabilities(key))
 
     def _get_export_file_name(self, path, key, popular, vulnerable):
         base_file_name = "vane2{0}{1}_versions.json"
