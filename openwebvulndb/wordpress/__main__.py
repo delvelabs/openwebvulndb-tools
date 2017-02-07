@@ -76,6 +76,7 @@ def vane2_export(storage, input_path):
         fp.write(data)
 
 
+# TODO put in vane2_export?
 def vane2_export_plugins(storage, input_path):
     if input_path:
         input_path = join(dirname(__file__), input_path)
@@ -83,14 +84,24 @@ def vane2_export_plugins(storage, input_path):
         input_path = dirname(__file__)
 
     exporter = Exporter(storage)
-    exporter.export_plugins(True)
 
-    filename = join(input_path, "vane2_plugins_versions.json")
-    with open(filename, "w") as fp:
-        data, errors = exporter.dump_plugins()
-        if errors:
-            raise Exception(errors)
-        fp.write(data)
+    exporter.export_plugins(input_path, only_popular=True)
+    exporter.export_plugins(input_path, only_vulnerable=True)
+    exporter.export_plugins(input_path)
+
+
+# TODO put in vane2_export?
+def vane2_export_themes(storage, input_path):
+    if input_path:
+        input_path = join(dirname(__file__), input_path)
+    else:
+        input_path = dirname(__file__)
+
+    exporter = Exporter(storage)
+
+    exporter.export_themes(input_path, only_popular=True)
+    exporter.export_themes(input_path, only_vulnerable=True)
+    exporter.export_themes(input_path)
 
 
 def populate_versions(loop, repository_hasher, storage):
@@ -128,6 +139,7 @@ operations = dict(list_themes=list_themes,
                   vane_export=vane_export,
                   vane2_export=vane2_export,
                   vane2_export_plugins=vane2_export_plugins,
+                  vane2_export_themes=vane2_export_themes,
                   populate_versions=populate_versions,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,

@@ -2,31 +2,43 @@ from openwebvulndb.common.models import FileListGroup
 from openwebvulndb.common.serialize import serialize
 from openwebvulndb.common.schemas import FileListGroupSchema
 from .versionrebuild import VersionRebuild
+from os.path import join
 
 
 class Exporter:
 
     def __init__(self, storage):
         self.storage = storage
-        self.plugins_list = FileListGroup(key="plugins", producer="Vane2Export")
-        self.themes_list = FileListGroup(key="themes", producer="Vane2Export")
+        self.version_rebuild = VersionRebuild(self.storage)
 
-    def export_plugins(self, only_popular=False, only_vulnerable=False):
-        version_rebuild = VersionRebuild(self.storage)
+    def export_plugins(self, export_path, only_popular=False, only_vulnerable=False):
+        plugin_list = FileListGroup(key="plugins", producer="Vane2Export")
         for plugin_key in self._list_keys("plugins", only_popular, only_vulnerable):
-            version_rebuild.update(plugin_key)
-            plugin = version_rebuild.file_list
-            self.plugins_list.file_lists.append(plugin)
+            self.version_rebuild.update(plugin_key)
+            plugin_file_list = self.version_rebuild.file_list
+            if len(plugin_file_list.files) > 0:
+                plugin_list.file_lists.append(plugin_file_list)
 
-    def export_themes(self, only_popular=False, only_vulnerable=False):
-        version_rebuild = VersionRebuild(self.storage)
+        file_name = self._get_export_file_name(export_path, "plugins", only_popular, only_vulnerable)
+        self._dump(file_name, plugin_list, FileListGroupSchema())
+
+    def export_themes(self, export_path, only_popular=False, only_vulnerable=False):
+        theme_list = FileListGroup(key="themes", producer="Vane2Export")
         for theme_key in self._list_keys("themes", only_popular, only_vulnerable):
-            version_rebuild.update(theme_key)
-            theme_files = version_rebuild.file_list
-            self.themes_list.file_lists.append(theme_files)
+            self.version_rebuild.update(theme_key)
+            theme_file_list = self.version_rebuild.file_list
+            if len(theme_file_list.files) > 0:
+                theme_list.file_lists.append(theme_file_list)
 
-    def dump_plugins(self):
-        return serialize(FileListGroupSchema(), self.plugins_list)
+        file_name = self._get_export_file_name(export_path, "themes", only_popular, only_vulnerable)
+        self._dump(file_name, theme_list, FileListGroupSchema())
+
+    def _dump(self, file_name, data, schema):
+        data, errors = serialize(schema, data)
+        if errors:
+            raise Exception(errors)
+        with open(file_name, "w") as fp:
+            fp.write(data)
 
     def _list_keys(self, key, only_popular=False, only_vulnerable=False):
         if only_popular:
@@ -50,16 +62,6 @@ class Exporter:
         for _key, files in self._walk(key):
             yield _key
 
-    def _list_popular_plugins_keys(self):
-        for key, path, dirnames, files in self.storage.walk("plugins"):
-            if "versions.json" in files and self._is_popular(key, files):
-                yield key
-
-    def _list_all_plugins_keys(self):
-        for key, path, dirnames, files in self.storage.walk("plugins"):
-            if "versions.json" in files:
-                yield key
-
     def _is_popular(self, key, files):
         if "META.json" in files:
             meta = self.storage.read_meta(key)
@@ -73,6 +75,16 @@ class Exporter:
         return False
 
     def _walk(self, key):
-        for key, path, dirnames, files in self.storage.walk(key):
+        for _key, path, dirnames, files in self.storage.walk(key):
             if "versions.json" in files:
-                yield key, files
+                yield _key, files
+
+    def _get_export_file_name(self, path, key, popular, vulnerable):
+        base_file_name = "vane2{0}{1}_versions.json"
+        if popular:
+            file_name = base_file_name.format("_popular_", key)
+        elif vulnerable:
+            file_name = base_file_name.format("_vulnerable_", key)
+        else:
+            file_name = base_file_name.format("_", key)
+        return join(path, file_name)

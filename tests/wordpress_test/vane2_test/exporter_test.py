@@ -10,17 +10,22 @@ class ExporterTest(TestCase):
     def setUp(self):
         self.storage = FakeStorage(None, None)
         self.exporter = Exporter(self.storage)
+        self.exporter._dump = MagicMock()
 
     def test_export_plugins_regroup_plugins_in_one_file(self):
-        plugin0_version_list = VersionList(key="plugin0", producer="unittest")
-        plugin1_version_list = VersionList(key="plugin1", producer="unittest")
+        version_definition = VersionDefinition(version="1.0", signatures=[Signature(path="file")])
+        plugin0_version_list = VersionList(key="plugin0", producer="unittest", versions=[version_definition])
+        plugin1_version_list = VersionList(key="plugin1", producer="unittest", versions=[version_definition])
         self.exporter._list_keys = MagicMock()
         self.exporter._list_keys.return_value = ["plugin0", "plugin1"]
         self.storage.version_list = [plugin0_version_list, plugin1_version_list]
 
-        self.exporter.export_plugins()
+        self.exporter.export_plugins(export_path="path")
 
-        plugins = self.exporter.plugins_list
+        args, kwargs = self.exporter._dump.call_args
+        plugins = args[1]
+        schema = args[2]
+        self.assertIsInstance(schema, FileListGroupSchema)
         self.assertEqual(plugins.key, "plugins")
         self.assertEqual(plugins.producer, "Vane2Export")
         self.assert_object_with_attribute_value_in_container("key", "plugin0", plugins.file_lists)
@@ -36,9 +41,10 @@ class ExporterTest(TestCase):
         self.exporter._list_keys.return_value = ["my-plugin"]
         self.storage.version_list = [plugin_version_list]
 
-        self.exporter.export_plugins()
+        self.exporter.export_plugins("path")
 
-        plugins = self.exporter.plugins_list
+        args, kwargs = self.exporter._dump.call_args
+        plugins = args[1]
         plugin = plugins.file_lists[0]
         self.assertEqual(plugin.key, "my-plugin")
         self.assert_object_with_attribute_value_in_container("path", "file.html", plugin.files)
@@ -54,16 +60,57 @@ class ExporterTest(TestCase):
         self.assertEqual(path_version2_signature.versions, ["2.0"])
         self.assertEqual(style_signature.versions, ["2.0"])
 
+    def test_export_plugins_ignore_plugins_with_empty_versions_file(self):
+        plugin_version_list = VersionList(key="my-plugin", producer="unittest")
+        self.exporter._list_keys = MagicMock()
+        self.exporter._list_keys.return_value = ["my-plugin"]
+        self.storage.version_list = [plugin_version_list]
+
+        self.exporter.export_plugins("path")
+
+        args, kwargs = self.exporter._dump.call_args
+        plugins = args[1]
+        self.assertEqual(len(plugins.file_lists), 0)
+
+    def test_export_plugins_call_list_keys_with_good_args(self):
+        self.exporter._list_keys = MagicMock()
+
+        self.exporter.export_plugins("path", only_popular=True)
+
+        self.exporter._list_keys.assert_called_once_with("plugins", True, False)
+        self.exporter._list_keys.reset_mock()
+
+        self.exporter.export_plugins("path", only_vulnerable=True)
+
+        self.exporter._list_keys.assert_called_once_with("plugins", False, True)
+
+    def test_export_plugins_call_dump_with_good_file_name(self):
+        self.exporter.export_plugins("path")
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_plugins_versions.json")
+
+        self.exporter.export_plugins("path", only_popular=True)
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_popular_plugins_versions.json")
+
+        self.exporter.export_plugins("path", only_vulnerable=True)
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_vulnerable_plugins_versions.json")
+
     def test_export_themes_regroup_themes_in_one_file(self):
-        theme0_version_list = VersionList(key="theme0", producer="unittest")
-        theme1_version_list = VersionList(key="theme1", producer="unittest")
+        version_definition = VersionDefinition(version="1.0", signatures=[Signature(path="file")])
+        theme0_version_list = VersionList(key="theme0", producer="unittest", versions=[version_definition])
+        theme1_version_list = VersionList(key="theme1", producer="unittest", versions=[version_definition])
         self.exporter._list_keys = MagicMock()
         self.exporter._list_keys.return_value = ["theme0", "theme1"]
         self.storage.version_list = [theme0_version_list, theme1_version_list]
 
-        self.exporter.export_themes()
+        self.exporter.export_themes("path")
 
-        themes = self.exporter.themes_list
+        args, kwargs = self.exporter._dump.call_args
+        themes = args[1]
+        schema = args[2]
+        self.assertIsInstance(schema, FileListGroupSchema)
         self.assertEqual(themes.key, "themes")
         self.assertEqual(themes.producer, "Vane2Export")
         self.assert_object_with_attribute_value_in_container("key", "theme0", themes.file_lists)
@@ -79,9 +126,10 @@ class ExporterTest(TestCase):
         self.exporter._list_keys.return_value = ["my-theme"]
         self.storage.version_list = [theme_version_list]
 
-        self.exporter.export_themes()
+        self.exporter.export_themes("path")
 
-        themes = self.exporter.themes_list
+        args, kwargs = self.exporter._dump.call_args
+        themes = args[1]
         theme = themes.file_lists[0]
         self.assertEqual(theme.key, "my-theme")
         self.assert_object_with_attribute_value_in_container("path", "file.html", theme.files)
@@ -97,39 +145,42 @@ class ExporterTest(TestCase):
         self.assertEqual(path_version2_signature.versions, ["2.0"])
         self.assertEqual(style_signature.versions, ["2.0"])
 
-    def test_list_plugins_keys(self):
-        self.skipTest("Change test")
-        files = ["versions.json"]
-        self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", files),
-                                          ("plugins/plugin1", "dirpath", "dirnames", files)]
+    def test_export_themes_ignore_themes_with_empty_versions_file(self):
+        theme_version_list = VersionList(key="my-theme", producer="unittest")
+        self.exporter._list_keys = MagicMock()
+        self.exporter._list_keys.return_value = ["my-theme"]
+        self.storage.version_list = [theme_version_list]
 
-        plugins_keys = list(self.exporter._list_plugins_keys())
+        self.exporter.export_themes("path")
 
-        self.assertIn("plugins/plugin0", plugins_keys)
-        self.assertIn("plugins/plugin1", plugins_keys)
+        args, kwargs = self.exporter._dump.call_args
+        themes = args[1]
+        self.assertEqual(len(themes.file_lists), 0)
 
-    def test_list_plugins_keys_list_popular_plugins(self):
-        self.skipTest("Change test")
-        self.storage.meta_list = [Meta(key='plugins/plugin0', is_popular=True),
-                                  Meta(key='plugins/plugin1', is_popular=False)]
-        files = ["META.json", "versions.json"]
-        self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", files),
-                                ("plugins/plugin1", "dirpath", "dirnames", files)]
+    def test_export_themes_call_list_keys_with_good_args(self):
+        self.exporter._list_keys = MagicMock()
 
-        plugins_keys = list(self.exporter._list_plugins_keys(only_popular=True))
+        self.exporter.export_themes("path", only_popular=True)
 
-        self.assertIn("plugins/plugin0", plugins_keys)
-        self.assertNotIn("plugins/plugin1", plugins_keys)
+        self.exporter._list_keys.assert_called_once_with("themes", True, False)
+        self.exporter._list_keys.reset_mock()
 
-    def test_list_plugins_keys_skip_plugins_without_version_file(self):
-        self.skipTest("Change test")
-        self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", ["META.json", "versions.json"]),
-                                          ("plugins/plugin1", "dirpath", "dirnames", ["META.json"])]
+        self.exporter.export_themes("path", only_vulnerable=True)
 
-        plugins_keys = list(self.exporter._list_plugins_keys())
+        self.exporter._list_keys.assert_called_once_with("themes", False, True)
 
-        self.assertIn("plugins/plugin0", plugins_keys)
-        self.assertNotIn("plugins/plugin1", plugins_keys)
+    def test_export_themes_call_dump_with_good_file_name(self):
+        self.exporter.export_themes("path")
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_themes_versions.json")
+
+        self.exporter.export_themes("path", only_popular=True)
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_popular_themes_versions.json")
+
+        self.exporter.export_themes("path", only_vulnerable=True)
+        args, kwargs = self.exporter._dump.call_args
+        self.assertEqual(args[0], "path/vane2_vulnerable_themes_versions.json")
 
     def test_walk_yield_keys_and_files_in_storage_if_versions_file_is_present(self):
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", ["META.json", "versions.json"]),
@@ -192,9 +243,7 @@ class ExporterTest(TestCase):
         self.assertEqual(len(theme_keys), 2)
 
     def assert_object_with_attribute_value_in_container(self, attribute, value, container):
-        if self.get_object_with_attribute_value_in_container(attribute, value, container) is None:
-            self.fail("No object with has an attribute '{0}' with the value '{1}' in '{2}'".format(attribute, value,
-                                                                                                   container))
+        self.assertIsNotNone(self.get_object_with_attribute_value_in_container(attribute, value, container))
 
     def get_object_with_attribute_value_in_container(self, attribute, value, container):
         for _object in container:
