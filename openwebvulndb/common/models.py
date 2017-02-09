@@ -231,6 +231,14 @@ class Signature(Model):
         self.contains_version = contains_version
 
 
+class FileListGroup(Model):
+
+    def init(self, *, key, producer, file_lists=None):
+        self.key = key
+        self.producer = producer
+        self.file_lists = file_lists or []
+
+
 class FileList(Model):
 
     def init(self, *, producer, key, files=None):

@@ -24,7 +24,7 @@ from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
-from .vane2.versionrebuild import VersionRebuild
+from .vane2.exporter import Exporter
 from ..common.logs import logger
 
 
@@ -56,23 +56,24 @@ def vane_export(vane_importer, storage, input_path):
 
 
 def vane2_export(storage, input_path):
-    if not input_path:
-        raise Exception("Option required: input_path")
-    input_path = join(dirname(__file__), input_path)
+    if input_path:
+        input_path = join(dirname(__file__), input_path)
+    else:
+        input_path = dirname(__file__)
 
-    key = "wordpress"
-    rebuild = VersionRebuild(storage)
+    exporter = Exporter(storage)
 
-    equal_versions = rebuild.update(key)
+    equal_versions = exporter.export_wordpress(input_path)
     for version in equal_versions:
         logger.info(version)
 
-    filename = join(input_path, key + "_vane2_versions.json")
-    with open(filename, "w") as fp:
-        data, errors = rebuild.dump()
-        if errors:
-            raise Exception(errors)
-        fp.write(data)
+    exporter.export_plugins(input_path, only_popular=True)
+    exporter.export_plugins(input_path, only_vulnerable=True)
+    exporter.export_plugins(input_path)
+
+    exporter.export_themes(input_path, only_popular=True)
+    exporter.export_themes(input_path, only_vulnerable=True)
+    exporter.export_themes(input_path)
 
 
 def populate_versions(loop, repository_hasher, storage):
