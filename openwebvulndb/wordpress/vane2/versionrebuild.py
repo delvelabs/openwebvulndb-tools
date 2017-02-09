@@ -58,9 +58,9 @@ class VersionRebuild:
         versions = self._sort_versions(version_list)
         files, versions_without_diff = self._get_diff_between_versions(versions, exclude_file=exclude_file,
                                                                        files_to_keep_per_diff=files_to_keep_per_diff)
-        # if no diff were found, (ex: plugin with only one version), return all the files:
+        # if no diff were found, (ex: plugin with only one version), choose 4 files arbitrarily:
         if len(files) == 0 and len(versions) > 0:
-            files = set(signature.path for version in versions for signature in version.signatures)
+            files = set(signature.path for signature in versions[0].signatures[:min(len(versions[0].signatures), 4)])
         return files, versions_without_diff
 
     def dump(self):

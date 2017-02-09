@@ -150,15 +150,17 @@ class VersionRebuildTest(TestCase):
         self.assertNotIn("style2.css", files)
         self.assertNotIn("button.css", files)
 
-    def test_get_files_for_versions_identification_return_files_if_no_diff_between_versions_exists(self):
-        version1 = VersionDefinition(version="1.0", signatures=[self.readme_signature, self.common_js_signature])
-        version2 = VersionDefinition(version="2.0", signatures=[self.readme_signature, self.common_js_signature])
+    def test_get_files_for_versions_identification_return_4_files_if_no_diff_between_versions_exists(self):
+        signatures = [Signature(path=str(i), hash=i) for i in range(0, 10)]
+        version1 = VersionDefinition(version="1.0", signatures=signatures)
+        version2 = VersionDefinition(version="2.0", signatures=signatures)
         version_list = VersionList(key="plugins/my-plugin", producer="", versions=[version1, version2])
 
-        files, _ = self.version_rebuild.get_files_for_versions_identification(version_list, files_to_keep_per_diff=2)
+        files, _ = self.version_rebuild.get_files_for_versions_identification(version_list)
 
-        self.assertIn(self.readme_signature.path, files)
-        self.assertIn(self.common_js_signature.path, files)
+        self.assertEqual(len(files), 4)
+        for file in files:
+            self.assertIn(file, [signature.path for signature in signatures])
 
     def test_sort_versions(self):
         version0 = VersionDefinition(version="3.7.16")
