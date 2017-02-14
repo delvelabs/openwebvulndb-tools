@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+from yarl import URL
 from aiohttp import ClientResponse, ClientTimeoutError
 
 from unittest import TestCase
@@ -150,7 +151,7 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_fetch_theme_data(self, loop):
-        my_response = ClientResponse('GET', 'https://api.wordpress.org/themes/info/1.1/?action=theme_information&request[slug]=twentyeleven')  # noqa
+        my_response = ClientResponse('GET', URL('https://api.wordpress.org/themes/info/1.1/?action=theme_information&request[slug]=twentyeleven'))  # noqa
         my_response.status = 200
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'twentyeleven.json').encode('utf8')
@@ -180,8 +181,8 @@ class EnumeratePluginsTest(TestCase):
         meta_2 = Meta(key="some-meta-2")
         meta_3 = Meta(key="some-meta-3")
 
-        my_response = ClientResponse('GET', 'http://api.wordpress.org/themes/info/1.1/?action=query_plugins'
-                                            '&request[browse]=popular&request[per_page]=100')
+        my_response = ClientResponse('GET', URL('http://api.wordpress.org/themes/info/1.1/?action=query_plugins'
+                                                '&request[browse]=popular&request[per_page]=100'))
         my_response.status = 100
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'popular-themes.json').encode('utf8')

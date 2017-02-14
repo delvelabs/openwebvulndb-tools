@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+from yarl import URL
 from aiohttp import ClientResponse, ClientTimeoutError
 
 from unittest import TestCase
@@ -148,7 +149,7 @@ class EnumeratePluginsTest(TestCase):
 
     @async_test()
     async def test_fetch_plugin_data(self, loop):
-        my_response = ClientResponse('GET', 'https://api.wordpress.org/plugins/info/1.0/better-wp-security.json')
+        my_response = ClientResponse('GET', URL('https://api.wordpress.org/plugins/info/1.0/better-wp-security.json'))
         my_response.status = 200
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'better-wp-security.json').encode('utf8')
@@ -177,8 +178,8 @@ class EnumeratePluginsTest(TestCase):
         meta_2 = Meta(key="some-meta-2")
         meta_3 = Meta(key="some-meta-3")
 
-        my_response = ClientResponse('GET', 'http://api.wordpress.org/plugins/info/1.1/?action=query_plugins'
-                                            '&request[browse]=popular&request[per_page]=200')
+        my_response = ClientResponse('GET', URL('http://api.wordpress.org/plugins/info/1.1/?action=query_plugins'
+                                                '&request[browse]=popular&request[per_page]=200'))
         my_response.status = 200
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'popular-plugins.json').encode('utf8')
