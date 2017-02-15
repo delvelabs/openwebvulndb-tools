@@ -24,10 +24,12 @@ export LC_NAME=en_CA.UTF-8
 
 source bin/activate
 
+pip install --ignore-installed -r requirements.txt
+
+pushd data
 git checkout master
 git merge origin/master  # Fast-forward
-
-pip install --ignore-installed -r requirements.txt
+popd
 
 python -m openwebvulndb.wordpress list_plugins
 python -m openwebvulndb.wordpress list_themes
