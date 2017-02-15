@@ -25,7 +25,7 @@ export LC_NAME=en_CA.UTF-8
 source bin/activate
 
 git checkout master
-git pull
+git merge origin/master  # Fast-forward
 
 pip install --ignore-installed -r requirements.txt
 
