@@ -33,7 +33,7 @@ popd
 
 python -m openwebvulndb.wordpress list_plugins
 python -m openwebvulndb.wordpress list_themes
-python -m openwebvulndb.wordpress populate_versions
+timeout ${POPULATE_TIMEOUT:-8h} python -m openwebvulndb.wordpress populate_versions
 
 pushd data
 git add -A
