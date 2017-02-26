@@ -71,7 +71,7 @@ class Exporter:
 
         vulnerability_list_group.vulnerability_lists.append(self._regroup_vulnerabilities_of_key_in_one_list("wordpress"))
 
-        file_name = join(export_path, "vane2_vulns.json")
+        file_name = join(export_path, "vane2_vulnerability_database.json")
         self._dump(file_name, vulnerability_list_group, VulnerabilityListGroupSchema())
 
     def _regroup_vulnerabilities_of_key_in_one_list(self, key):
