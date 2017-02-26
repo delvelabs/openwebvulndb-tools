@@ -17,7 +17,7 @@
 
 from marshmallow import Schema, fields, post_load, validates_schema, ValidationError
 from .models import Meta, Repository, Vulnerability, VulnerabilityList, VersionRange, Reference, FileList, File, \
-    FileSignature, FileListGroup
+    FileSignature, FileListGroup, VulnerabilityListGroup
 from .models import VersionList, VersionDefinition, Signature
 
 
@@ -120,6 +120,18 @@ class VulnerabilityListSchema(Schema):
     @post_load
     def make(self, data):
         return VulnerabilityList(**data)
+
+
+class VulnerabilityListGroupSchema(Schema):
+    class Meta:
+        ordered = True
+
+    producer = fields.String(required=True)
+    vulnerability_lists = fields.Nested(VulnerabilityListSchema, many=True, required=True)
+
+    @post_load
+    def make(self, data):
+        return VulnerabilityListGroup(**data)
 
 
 class SignatureSchema(Schema):

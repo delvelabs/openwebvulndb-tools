@@ -75,6 +75,8 @@ def vane2_export(storage, input_path):
     exporter.export_themes(input_path, only_vulnerable=True)
     exporter.export_themes(input_path)
 
+    exporter.export_vulnerabilities(input_path)
+
 
 def populate_versions(loop, repository_hasher, storage):
     async def load_input():
