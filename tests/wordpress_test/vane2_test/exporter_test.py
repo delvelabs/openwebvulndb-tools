@@ -17,7 +17,8 @@
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from openwebvulndb.common.models import VersionList, VersionDefinition, Signature, Meta
+from openwebvulndb.common.models import VersionList, VersionDefinition, Signature, Meta, Vulnerability, \
+    VulnerabilityList
 from openwebvulndb.wordpress.vane2.exporter import Exporter
 from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
 
@@ -224,6 +225,66 @@ class ExporterTest(TestCase):
         self.assertEqual(path_version2_signature.versions, ["2.0"])
         self.assertEqual(style_signature.versions, ["2.0"])
 
+    def test_export_vulnerabilities_export_all_vuln_lists_in_one_file(self):
+        plugin0_vuln0 = Vulnerability(id="0")
+        plugin0_vuln1 = Vulnerability(id="1")
+        plugin0_vuln_list = VulnerabilityList(producer="test", key="plugins/plugin0",
+                                              vulnerabilities=[plugin0_vuln0, plugin0_vuln1])
+        plugin1_vuln0 = Vulnerability(id="2")
+        plugin1_vuln1 = Vulnerability(id="3")
+        plugin1_vuln_list = VulnerabilityList(producer="test", key="plugins/plugin1",
+                                              vulnerabilities=[plugin1_vuln0, plugin1_vuln1])
+        theme_vuln0 = Vulnerability(id="4")
+        theme_vuln1 = Vulnerability(id="5")
+        theme_vuln_list = VulnerabilityList(producer="test", key="themes/theme",
+                                            vulnerabilities=[theme_vuln0, theme_vuln1])
+        wordpress_vuln0 = Vulnerability(id="6")
+        wordpress_vuln1 = Vulnerability(id="7")
+        wordpress_vuln_list = VulnerabilityList(producer="test", key="wordpress",
+                                                vulnerabilities=[wordpress_vuln0, wordpress_vuln1])
+        self.storage.add_vulnerability_lists({'plugins/plugin0': plugin0_vuln_list, 'plugins/plugin1': plugin1_vuln_list,
+                                              'themes/theme': theme_vuln_list, 'wordpress': wordpress_vuln_list})
+
+        self.exporter.export_vulnerabilities("path_to_dir")
+
+        args, kwargs = self.exporter._dump.call_args
+        vulnerability_list_group = args[1]
+        self.assertEqual(vulnerability_list_group.producer, "vane2_export")
+        vulnerability_lists = vulnerability_list_group.vulnerability_lists
+        self.assert_object_with_attribute_value_in_container("key", "plugins/plugin0", vulnerability_lists)
+        self.assert_object_with_attribute_value_in_container("key", "plugins/plugin1", vulnerability_lists)
+        self.assert_object_with_attribute_value_in_container("key", "themes/theme", vulnerability_lists)
+        self.assert_object_with_attribute_value_in_container("key", "wordpress", vulnerability_lists)
+        exported_plugin0_vuln_list = self.get_object_with_attribute_value_in_container("key", "plugins/plugin0",
+                                                                                       vulnerability_lists)
+        exported_plugin1_vuln_list = self.get_object_with_attribute_value_in_container("key", "plugins/plugin1",
+                                                                                       vulnerability_lists)
+        exported_theme_vuln_list = self.get_object_with_attribute_value_in_container("key", "themes/theme",
+                                                                                       vulnerability_lists)
+        exported_wordpress_vuln_list = self.get_object_with_attribute_value_in_container("key", "wordpress",
+                                                                                         vulnerability_lists)
+        self.assertIn(plugin0_vuln0, exported_plugin0_vuln_list.vulnerabilities)
+        self.assertIn(plugin0_vuln1, exported_plugin0_vuln_list.vulnerabilities)
+        self.assertIn(plugin1_vuln0, exported_plugin1_vuln_list.vulnerabilities)
+        self.assertIn(plugin1_vuln1, exported_plugin1_vuln_list.vulnerabilities)
+        self.assertIn(theme_vuln0, exported_theme_vuln_list.vulnerabilities)
+        self.assertIn(theme_vuln1, exported_theme_vuln_list.vulnerabilities)
+        self.assertIn(wordpress_vuln0, exported_wordpress_vuln_list.vulnerabilities)
+        self.assertIn(wordpress_vuln1, exported_wordpress_vuln_list.vulnerabilities)
+
+    def test_regroup_vulnerabilities_of_key_in_one_list(self):
+        plugin_vuln0 = Vulnerability(id="0")
+        plugin_vuln1 = Vulnerability(id="1")
+        self.storage.vulnerability_lists['plugins/plugin/producer0'] = VulnerabilityList(
+            producer="producer0", key="plugins/plugin", vulnerabilities=[plugin_vuln0])
+        self.storage.vulnerability_lists['plugins/plugin/producer1'] = VulnerabilityList(
+            producer="producer1", key="plugins/plugin", vulnerabilities=[plugin_vuln1])
+
+        plugin_vuln_list = self.exporter._regroup_vulnerabilities_of_key_in_one_list("plugins/plugin")
+
+        self.assertIn(plugin_vuln0, plugin_vuln_list.vulnerabilities)
+        self.assertIn(plugin_vuln1, plugin_vuln_list.vulnerabilities)
+
     def test_list_all_keys_yield_key_if_versions_file_is_present(self):
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", ["META.json", "versions.json"]),
                                           ("plugins/plugin1", "dirpath", "dirnames", ["META.json"]),
@@ -238,7 +299,7 @@ class ExporterTest(TestCase):
 
     def test_list_vulnerable_list_keys_of_plugins_or_themes_with_vuln(self):
         files = ["versions.json"]
-        self.storage.keys_with_vulnerabilities = ["plugins/plugin1", "themes/theme1"]
+        self.storage.vulnerability_lists = {"plugins/plugin1": ["vuln"], "themes/theme1": ["vuln"]}
         self.storage.content = [("plugins/plugin0", "dirpath", "dirnames", files),
                                 ("plugins/plugin1", "dirpath", "dirnames", files),
                                 ("themes/theme0", "dirpath", "dirnames", files),
@@ -282,7 +343,7 @@ class FakeStorage:
         self.version_list = version_list or []
         self.meta_list = meta_list or []
         self.content = []
-        self.keys_with_vulnerabilities = []
+        self.vulnerability_lists = {}
 
     def list_meta(self, key):
         for meta in self.meta_list:
@@ -290,9 +351,9 @@ class FakeStorage:
                 yield meta
 
     def list_vulnerabilities(self, key):
-        for _key, path, dirname, files in self.walk(key):
-            if _key in self.keys_with_vulnerabilities:
-                yield _key
+        for _key in self.vulnerability_lists.keys():
+            if _key.startswith(key):
+                yield self.vulnerability_lists[_key]
 
     def walk(self, key):
         for _key, path, dirnames, files in self.content:
@@ -310,3 +371,8 @@ class FakeStorage:
             if meta.key == key:
                 return meta
         return None
+
+    def add_vulnerability_lists(self, vulnerability_lists):
+        self.vulnerability_lists = vulnerability_lists
+        for key in vulnerability_lists.keys():
+            self.content.append((key, "path", "dirname", ["versions.json"]))

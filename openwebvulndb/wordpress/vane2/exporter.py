@@ -17,7 +17,8 @@
 
 from openwebvulndb.common.models import FileListGroup
 from openwebvulndb.common.serialize import serialize
-from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema
+from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema, VulnerabilityListGroupSchema
+from openwebvulndb.common.models import VulnerabilityListGroup, VulnerabilityList
 from .versionrebuild import VersionRebuild
 from os.path import join
 
@@ -56,6 +57,28 @@ class Exporter:
         file_name = self._get_export_file_name(export_path, "wordpress", False, False)
         self._dump(file_name, wordpress_file_list, FileListSchema())
         return equal_versions
+
+    def export_vulnerabilities(self, export_path):
+        vulnerability_list_group = VulnerabilityListGroup(producer="vane2_export")
+
+        for plugin_key in self._list_vulnerable("plugins"):
+            vulnerability_list_group.vulnerability_lists.append(
+                self._regroup_vulnerabilities_of_key_in_one_list(plugin_key))
+
+        for theme_key in self._list_vulnerable("themes"):
+            vulnerability_list_group.vulnerability_lists.append(
+                self._regroup_vulnerabilities_of_key_in_one_list(theme_key))
+
+        vulnerability_list_group.vulnerability_lists.append(self._regroup_vulnerabilities_of_key_in_one_list("wordpress"))
+
+        file_name = join(export_path, "vane2_vulnerability_database.json")
+        self._dump(file_name, vulnerability_list_group, VulnerabilityListGroupSchema())
+
+    def _regroup_vulnerabilities_of_key_in_one_list(self, key):
+        vulnerability_list = VulnerabilityList(key=key, producer="vane2_export")
+        for _vulnerability_list in self.storage.list_vulnerabilities(key):
+            vulnerability_list.vulnerabilities.extend(_vulnerability_list.vulnerabilities)
+        return vulnerability_list
 
     def _dump(self, file_name, data, schema):
         data, errors = serialize(schema, data)

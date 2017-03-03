@@ -40,6 +40,13 @@ class Repository(Model):
         self.location = location
 
 
+class VulnerabilityListGroup(Model):
+
+    def init(self, *, producer, vulnerability_lists=None):
+        self.producer = producer
+        self.vulnerability_lists = vulnerability_lists or []
+
+
 class VulnerabilityList(Model):
 
     def init(self, *, producer, key, vulnerabilities=None, license=None, copyright=None):
