@@ -33,6 +33,18 @@ class Meta(Model):
         self.hints = hints or []
 
 
+class MetaList(Model):
+    def init(self, *, key, metas=None):
+        self.key = key
+        self.metas = metas or []
+
+    def get_meta(self, key):
+        for meta in self.metas:
+            if meta.key == key:
+                return meta
+        return None
+
+
 class Repository(Model):
 
     def init(self, *, type, location):

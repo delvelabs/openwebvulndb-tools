@@ -66,14 +66,17 @@ def vane2_export(storage, input_path):
     equal_versions = exporter.export_wordpress(input_path)
     for version in equal_versions:
         logger.info(version)
+    exporter.dump_meta("wordpress", input_path)
 
     exporter.export_plugins(input_path, only_popular=True)
     exporter.export_plugins(input_path, only_vulnerable=True)
     exporter.export_plugins(input_path)
+    exporter.dump_meta("plugins", input_path)
 
     exporter.export_themes(input_path, only_popular=True)
     exporter.export_themes(input_path, only_vulnerable=True)
     exporter.export_themes(input_path)
+    exporter.dump_meta("themes", input_path)
 
     exporter.export_vulnerabilities(input_path)
 

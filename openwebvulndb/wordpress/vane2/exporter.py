@@ -17,8 +17,9 @@
 
 from openwebvulndb.common.models import FileListGroup
 from openwebvulndb.common.serialize import serialize
-from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema, VulnerabilityListGroupSchema
-from openwebvulndb.common.models import VulnerabilityListGroup, VulnerabilityList
+from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema, VulnerabilityListGroupSchema, \
+    MetaListSchema
+from openwebvulndb.common.models import VulnerabilityListGroup, VulnerabilityList, MetaList
 from .versionrebuild import VersionRebuild
 from os.path import join
 
@@ -73,6 +74,14 @@ class Exporter:
 
         file_name = join(export_path, "vane2_vulnerability_database.json")
         self._dump(file_name, vulnerability_list_group, VulnerabilityListGroupSchema())
+
+    def dump_meta(self, key, export_path):
+        meta_list = MetaList(key=key)
+        for meta in self.storage.list_meta(key):
+            meta_list.metas.append(meta)
+
+        file_name = join(export_path, "vane2_%s_meta.json" % key)
+        self._dump(file_name, meta_list, MetaListSchema())
 
     def _regroup_vulnerabilities_of_key_in_one_list(self, key):
         vulnerability_list = VulnerabilityList(key=key, producer="vane2_export")
