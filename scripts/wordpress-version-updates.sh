@@ -22,7 +22,7 @@
 export LANG=en_US.UTF-8
 export LC_NAME=en_CA.UTF-8
 
-source bin/activate
+source bin/activate || source ~/venv-openwebvulndb/bin/activate
 
 pip install --ignore-installed -r requirements.txt
 
