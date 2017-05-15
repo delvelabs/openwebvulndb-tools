@@ -21,6 +21,7 @@ from easyinject import Injector
 from .common import Storage, RepositoryChecker, Subversion, VulnerabilityManager, RepositoryHasher
 from .common.parallel import BackgroundRunner
 from .common.cve import CVEReader
+from .wordpress.vane2.release import GitHubRelease
 
 app = Injector(storage=Storage,
                loop=asyncio.get_event_loop,
@@ -30,4 +31,5 @@ app = Injector(storage=Storage,
                subversion=Subversion,
                vulnerability_manager=VulnerabilityManager,
                aiohttp_session=aiohttp.ClientSession,
-               repository_hasher=RepositoryHasher)
+               repository_hasher=RepositoryHasher,
+               github_release=GitHubRelease)
