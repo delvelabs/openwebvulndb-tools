@@ -18,6 +18,11 @@
 import tarfile
 from os.path import join, dirname
 from glob import glob
+from openwebvulndb.common.version import VersionCompare
+import json
+from aiohttp import BasicAuth
+from subprocess import run
+from os import chdir, system
 
 
 class GitHubRelease:
@@ -25,16 +30,46 @@ class GitHubRelease:
     def __init__(self, aiohttp_session=None):
         self.aiohttp_session = aiohttp_session
         self.url = None
+        self.repository_path = None
+        self.repository_password = None
+        self.repository_owner = None
 
-    def set_repository_settings(self, repository_owner, repository_name):
+    def set_repository_settings(self, repository_owner, repository_password, repository_name, repository_path):
         base_url = "https://api.github.com/repos/{0}/{1}"
         self.url = base_url.format(repository_owner, repository_name)
+        self.repository_path = repository_path
+        self.repository_owner = repository_owner
+        self.repository_password = repository_password
 
     async def get_latest_release_version(self):
         url = self.url + "/releases/latest"
         response = await self.aiohttp_session.get(url)
         data = await response.json()
-        return data['tag_name']
+        try:
+            latest_version = data['tag_name']
+        except KeyError:
+            latest_version = "0.0"
+        return latest_version
+
+    async def get_release_version(self):
+        latest_version = await self.get_latest_release_version()
+        new_version = VersionCompare.next_minor(latest_version)
+        return new_version
+
+    async def create_release(self):
+        self.commit_data()
+        release_version = await self.get_release_version()
+        url = self.url + "/releases"
+        data = {'tag_name': release_version, 'target_commitish': 'master', 'name': release_version}
+        authentication =BasicAuth(self.repository_owner, password=self.repository_password)
+
+        response = await self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication)
+
+        #response.close()
+
+    def commit_data(self):
+        chdir(self.repository_path)
+        run("./commit_data.sh")
 
 
 def compress_exported_files(dir_path):

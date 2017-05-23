@@ -21,43 +21,119 @@ from openwebvulndb.wordpress.vane2.release import compress_exported_files, GitHu
 from os.path import join
 from fixtures import async_test
 from aiohttp.test_utils import make_mocked_coro
+from aiohttp import BasicAuth
+import json
 
 
 class TestGitHubRelease(TestCase):
 
+    def setUp(self):
+        repo_path = "path/to/repository"
+        self.release = GitHubRelease()
+        self.release.set_repository_settings("Owner", None, "repository_name", repo_path)
+
     def test_set_repository_settings_merge_api_url_with_repo_owner_and_name(self):
-        release = GitHubRelease()
+        self.release.set_repository_settings("Owner", None, "repository_name", "path/to/repo")
 
-        release.set_repository_settings("Owner", "repository_name")
-
-        self.assertEqual(release.url, "https://api.github.com/repos/Owner/repository_name")
+        self.assertEqual(self.release.url, "https://api.github.com/repos/Owner/repository_name")
 
     @async_test()
     async def test_get_latest_release_version_request_latest_release_as_json_to_github_api(self, loop):
-        release = GitHubRelease()
-        release.aiohttp_session = MagicMock()
+        self.release.aiohttp_session = MagicMock()
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
-        release.aiohttp_session.get = make_mocked_coro(return_value=response)
-        release.set_repository_settings("Owner", "repository_name")
+        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
 
-        await release.get_latest_release_version()
+        await self.release.get_latest_release_version()
 
-        release.aiohttp_session.get.assert_called_once_with(
+        self.release.aiohttp_session.get.assert_called_once_with(
             "https://api.github.com/repos/Owner/repository_name/releases/latest")
 
     @async_test()
     async def test_get_latest_release_version_return_tag_name_from_response(self, loop):
-        release = GitHubRelease()
-        release.aiohttp_session = MagicMock()
+        self.release.aiohttp_session = MagicMock()
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
-        release.aiohttp_session.get = make_mocked_coro(return_value=response)
-        release.set_repository_settings("Owner", "repository_name")
+        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
 
-        version = await release.get_latest_release_version()
+        version = await self.release.get_latest_release_version()
 
         self.assertEqual(version, "1.0")
+
+    @async_test()
+    async def test_get_latest_release_version_return_version_0_if_no_release_found(self, loop):
+        self.release.aiohttp_session = MagicMock()
+        response = MagicMock()
+        response.json = make_mocked_coro(return_value={"message": "Not Found"})
+        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
+
+        version = await self.release.get_latest_release_version()
+
+        self.assertEqual(version, "0.0")
+
+    @async_test()
+    async def test_get_release_version_increment_latest_version(self, loop):
+        self.release.get_latest_release_version = make_mocked_coro(return_value="1.0")
+
+        new_version = await self.release.get_release_version()
+
+        self.assertEqual(new_version, "1.1")
+
+    @async_test()
+    async def test_create_release_create_release_with_new_version_from_master(self, loop):
+        self.release.get_release_version = make_mocked_coro("1.0")
+        self.release.aiohttp_session = MagicMock()
+        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.commit_data = MagicMock()
+
+        await self.release.create_release()
+
+        data = {'tag_name': '1.0', 'target_commitish': 'master', 'name': '1.0'}
+        self.release.aiohttp_session.post.assert_called_once_with("https://api.github.com/repos/Owner/repository_name/"
+                                                                  "releases", data=json.dumps(data), auth=ANY)
+    @async_test()
+    async def test_create_release_send_credential_with_post_request(self, loop):
+        self.release.get_release_version = make_mocked_coro("1.0")
+        self.release.aiohttp_session = MagicMock()
+        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.commit_data = MagicMock()
+        self.release.set_repository_settings("Owner", "password", "repository_name", "path/to/repo")
+
+        await self.release.create_release()
+
+        data = {'tag_name': '1.0', 'target_commitish': 'master', 'name': '1.0'}
+        self.release.aiohttp_session.post.assert_called_once_with(ANY, data=ANY, auth=BasicAuth("Owner", password="password"))
+
+    @async_test()
+    async def test_create_release_commit_data(self, loop):
+        self.release.get_release_version = make_mocked_coro("1.0")
+        self.release.aiohttp_session = MagicMock()
+        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.commit_data = MagicMock()
+
+        await self.release.create_release()
+
+        self.release.commit_data.assert_called_once_with()
+
+    def test_commit_data_chdir_to_repository(self):
+        fake_chdir = MagicMock()
+        fake_run = MagicMock()
+
+
+        with patch("openwebvulndb.wordpress.vane2.release.chdir", fake_chdir):
+            with patch("openwebvulndb.wordpress.vane2.release.run", fake_run):
+                self.release.commit_data()
+
+                fake_chdir.assert_called_once_with(self.release.repository_path)
+
+    def test_commit_data_create_commit_with_all_data_files(self):
+        fake_run = MagicMock()
+        fake_chdir = MagicMock()
+        with patch("openwebvulndb.wordpress.vane2.release.run", fake_run):
+            with patch("openwebvulndb.wordpress.vane2.release.chdir", fake_chdir):
+                self.release.commit_data()
+
+                fake_run.assert_called_once_with("./commit_data.sh")
 
 
 class TestRelease(TestCase):
@@ -100,3 +176,20 @@ class TestRelease(TestCase):
 
     def test_get_release_version_request_latest_release_from_repository(self):
         pass
+
+
+class FakeAsyncContextManager:
+
+    def __init__(self, aenter_coro, yield_coro, aexit_coro):
+        self.aenter_coro = aenter_coro
+        self.aexit_coro = aexit_coro
+        self.yield_coro = yield_coro
+
+    async def __call__(self, *args, **kwargs):
+        await self.yield_coro
+
+    async def __aenter__(self, *args):
+        await self.aenter_coro
+
+    async def __aexit__(self, *args):
+        await self.aexit_coro
