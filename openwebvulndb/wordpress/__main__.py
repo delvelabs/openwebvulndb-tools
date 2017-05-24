@@ -88,7 +88,7 @@ def vane2_export(storage, input_path, github_release, loop):
 
     github_release.set_repository_settings("NicolasAubry", "b6dbc8246825195f9a2779e59e4f7d1e5402453e",
                                            "vane_data_test", output_path)
-    sleep(300)
+    #sleep(300)
     loop.run_until_complete(github_release.create_release())
 
 

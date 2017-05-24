@@ -30,7 +30,7 @@ class TestGitHubRelease(TestCase):
     def setUp(self):
         repo_path = "path/to/repository"
         self.release = GitHubRelease()
-        self.release.set_repository_settings("Owner", None, "repository_name", repo_path)
+        self.release.set_repository_settings("Owner", "password", "repository_name", repo_path)
 
     def test_set_repository_settings_merge_api_url_with_repo_owner_and_name(self):
         self.release.set_repository_settings("Owner", None, "repository_name", "path/to/repo")
@@ -40,9 +40,7 @@ class TestGitHubRelease(TestCase):
     @async_test()
     async def test_get_latest_release_version_request_latest_release_as_json_to_github_api(self, loop):
         self.release.aiohttp_session = MagicMock()
-        response = MagicMock()
-        response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
-        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
+        self.release.aiohttp_session.get = AsyncContextManagerMock()
 
         await self.release.get_latest_release_version()
 
@@ -54,7 +52,7 @@ class TestGitHubRelease(TestCase):
         self.release.aiohttp_session = MagicMock()
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
-        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
+        self.release.aiohttp_session.get = MagicMock(return_value=AsyncContextManagerMock(aenter_return=response))
 
         version = await self.release.get_latest_release_version()
 
@@ -65,7 +63,7 @@ class TestGitHubRelease(TestCase):
         self.release.aiohttp_session = MagicMock()
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"message": "Not Found"})
-        self.release.aiohttp_session.get = make_mocked_coro(return_value=response)
+        self.release.aiohttp_session.get = MagicMock(return_value=AsyncContextManagerMock(aenter_return=response))
 
         version = await self.release.get_latest_release_version()
 
@@ -83,7 +81,7 @@ class TestGitHubRelease(TestCase):
     async def test_create_release_create_release_with_new_version_from_master(self, loop):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
-        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.aiohttp_session.post = AsyncContextManagerMock()
         self.release.commit_data = MagicMock()
 
         await self.release.create_release()
@@ -95,7 +93,7 @@ class TestGitHubRelease(TestCase):
     async def test_create_release_send_credential_with_post_request(self, loop):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
-        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.aiohttp_session.post = AsyncContextManagerMock()
         self.release.commit_data = MagicMock()
         self.release.set_repository_settings("Owner", "password", "repository_name", "path/to/repo")
 
@@ -108,7 +106,7 @@ class TestGitHubRelease(TestCase):
     async def test_create_release_commit_data(self, loop):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
-        self.release.aiohttp_session.post = make_mocked_coro()
+        self.release.aiohttp_session.post = AsyncContextManagerMock()
         self.release.commit_data = MagicMock()
 
         await self.release.create_release()
@@ -178,18 +176,16 @@ class TestRelease(TestCase):
         pass
 
 
-class FakeAsyncContextManager:
+class AsyncContextManagerMock(MagicMock):
 
-    def __init__(self, aenter_coro, yield_coro, aexit_coro):
-        self.aenter_coro = aenter_coro
-        self.aexit_coro = aexit_coro
-        self.yield_coro = yield_coro
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    async def __call__(self, *args, **kwargs):
-        await self.yield_coro
+        for key in ('aenter_return', 'aexit_return'):
+            setattr(self, key,  kwargs[key] if key in kwargs else MagicMock())
 
-    async def __aenter__(self, *args):
-        await self.aenter_coro
+    async def __aenter__(self):
+        return self.aenter_return
 
     async def __aexit__(self, *args):
-        await self.aexit_coro
+        return self.aexit_return

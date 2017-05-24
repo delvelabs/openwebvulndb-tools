@@ -43,13 +43,13 @@ class GitHubRelease:
 
     async def get_latest_release_version(self):
         url = self.url + "/releases/latest"
-        response = await self.aiohttp_session.get(url)
-        data = await response.json()
-        try:
-            latest_version = data['tag_name']
-        except KeyError:
-            latest_version = "0.0"
-        return latest_version
+        async with self.aiohttp_session.get(url) as response:
+            data = await response.json()
+            try:
+                latest_version = data['tag_name']
+            except KeyError:
+                latest_version = "0.0"
+            return latest_version
 
     async def get_release_version(self):
         latest_version = await self.get_latest_release_version()
@@ -61,11 +61,10 @@ class GitHubRelease:
         release_version = await self.get_release_version()
         url = self.url + "/releases"
         data = {'tag_name': release_version, 'target_commitish': 'master', 'name': release_version}
-        authentication =BasicAuth(self.repository_owner, password=self.repository_password)
+        authentication = BasicAuth(self.repository_owner, password=self.repository_password)
 
-        response = await self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication)
-
-        #response.close()
+        async with self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication) as response:
+            pass
 
     def commit_data(self):
         chdir(self.repository_path)
