@@ -38,6 +38,9 @@ match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plug
 match_cpe = re.compile(r':a:(?P<vendor>[^:]+):(?P<product>[^:]+)(?::(?P<version>[^-][^:]+))?')
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+DATE_FORMAT_NO_MICROSECONDS = "%Y-%m-%dT%H:%M:%S"
+microseconds_in_datetime = re.compile("\.\d{3}")
+timezone_in_datetime = re.compile("(\+|-)\d\d:\d\d$")
 
 
 class CVEReader:
@@ -107,7 +110,8 @@ class CVEReader:
             vuln.title = self.summarize(vuln.description)
 
         if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
-            vuln.reported_type = entry.get("cwe")
+            if entry.get("cwe") is not None:
+                vuln.reported_type = entry.get("cwe")
 
         dates = [x for x in [vuln.updated_at.replace(tzinfo=None) if vuln.updated_at else None,
                              self._get_last_modified(entry)] if x is not None]
@@ -200,9 +204,17 @@ class CVEReader:
         for field in ["last-modified", "Modified"]:
             string = entry.get(field)
             if string is not None:
-                string = string[0:-6]  # Strip the timezone, it's horrible to deal with
-                parsed = datetime.strptime(string, DATE_FORMAT).replace(tzinfo=None)
-                return parsed - timedelta(microseconds=parsed.microsecond)
+                return self.parse_datetime(string)
+
+    @staticmethod
+    def parse_datetime(string):
+        if timezone_in_datetime.search(string):
+            string = string[0:-6]  # Strip the timezone, it's horrible to deal with
+        if microseconds_in_datetime.search(string):
+            parsed = datetime.strptime(string, DATE_FORMAT).replace(tzinfo=None)
+        else:
+            parsed = datetime.strptime(string, DATE_FORMAT_NO_MICROSECONDS).replace(tzinfo=None)
+        return parsed - timedelta(microseconds=parsed.microsecond)
 
     @staticmethod
     def summarize(summary):

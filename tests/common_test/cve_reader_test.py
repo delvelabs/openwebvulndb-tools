@@ -437,6 +437,51 @@ class LookupVulnerabilityTest(TestCase):
         self.assertIs(vuln, v)
         self.assertGreater(vuln.updated_at, initial)
 
+    def test_get_last_modified_remove_timezone(self):
+        vuln = {
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "last-modified": "2016-08-10T12:29:12.813-04:00",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        }
+
+        parsed_time = self.reader._get_last_modified(vuln)
+
+        self.assertEqual(parsed_time, datetime.strptime("2016-08-10T12:29:12", "%Y-%m-%dT%H:%M:%S"))
+
+    def test_get_last_modified_parse_date_without_timezone(self):
+        vuln = {
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "last-modified": "2017-05-23T12:00:01.143000",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        }
+
+        parsed_time = self.reader._get_last_modified(vuln)
+
+        self.assertEqual(parsed_time, datetime.strptime("2017-05-23T12:00:01.000000", "%Y-%m-%dT%H:%M:%S.%f"))
+
+    def test_get_last_modified_parse_date_without_microseconds(self):
+        vuln = {
+            "id": "CVE-1234-2334",
+            "summary": "Some Text",
+            "last-modified": "2013-07-30T00:00:00",
+            "vulnerable_configuration": [
+                "cpe:2.3:a:wordpress:wordpress:4.4.3",
+                "cpe:2.3:a:wordpress:wordpress:4.4.4",
+            ],
+        }
+
+        parsed_time = self.reader._get_last_modified(vuln)
+
+        self.assertEqual(parsed_time, datetime.strptime("2013-07-30T00:00:00", "%Y-%m-%dT%H:%M:%S"))
+
     def test_guess_versions(self):
         vuln = Vulnerability(id="X",
                              description="A description")
@@ -463,6 +508,15 @@ class LookupVulnerabilityTest(TestCase):
         self.assertEqual(v.affected_versions, [
             VersionRange(introduced_in="1.0"),
         ])
+
+    def test_dont_erase_reported_type_if_unknown_and_no_cwe(self):
+        vuln = Vulnerability(id="CVE-1234-2334", description="Some Text", reported_type="unknown")
+        self.manager.find_vulnerability.return_value = vuln
+        vuln_entry = {"id": "CVE-1234-2334", "summary": "Some Text"}
+
+        self.reader.apply_data(vuln, vuln_entry)
+
+        self.assertEqual(vuln.reported_type, "unknown")
 
 
 class RangeGuesserTest(TestCase):
