@@ -83,9 +83,12 @@ def vane2_export(storage, input_path, github_release, loop):
 
         exporter.export_vulnerabilities(input_path)
 
-    github_release.set_repository_settings("NicolasAubry", "b6dbc8246825195f9a2779e59e4f7d1e5402453e",
-                                           "vane_data_test", output_path)
-    loop.run_until_complete(github_release.release_vane_data(output_path))
+    github_release.set_repository_settings("NicolasAubry", "b6dbc8246825195f9a2779e59e4f7d1e5402453e", "vane_data_test")
+    try:
+        loop.run_until_complete(github_release.release_vane_data(output_path))
+        print("Vane data successfully released.")
+    except Exception as e:
+        print(e)
 
 
 def populate_versions(loop, repository_hasher, storage):

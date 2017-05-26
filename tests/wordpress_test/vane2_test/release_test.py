@@ -28,9 +28,8 @@ import json
 class TestGitHubRelease(TestCase):
 
     def setUp(self):
-        repo_path = "path/to/repository"
         self.release = GitHubRelease()
-        self.release.set_repository_settings("Owner", "password", "repository_name", repo_path)
+        self.release.set_repository_settings("Owner", "password", "repository_name")
         self.files_in_dir = ["file1.json", "file2.json"]
         self.dir_path = "files/to/compress"
         self.fake_glob = MagicMock(return_value=[join(self.dir_path, self.files_in_dir[0]),
@@ -40,12 +39,12 @@ class TestGitHubRelease(TestCase):
         self.addCleanup(glob_patch.stop)
 
     def test_set_repository_settings_merge_api_url_with_repo_owner_and_name(self):
-        self.release.set_repository_settings("Owner", None, "repository_name", "path/to/repo")
+        self.release.set_repository_settings("Owner", None, "repository_name")
 
         self.assertEqual(self.release.url, "https://api.github.com/repos/Owner/repository_name")
 
     @async_test()
-    async def test_get_latest_release_request_latest_release_as_json_to_github_api(self, loop):
+    async def test_get_latest_release_request_latest_release_as_json_to_github_api(self):
         self.release.aiohttp_session = MagicMock()
         self.release.aiohttp_session.get = AsyncContextManagerMock()
 
@@ -55,7 +54,7 @@ class TestGitHubRelease(TestCase):
             "https://api.github.com/repos/Owner/repository_name/releases/latest")
 
     @async_test()
-    async def test_get_latest_release_return_response_as_json(self, loop):
+    async def test_get_latest_release_return_response_as_json(self):
         self.release.aiohttp_session = MagicMock()
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
@@ -88,16 +87,7 @@ class TestGitHubRelease(TestCase):
         self.assertEqual(release_id, "12345")
 
     @async_test()
-    async def test_get_release_version_increment_latest_version(self, loop):
-        self.skipTest("remove")
-        self.release.get_latest_release_version = make_mocked_coro(return_value="1.0")
-
-        new_version = await self.release.get_release_version()
-
-        self.assertEqual(new_version, "1.1")
-
-    @async_test()
-    async def test_create_release_create_release_with_new_version_from_master(self, loop):
+    async def test_create_release_create_release_with_new_version_from_master(self):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
         self.release.aiohttp_session.post = AsyncContextManagerMock()
@@ -110,12 +100,12 @@ class TestGitHubRelease(TestCase):
                                                                   "releases", data=json.dumps(data), auth=ANY)
 
     @async_test()
-    async def test_create_release_send_credential_with_post_request(self, loop):
+    async def test_create_release_send_credential_with_post_request(self):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
         self.release.aiohttp_session.post = AsyncContextManagerMock()
         self.release.commit_data = MagicMock()
-        self.release.set_repository_settings("Owner", "password", "repository_name", "path/to/repo")
+        self.release.set_repository_settings("Owner", "password", "repository_name")
 
         await self.release.create_release()
 
@@ -123,7 +113,7 @@ class TestGitHubRelease(TestCase):
         self.release.aiohttp_session.post.assert_called_once_with(ANY, data=ANY, auth=BasicAuth("Owner", password="password"))
 
     @async_test()
-    async def test_create_release_commit_data(self, loop):
+    async def test_create_release_commit_data(self):
         self.release.get_release_version = make_mocked_coro("1.0")
         self.release.aiohttp_session = MagicMock()
         self.release.aiohttp_session.post = AsyncContextManagerMock()
@@ -181,7 +171,7 @@ class TestGitHubRelease(TestCase):
         self.release.upload_compressed_data.assert_called_once_with(self.dir_path, "filename_1.0.tar.gz")
 
     @async_test()
-    async def test_upload_compressed_data_upload_exported_compressed_data_as_asset_of_latest_release(self, loop):
+    async def test_upload_compressed_data_upload_exported_compressed_data_as_asset_of_latest_release(self):
         self.release.aiohttp_session = MagicMock()
         self.release.aiohttp_session.post = MagicMock(return_value=AsyncContextManagerMock())
         release_id = "12345"

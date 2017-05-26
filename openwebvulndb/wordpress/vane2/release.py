@@ -35,11 +35,10 @@ class GitHubRelease:
         self.repository_owner = None
         self.repository_name = None
 
-    def set_repository_settings(self, repository_owner, repository_password, repository_name, repository_path):
+    def set_repository_settings(self, repository_owner, repository_password, repository_name):
         base_url = "https://api.github.com/repos/{0}/{1}"
         self.url = base_url.format(repository_owner, repository_name)
         self.repository_name = repository_name
-        self.repository_path = repository_path
         self.repository_owner = repository_owner
         self.repository_password = repository_password
 
@@ -59,12 +58,6 @@ class GitHubRelease:
     def get_release_id(self, release):
         return release['id']
 
-    """
-    async def get_release_version(self):
-        latest_version = await self.get_latest_release_version()
-        new_version = VersionCompare.next_minor(latest_version)
-        return new_version
-    """
     async def create_release(self):
         self.commit_data()
         release_version = await self.get_release_version()
@@ -95,7 +88,9 @@ class GitHubRelease:
         headers = {'Content-Type': "application/gzip"}
         async with self.aiohttp_session.post(url, headers=headers, data=data,
                                              auth=BasicAuth(self.repository_owner, password=self.repository_password)) as response:
-            print(await response.json())
+            if response.status != 201:
+                raise Exception("Error while uploading data, response status code: {0}, response message: {1}"\
+                                .format(response.status, await response.read()))
 
     def get_assets_upload_url(self, release_id, asset_name):
         upload_url = "https://uploads.github.com/repos/{0}/{1}/releases/{2}/assets?name={3}"
