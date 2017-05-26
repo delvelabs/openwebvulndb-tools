@@ -26,7 +26,7 @@ from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 from .vane2.exporter import Exporter
 from ..common.logs import logger
-from .vane2.release import compress_exported_files, GitHubRelease
+from .vane2.release import GitHubRelease
 from time import sleep
 
 
@@ -64,32 +64,28 @@ def vane2_export(storage, input_path, github_release, loop):
         input_path = dirname(__file__)
 
     output_path = join(input_path, "vane2_data")
+    exporter = Exporter(storage)
+    if False:
+        equal_versions = exporter.export_wordpress(output_path)
+        for version in equal_versions:
+            logger.info(version)
+        exporter.dump_meta("wordpress", output_path)
 
-    # exporter = Exporter(storage)
-    #
-    # equal_versions = exporter.export_wordpress(output_path)
-    # for version in equal_versions:
-    #     logger.info(version)
-    # exporter.dump_meta("wordpress", output_path)
-    #
-    # exporter.export_plugins(output_path, only_popular=True)
-    # # exporter.export_plugins(input_path, only_vulnerable=True)
-    # # exporter.export_plugins(input_path)
-    # exporter.dump_meta("plugins", output_path)
-    # #
-    # exporter.export_themes(output_path, only_popular=True)
-    # # exporter.export_themes(input_path, only_vulnerable=True)
-    # # exporter.export_themes(input_path)
-    # exporter.dump_meta("themes", output_path)
-    # #
-    # # exporter.export_vulnerabilities(input_path)
-    #
-    # # compress_exported_files(input_path)
+        exporter.export_plugins(output_path, only_popular=True)
+        exporter.export_plugins(input_path, only_vulnerable=True)
+        exporter.export_plugins(input_path)
+        exporter.dump_meta("plugins", output_path)
+
+        exporter.export_themes(output_path, only_popular=True)
+        exporter.export_themes(input_path, only_vulnerable=True)
+        exporter.export_themes(input_path)
+        exporter.dump_meta("themes", output_path)
+
+        exporter.export_vulnerabilities(input_path)
 
     github_release.set_repository_settings("NicolasAubry", "b6dbc8246825195f9a2779e59e4f7d1e5402453e",
                                            "vane_data_test", output_path)
-    #sleep(300)
-    loop.run_until_complete(github_release.create_release())
+    loop.run_until_complete(github_release.release_vane_data(output_path))
 
 
 def populate_versions(loop, repository_hasher, storage):

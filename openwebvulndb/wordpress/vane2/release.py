@@ -33,29 +33,38 @@ class GitHubRelease:
         self.repository_path = None
         self.repository_password = None
         self.repository_owner = None
+        self.repository_name = None
 
     def set_repository_settings(self, repository_owner, repository_password, repository_name, repository_path):
         base_url = "https://api.github.com/repos/{0}/{1}"
         self.url = base_url.format(repository_owner, repository_name)
+        self.repository_name = repository_name
         self.repository_path = repository_path
         self.repository_owner = repository_owner
         self.repository_password = repository_password
 
-    async def get_latest_release_version(self):
+    async def get_latest_release(self):
         url = self.url + "/releases/latest"
         async with self.aiohttp_session.get(url) as response:
             data = await response.json()
-            try:
-                latest_version = data['tag_name']
-            except KeyError:
-                latest_version = "0.0"
-            return latest_version
+            return data
 
+    def get_release_version(self, release):
+        try:
+            latest_version = release['tag_name']
+        except KeyError:
+            latest_version = None
+        return latest_version
+
+    def get_release_id(self, release):
+        return release['id']
+
+    """
     async def get_release_version(self):
         latest_version = await self.get_latest_release_version()
         new_version = VersionCompare.next_minor(latest_version)
         return new_version
-
+    """
     async def create_release(self):
         self.commit_data()
         release_version = await self.get_release_version()
@@ -70,20 +79,38 @@ class GitHubRelease:
         chdir(self.repository_path)
         run("./commit_data.sh")
 
+    async def release_vane_data(self, dir_path):
+        latest_release = await self.get_latest_release()
+        latest_release_version = self.get_release_version(latest_release)
+        if latest_release_version is None:
+            raise ValueError("Cannot add exported Vane data if no previous release exists.")
+        filename = self.compress_exported_files(dir_path, latest_release_version)
+        await self.upload_compressed_data(dir_path, filename)
 
-def compress_exported_files(dir_path):
-    release_version = get_release_version(None)
-    archive_name = "vane2_data_{0}.tar.gz".format(release_version)
-    tar_archive = tarfile.open(join(dir_path, archive_name), "w:gz")
-    files_to_compress = glob(join(dir_path, "*"))
-    for file in files_to_compress:
-        file = file[len(dirname(file) + "/"):]
-        tar_archive.add(join(dir_path, file), file)
+    async def upload_compressed_data(self, dir_path, filename):
+        latest_release = await self.get_latest_release()
+        latest_release_id = self.get_release_id(latest_release)
+        url = self.get_assets_upload_url(latest_release_id, filename)
+        data = self.load_compressed_file(join(dir_path, filename))
+        headers = {'Content-Type': "application/gzip"}
+        async with self.aiohttp_session.post(url, headers=headers, data=data,
+                                             auth=BasicAuth(self.repository_owner, password=self.repository_password)) as response:
+            print(await response.json())
 
+    def get_assets_upload_url(self, release_id, asset_name):
+        upload_url = "https://uploads.github.com/repos/{0}/{1}/releases/{2}/assets?name={3}"
+        return upload_url.format(self.repository_owner, self.repository_name, release_id, asset_name)
 
-def get_release_version(repository_url):
-    return ""
+    def load_compressed_file(self, filename):
+        with open(filename, 'rb') as file:
+            data = file.read()
+            return data
 
-
-def create_release(repository_url):
-    pass
+    def compress_exported_files(self, dir_path, release_version):
+        archive_name = "vane2_data_{0}.tar.gz".format(release_version)
+        with tarfile.open(join(dir_path, archive_name), "w:gz") as tar_archive:
+            files_to_compress = glob(join(dir_path, "*.json"))
+            for file in files_to_compress:
+                file = file[len(dirname(file) + "/"):]
+                tar_archive.add(join(dir_path, file), file)
+            return archive_name
