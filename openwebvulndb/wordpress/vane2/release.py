@@ -18,11 +18,10 @@
 import tarfile
 from os.path import join, dirname
 from glob import glob
-from openwebvulndb.common.version import VersionCompare
 import json
 from aiohttp import BasicAuth
 from subprocess import run
-from os import chdir, system
+from os import chdir
 
 
 class GitHubRelease:
@@ -78,7 +77,7 @@ class GitHubRelease:
         if latest_release_version is None:
             raise ValueError("Cannot add exported Vane data if no previous release exists.")
         filename = self.compress_exported_files(dir_path, latest_release_version)
-        await self.upload_compressed_data(dir_path, filename)
+        #await self.upload_compressed_data(dir_path, filename)
 
     async def upload_compressed_data(self, dir_path, filename):
         latest_release = await self.get_latest_release()
@@ -105,7 +104,7 @@ class GitHubRelease:
         archive_name = "vane2_data_{0}.tar.gz".format(release_version)
         with tarfile.open(join(dir_path, archive_name), "w:gz") as tar_archive:
             files_to_compress = glob(join(dir_path, "*.json"))
-            for file in files_to_compress:
-                file = file[len(dirname(file) + "/"):]
-                tar_archive.add(join(dir_path, file), file)
+            for file_path in files_to_compress:
+                file_name = file_path[len(dir_path + "/"):]
+                tar_archive.add(file_path, file_name)
             return archive_name

@@ -18,6 +18,7 @@
 from argparse import ArgumentParser
 from random import shuffle
 from os.path import join, dirname
+import os
 
 from openwebvulndb import app
 from .repository import WordPressRepository
@@ -26,8 +27,6 @@ from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 from .vane2.exporter import Exporter
 from ..common.logs import logger
-from .vane2.release import GitHubRelease
-from time import sleep
 
 
 def list_plugins(loop, repository):
@@ -83,12 +82,17 @@ def vane2_export(storage, input_path, github_release, loop):
 
         exporter.export_vulnerabilities(input_path)
 
-    github_release.set_repository_settings("NicolasAubry", "b6dbc8246825195f9a2779e59e4f7d1e5402453e", "vane_data_test")
-    try:
-        loop.run_until_complete(github_release.release_vane_data(output_path))
-        print("Vane data successfully released.")
-    except Exception as e:
-        print(e)
+    if "VANE2_REPO_PASSWORD" in os.environ:
+        github_release.set_repository_settings("NicolasAubry", os.environ["VANE2_REPO_PASSWORD"], "vane_data_test")
+        try:
+            import time
+            time.sleep(300)
+            loop.run_until_complete(github_release.release_vane_data(output_path))
+            print("Vane data successfully released.")
+        except (Exception, RuntimeError) as e:
+            print(e)
+    else:
+        logger.error("VANE2_REPO_PASSWORD environment variable must be defined to push Vane2 data to repository.")
 
 
 def populate_versions(loop, repository_hasher, storage):
