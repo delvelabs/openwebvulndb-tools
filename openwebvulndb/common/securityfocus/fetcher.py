@@ -27,9 +27,8 @@ from aiohttp import ClientResponseError
 
 class SecurityFocusFetcher:
 
-    def __init__(self, http_session=None, vulnerability_manager=None):
+    def __init__(self, http_session=None):
         self.http_session = http_session
-        self.vulnerability_manager = vulnerability_manager
 
     async def get_list_of_vuln_on_first_page(self, file=None):
         if file is not None:

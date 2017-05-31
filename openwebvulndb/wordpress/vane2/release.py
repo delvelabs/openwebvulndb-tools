@@ -77,7 +77,7 @@ class GitHubRelease:
         if latest_release_version is None:
             raise ValueError("Cannot add exported Vane data if no previous release exists.")
         filename = self.compress_exported_files(dir_path, latest_release_version)
-        #await self.upload_compressed_data(dir_path, filename)
+        await self.upload_compressed_data(dir_path, filename)
 
     async def upload_compressed_data(self, dir_path, filename):
         latest_release = await self.get_latest_release()

@@ -21,7 +21,7 @@ from asyncio import TimeoutError
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file, async_test, fake_future
+from fixtures import read_file, async_test, fake_future, ClientSessionMock
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
 from openwebvulndb.common import Meta, Repository
@@ -157,8 +157,8 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'twentyeleven.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock())
-        handler.session.get.return_value = fake_future(my_response, loop)
+        aiohttp_session = ClientSessionMock(get_response=my_response)
+        handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session)
 
         theme = await handler.fetch_theme('twentyeleven')
 
@@ -188,8 +188,8 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'popular-themes.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock(), storage=MagicMock())
-        handler.session.get.return_value = fake_future(my_response, loop)
+        aiohttp_session = ClientSessionMock(get_response=my_response)
+        handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session, storage=MagicMock())
         handler.storage.read_meta.side_effect = [meta_1, meta_2, meta_3]
 
         await handler.mark_popular_themes()

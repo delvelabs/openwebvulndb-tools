@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import unittest
+from unittest.mock import MagicMock
 import asyncio
 from functools import wraps
 from os.path import join, dirname
@@ -60,3 +61,34 @@ def fake_future(result, loop):
     f = asyncio.Future(loop=loop)
     f.set_result(result)
     return f
+
+
+class ClientSessionMock:
+
+    def __init__(self, get_response=None, post_response=None):
+        self.get = MagicMock(return_value=AsyncContextManagerMock())
+        self.post = MagicMock(return_value=AsyncContextManagerMock())
+        self.get_response = get_response or MagicMock()
+        self.post_response = post_response or MagicMock()
+
+    def __setattr__(self, name, value):
+        if name == "get_response":
+            self.get.return_value.aenter_return = value
+        elif name == "post_response":
+            self.post.return_value.aenter_return = value
+        super().__setattr__(name, value)
+
+
+class AsyncContextManagerMock(MagicMock):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for key in ('aenter_return', 'aexit_return'):
+            setattr(self, key, kwargs[key] if key in kwargs else MagicMock())
+
+    async def __aenter__(self):
+        return self.aenter_return
+
+    async def __aexit__(self, *args):
+        return self.aexit_return

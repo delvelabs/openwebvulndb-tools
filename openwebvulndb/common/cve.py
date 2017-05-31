@@ -64,10 +64,10 @@ class CVEReader:
                 self.read_one(entry)
 
     async def read_api(self, url):
-        response = await self.session.get(url)
-        data = await response.json()
-        for entry in data:
-            self.read_one(entry)
+        async with self.session.get(url) as response:
+            data = await response.json()
+            for entry in data:
+                self.read_one(entry)
 
     def read_one(self, entry):
         target = self.identify_target(entry)

@@ -19,7 +19,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch, ANY, call
 from openwebvulndb.wordpress.vane2.release import GitHubRelease
 from os.path import join
-from fixtures import async_test
+from fixtures import async_test, ClientSessionMock
 from aiohttp.test_utils import make_mocked_coro
 from aiohttp import BasicAuth
 import json
@@ -31,9 +31,7 @@ class TestGitHubRelease(TestCase):
         self.release = GitHubRelease()
         self.release.set_repository_settings("Owner", "password", "repository_name")
 
-        self.release.aiohttp_session = MagicMock()
-        self.release.aiohttp_session.get.return_value = AsyncContextManagerMock()
-        self.release.aiohttp_session.post.return_value = AsyncContextManagerMock()
+        self.release.aiohttp_session = ClientSessionMock()
 
         self.files_in_dir = ["file1.json", "file2.json"]
         self.dir_path = "files/to/compress"
@@ -58,7 +56,7 @@ class TestGitHubRelease(TestCase):
     async def test_get_latest_release_return_response_as_json(self):
         response = MagicMock()
         response.json = make_mocked_coro(return_value={"tag_name": "1.0"})
-        self.release.aiohttp_session.get.return_value.aenter_return = response
+        self.release.aiohttp_session.get_response = response
 
         release = await self.release.get_latest_release()
 
@@ -233,18 +231,3 @@ class TestGitHubRelease(TestCase):
             filename = self.release.compress_exported_files(dir_path, "1.3")
 
             self.assertEqual(filename, "vane2_data_1.3.tar.gz")
-
-
-class AsyncContextManagerMock(MagicMock):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        for key in ('aenter_return', 'aexit_return'):
-            setattr(self, key,  kwargs[key] if key in kwargs else MagicMock())
-
-    async def __aenter__(self):
-        return self.aenter_return
-
-    async def __aexit__(self, *args):
-        return self.aexit_return
