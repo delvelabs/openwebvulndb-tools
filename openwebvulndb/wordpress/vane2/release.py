@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import tarfile
-from os.path import join, dirname
+from os.path import join
 from glob import glob
 import json
 from aiohttp import BasicAuth
@@ -56,20 +56,6 @@ class GitHubRelease:
 
     def get_release_id(self, release):
         return release['id']
-
-    async def create_release(self):
-        self.commit_data()
-        release_version = await self.get_release_version()
-        url = self.url + "/releases"
-        data = {'tag_name': release_version, 'target_commitish': 'master', 'name': release_version}
-        authentication = BasicAuth(self.repository_owner, password=self.repository_password)
-
-        async with self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication) as response:
-            pass
-
-    def commit_data(self):
-        chdir(self.repository_path)
-        run("./commit_data.sh")
 
     async def release_vane_data(self, dir_path):
         latest_release = await self.get_latest_release()

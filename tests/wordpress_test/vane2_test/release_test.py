@@ -85,57 +85,6 @@ class TestGitHubRelease(TestCase):
         self.assertEqual(release_id, "12345")
 
     @async_test()
-    async def test_create_release_create_release_with_new_version_from_master(self):
-        self.release.get_release_version = make_mocked_coro("1.0")
-        self.release.commit_data = MagicMock()
-
-        await self.release.create_release()
-
-        data = {'tag_name': '1.0', 'target_commitish': 'master', 'name': '1.0'}
-        self.release.aiohttp_session.post.assert_called_once_with("https://api.github.com/repos/Owner/repository_name/"
-                                                                  "releases", data=json.dumps(data), auth=ANY)
-
-    @async_test()
-    async def test_create_release_send_credential_with_post_request(self):
-        self.release.get_release_version = make_mocked_coro("1.0")
-        self.release.commit_data = MagicMock()
-        self.release.set_repository_settings("Owner", "password", "repository_name")
-
-        await self.release.create_release()
-
-        data = {'tag_name': '1.0', 'target_commitish': 'master', 'name': '1.0'}
-        self.release.aiohttp_session.post.assert_called_once_with(ANY, data=ANY, auth=BasicAuth("Owner", password="password"))
-
-    @async_test()
-    async def test_create_release_commit_data(self):
-        self.release.get_release_version = make_mocked_coro("1.0")
-        self.release.commit_data = MagicMock()
-
-        await self.release.create_release()
-
-        self.release.commit_data.assert_called_once_with()
-
-    def test_commit_data_chdir_to_repository(self):
-        fake_chdir = MagicMock()
-        fake_run = MagicMock()
-
-
-        with patch("openwebvulndb.wordpress.vane2.release.chdir", fake_chdir):
-            with patch("openwebvulndb.wordpress.vane2.release.run", fake_run):
-                self.release.commit_data()
-
-                fake_chdir.assert_called_once_with(self.release.repository_path)
-
-    def test_commit_data_create_commit_with_all_data_files(self):
-        fake_run = MagicMock()
-        fake_chdir = MagicMock()
-        with patch("openwebvulndb.wordpress.vane2.release.run", fake_run):
-            with patch("openwebvulndb.wordpress.vane2.release.chdir", fake_chdir):
-                self.release.commit_data()
-
-                fake_run.assert_called_once_with("./commit_data.sh")
-
-    @async_test()
     async def test_release_vane_data_raise_value_error_if_no_wordpress_data_release_exists(self):
         self.release.get_latest_release = make_mocked_coro(return_value={})
 
