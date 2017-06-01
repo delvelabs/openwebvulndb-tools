@@ -26,7 +26,6 @@ class GitHubRelease:
     def __init__(self, aiohttp_session=None):
         self.aiohttp_session = aiohttp_session
         self.url = None
-        self.repository_path = None
         self.repository_password = None
         self.repository_owner = None
         self.repository_name = None
@@ -37,6 +36,14 @@ class GitHubRelease:
         self.repository_name = repository_name
         self.repository_owner = repository_owner
         self.repository_password = repository_password
+
+    async def release_vane_data(self, directory_path):
+        latest_release = await self.get_latest_release()
+        latest_release_version = self.get_release_version(latest_release)
+        if latest_release_version is None:
+            raise ValueError("Cannot add exported Vane data if no previous release exists.")
+        filename = self.compress_exported_files(directory_path, latest_release_version)
+        await self.upload_compressed_data(directory_path, filename, latest_release['id'])
 
     async def get_latest_release(self):
         url = self.url + "/releases/latest"
@@ -51,43 +58,30 @@ class GitHubRelease:
             latest_version = None
         return latest_version
 
-    def get_release_id(self, release):
-        return release['id']
-
-    async def release_vane_data(self, dir_path):
-        latest_release = await self.get_latest_release()
-        latest_release_version = self.get_release_version(latest_release)
-        if latest_release_version is None:
-            raise ValueError("Cannot add exported Vane data if no previous release exists.")
-        filename = self.compress_exported_files(dir_path, latest_release_version)
-        await self.upload_compressed_data(dir_path, filename)
-
-    async def upload_compressed_data(self, dir_path, filename):
-        latest_release = await self.get_latest_release()
-        latest_release_id = self.get_release_id(latest_release)
-        url = self.get_assets_upload_url(latest_release_id, filename)
-        data = self.load_compressed_file(join(dir_path, filename))
+    async def upload_compressed_data(self, directory_path, filename, release_id):
+        url = self.get_assets_upload_url(release_id, filename)
+        data = self.load_file(join(directory_path, filename))
         headers = {'Content-Type': "application/gzip"}
-        async with self.aiohttp_session.post(url, headers=headers, data=data,
-                                             auth=BasicAuth(self.repository_owner, password=self.repository_password)) as response:
+        authentication = BasicAuth(self.repository_owner, password=self.repository_password)
+        async with self.aiohttp_session.post(url, headers=headers, data=data, auth=authentication) as response:
             if response.status != 201:
-                raise Exception("Error while uploading data, response status code: {0}, response message: {1}"\
-                                .format(response.status, await response.read()))
+                error_message = "Error while uploading data, response status code: {0}, response message: {1}"
+                raise Exception(error_message.format(response.status, await response.read()))
 
     def get_assets_upload_url(self, release_id, asset_name):
         upload_url = "https://uploads.github.com/repos/{0}/{1}/releases/{2}/assets?name={3}"
         return upload_url.format(self.repository_owner, self.repository_name, release_id, asset_name)
 
-    def load_compressed_file(self, filename):
+    def load_file(self, filename):
         with open(filename, 'rb') as file:
             data = file.read()
             return data
 
-    def compress_exported_files(self, dir_path, release_version):
+    def compress_exported_files(self, directory_path, release_version):
         archive_name = "vane2_data_{0}.tar.gz".format(release_version)
-        with tarfile.open(join(dir_path, archive_name), "w:gz") as tar_archive:
-            files_to_compress = glob(join(dir_path, "*.json"))
+        with tarfile.open(join(directory_path, archive_name), "w:gz") as tar_archive:
+            files_to_compress = glob(join(directory_path, "*.json"))
             for file_path in files_to_compress:
-                file_name = file_path[len(dir_path + "/"):]
+                file_name = file_path[len(directory_path + "/"):]
                 tar_archive.add(file_path, file_name)
             return archive_name

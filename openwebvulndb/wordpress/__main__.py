@@ -58,35 +58,30 @@ def vane_export(vane_importer, storage, input_path):
 
 
 def vane2_export(storage, input_path, github_release, loop):
-    if input_path:
-        input_path = join(dirname(__file__), input_path)
-    else:
-        input_path = dirname(__file__)
-
-    output_path = join(input_path, "vane2_data")
+    export_path = join(dirname(__file__), "../../dist/vane2_data")
     exporter = Exporter(storage)
 
-    equal_versions = exporter.export_wordpress(output_path)
+    equal_versions = exporter.export_wordpress(export_path)
     for version in equal_versions:
         logger.info(version)
-    exporter.dump_meta("wordpress", output_path)
+    exporter.dump_meta("wordpress", export_path)
 
-    exporter.export_plugins(output_path, only_popular=True)
-    exporter.export_plugins(input_path, only_vulnerable=True)
-    exporter.export_plugins(input_path)
-    exporter.dump_meta("plugins", output_path)
+    exporter.export_plugins(export_path, only_popular=True)
+    exporter.export_plugins(export_path, only_vulnerable=True)
+    exporter.export_plugins(export_path)
+    exporter.dump_meta("plugins", export_path)
 
-    exporter.export_themes(output_path, only_popular=True)
-    exporter.export_themes(input_path, only_vulnerable=True)
-    exporter.export_themes(input_path)
-    exporter.dump_meta("themes", output_path)
-    #
-    exporter.export_vulnerabilities(input_path)
+    exporter.export_themes(export_path, only_popular=True)
+    exporter.export_themes(export_path, only_vulnerable=True)
+    exporter.export_themes(export_path)
+    exporter.dump_meta("themes", export_path)
+
+    exporter.export_vulnerabilities(export_path)
 
     if "VANE2_REPO_PASSWORD" in os.environ:
         github_release.set_repository_settings("NicolasAubry", os.environ["VANE2_REPO_PASSWORD"], "vane_data_test")
         try:
-            loop.run_until_complete(github_release.release_vane_data(output_path))
+            loop.run_until_complete(github_release.release_vane_data(export_path))
             logger.info("Vane data successfully released.")
         except (Exception, RuntimeError) as e:
             logger.exception(e)
