@@ -18,10 +18,7 @@
 import tarfile
 from os.path import join
 from glob import glob
-import json
 from aiohttp import BasicAuth
-from subprocess import run
-from os import chdir
 
 
 class GitHubRelease:

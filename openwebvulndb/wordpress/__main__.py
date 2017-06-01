@@ -24,7 +24,8 @@ from openwebvulndb import app
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
 from ..common.parallel import ParallelWorker
-from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
+from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
+    download_vulnerability_entry
 from .vane2.exporter import Exporter
 from ..common.logs import logger
 
@@ -64,33 +65,31 @@ def vane2_export(storage, input_path, github_release, loop):
 
     output_path = join(input_path, "vane2_data")
     exporter = Exporter(storage)
-    if False:
-        equal_versions = exporter.export_wordpress(output_path)
-        for version in equal_versions:
-            logger.info(version)
-        exporter.dump_meta("wordpress", output_path)
 
-        exporter.export_plugins(output_path, only_popular=True)
-        exporter.export_plugins(input_path, only_vulnerable=True)
-        exporter.export_plugins(input_path)
-        exporter.dump_meta("plugins", output_path)
+    equal_versions = exporter.export_wordpress(output_path)
+    for version in equal_versions:
+        logger.info(version)
+    exporter.dump_meta("wordpress", output_path)
 
-        exporter.export_themes(output_path, only_popular=True)
-        exporter.export_themes(input_path, only_vulnerable=True)
-        exporter.export_themes(input_path)
-        exporter.dump_meta("themes", output_path)
+    exporter.export_plugins(output_path, only_popular=True)
+    exporter.export_plugins(input_path, only_vulnerable=True)
+    exporter.export_plugins(input_path)
+    exporter.dump_meta("plugins", output_path)
 
-        exporter.export_vulnerabilities(input_path)
+    exporter.export_themes(output_path, only_popular=True)
+    exporter.export_themes(input_path, only_vulnerable=True)
+    exporter.export_themes(input_path)
+    exporter.dump_meta("themes", output_path)
+    #
+    exporter.export_vulnerabilities(input_path)
 
     if "VANE2_REPO_PASSWORD" in os.environ:
         github_release.set_repository_settings("NicolasAubry", os.environ["VANE2_REPO_PASSWORD"], "vane_data_test")
         try:
-            import time
-            time.sleep(300)
             loop.run_until_complete(github_release.release_vane_data(output_path))
-            print("Vane data successfully released.")
+            logger.info("Vane data successfully released.")
         except (Exception, RuntimeError) as e:
-            print(e)
+            logger.exception(e)
     else:
         logger.error("VANE2_REPO_PASSWORD environment variable must be defined to push Vane2 data to repository.")
 
