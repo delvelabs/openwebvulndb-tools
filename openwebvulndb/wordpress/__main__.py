@@ -57,7 +57,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, input_path, github_release, loop):
+def vane2_export(storage, github_release, loop):
     export_path = join(dirname(__file__), "../../dist/vane2_data")
     exporter = Exporter(storage)
 
