@@ -15,14 +15,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import json
+from os.path import join
 from unittest import TestCase
 from unittest.mock import MagicMock, patch, ANY, call
-from openwebvulndb.wordpress.vane2.release import GitHubRelease
-from os.path import join
-from fixtures import async_test, ClientSessionMock
-from aiohttp.test_utils import make_mocked_coro
-import json
+
 from aiohttp import BasicAuth
+from aiohttp.test_utils import make_mocked_coro
+from fixtures import async_test, ClientSessionMock
+
+from openwebvulndb.common.release import GitHubRelease
 
 
 class TestGitHubRelease(TestCase):
@@ -37,7 +39,7 @@ class TestGitHubRelease(TestCase):
         self.dir_path = "files/to/compress"
         self.fake_glob = MagicMock(return_value=[join(self.dir_path, self.files_in_dir[0]),
                                             join(self.dir_path, self.files_in_dir[1])])
-        glob_patch = patch("openwebvulndb.wordpress.vane2.release.glob", self.fake_glob)
+        glob_patch = patch("openwebvulndb.common.release.glob", self.fake_glob)
         glob_patch.start()
         self.addCleanup(glob_patch.stop)
 
@@ -196,7 +198,7 @@ class TestGitHubRelease(TestCase):
         self.files_in_dir.append("file.txt")
         self.fake_glob.return_value = [join(self.dir_path, file) for file in self.files_in_dir]
 
-        with(patch("openwebvulndb.wordpress.vane2.release.tarfile.open", fake_tarfile_open)):
+        with(patch("openwebvulndb.common.release.tarfile.open", fake_tarfile_open)):
             self.release.compress_exported_files(self.dir_path, "1.0")
 
             fake_tarfile_open.assert_called_once_with(ANY, "w:gz")
@@ -212,7 +214,7 @@ class TestGitHubRelease(TestCase):
         self.fake_glob.return_value = [join(self.dir_path, file) for file in files_in_dir]
         file_pattern = ["*.json", "*.txt"]
 
-        with(patch("openwebvulndb.wordpress.vane2.release.tarfile.open", fake_tarfile_open)):
+        with(patch("openwebvulndb.common.release.tarfile.open", fake_tarfile_open)):
             self.release.compress_exported_files(self.dir_path, "filename", file_pattern=file_pattern)
 
             self.fake_glob.assert_has_calls([call(self.dir_path + "/" + file_pattern[0]),
@@ -228,7 +230,7 @@ class TestGitHubRelease(TestCase):
         filename = "vane2_data_1.3"
         fake_tarfile_open = MagicMock()
 
-        with(patch("openwebvulndb.wordpress.vane2.release.tarfile.open", fake_tarfile_open)):
+        with(patch("openwebvulndb.common.release.tarfile.open", fake_tarfile_open)):
             self.release.compress_exported_files(dir_path,  filename)
 
             fake_tarfile_open.assert_called_once_with(join(dir_path, filename + ".tar.gz"), ANY)
@@ -238,7 +240,7 @@ class TestGitHubRelease(TestCase):
         filename = "vane2_data_1.3"
         fake_tarfile_open = MagicMock()
 
-        with(patch("openwebvulndb.wordpress.vane2.release.tarfile.open", fake_tarfile_open)):
+        with(patch("openwebvulndb.common.release.tarfile.open", fake_tarfile_open)):
             filename = self.release.compress_exported_files(dir_path, filename)
 
             self.assertEqual(filename, "vane2_data_1.3.tar.gz")

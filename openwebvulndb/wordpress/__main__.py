@@ -15,21 +15,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from argparse import ArgumentParser
-from random import shuffle
-from os.path import join
 import os
+from argparse import ArgumentParser
+from os.path import join
+from random import shuffle
 
 from openwebvulndb import app
+from openwebvulndb.common.release import GitHubRelease
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
+from .vane2.exporter import Exporter
+from ..common.config import EXPORT_PATH
+from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
     download_vulnerability_entry
-from .vane2.exporter import Exporter
-from ..common.logs import logger
-from ..common.config import EXPORT_PATH
-from .vane2.release import GitHubRelease
 
 
 def list_plugins(loop, repository):
