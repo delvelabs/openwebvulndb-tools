@@ -58,7 +58,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, github_release, loop):
+def vane2_export(storage, github_release, loop, create_release=False, commit_number=None, release_version=None):
     export_path = EXPORT_PATH
     exporter = Exporter(storage)
 
@@ -68,29 +68,30 @@ def vane2_export(storage, github_release, loop):
             logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
             return
 
-    equal_versions = exporter.export_wordpress(export_path)
-    for version in equal_versions:
-        logger.info(version)
-    exporter.dump_meta("wordpress", export_path)
-
-    exporter.export_plugins(export_path, only_popular=True)
-    exporter.export_plugins(export_path, only_vulnerable=True)
-    exporter.export_plugins(export_path)
-    exporter.dump_meta("plugins", export_path)
-
-    exporter.export_themes(export_path, only_popular=True)
-    exporter.export_themes(export_path, only_vulnerable=True)
-    exporter.export_themes(export_path)
-    exporter.dump_meta("themes", export_path)
-
-    exporter.export_vulnerabilities(export_path)
+    # equal_versions = exporter.export_wordpress(export_path)
+    # for version in equal_versions:
+    #     logger.info(version)
+    # exporter.dump_meta("wordpress", export_path)
+    #
+    # exporter.export_plugins(export_path, only_popular=True)
+    # exporter.export_plugins(export_path, only_vulnerable=True)
+    # exporter.export_plugins(export_path)
+    # exporter.dump_meta("plugins", export_path)
+    #
+    # exporter.export_themes(export_path, only_popular=True)
+    # exporter.export_themes(export_path, only_vulnerable=True)
+    # exporter.export_themes(export_path)
+    # exporter.dump_meta("themes", export_path)
+    #
+    # exporter.export_vulnerabilities(export_path)
 
     github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
                                            os.environ["VANE2_REPO_NAME"])
     try:
-        loop.run_until_complete(github_release.release_vane_data(export_path))
+        loop.run_until_complete(github_release.release_data(export_path, "vane2_data_", create_release, commit_number,
+                                                            release_version))
         logger.info("Vane data successfully released.")
-    except (Exception, RuntimeError) as e:
+    except (Exception, RuntimeError, ValueError) as e:
         logger.exception(e)
 
 
@@ -143,6 +144,9 @@ parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
 parser.add_argument('-f', '--input-file', dest='input_file',
                     help='Cached input file')
+parser.add_argument('--create-release', dest='create_release', action='store_true', help='Create a new GitHub release')
+parser.add_argument('--commit-number', dest='commit_number', help='SHA number of the commit used for the new release')
+parser.add_argument('--release-version', dest='release_version', help='version of the new release')
 
 args = parser.parse_args()
 
@@ -152,7 +156,10 @@ try:
                     input_path=args.input_path,
                     input_file=args.input_file,
                     bugtraq_id=args.bugtraq_id,
-                    dest_folder=args.dest_folder)
+                    dest_folder=args.dest_folder,
+                    create_release=args.create_release,
+                    commit_number=args.commit_number,
+                    release_version=args.release_version)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass

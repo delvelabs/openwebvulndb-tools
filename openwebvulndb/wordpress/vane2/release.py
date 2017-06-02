@@ -19,6 +19,7 @@ import tarfile
 from os.path import join
 from glob import glob
 from aiohttp import BasicAuth
+import json
 
 
 class GitHubRelease:
@@ -37,13 +38,21 @@ class GitHubRelease:
         self.repository_owner = repository_owner
         self.repository_password = repository_password
 
-    async def release_vane_data(self, directory_path):
-        latest_release = await self.get_latest_release()
-        latest_release_version = self.get_release_version(latest_release)
-        if latest_release_version is None:
-            raise ValueError("Cannot add exported Vane data if no previous release exists.")
-        filename = self.compress_exported_files(directory_path, latest_release_version)
-        await self.upload_compressed_data(directory_path, filename, latest_release['id'])
+    async def release_data(self, directory_path, filename, create_release=False, commit_number=None,
+                           release_version=None):
+        if create_release:
+            if commit_number is None:
+                raise ValueError("Cannot create a release if commit_number is none.")
+            if release_version is None:
+                raise ValueError("Cannot create a release if release_version is none.")
+            latest_release = await self.create_release(commit_number, release_version)
+        else:
+            latest_release = await self.get_latest_release()
+            release_version = self.get_release_version(latest_release)
+            if release_version is None:
+                raise ValueError("Cannot add exported Vane data if no previous release exists.")
+        compressed_filename = self.compress_exported_files(directory_path, filename + release_version)
+        await self.upload_compressed_data(directory_path, compressed_filename, latest_release['id'])
 
     async def get_latest_release(self):
         url = self.url + "/releases/latest"
@@ -57,6 +66,16 @@ class GitHubRelease:
         except KeyError:
             latest_version = None
         return latest_version
+
+    async def create_release(self, commit, version, name=None):
+        url = self.url + "/releases"
+        data = {'tag_name': version, 'target_commitish': commit, 'name': name or version}
+        authentication = BasicAuth(self.repository_owner, password=self.repository_password)
+        async with self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication) as response:
+            if response.status != 201:
+                error_message = "Error while creating release, response status code: {0}, response message: {1}"
+                raise Exception(error_message.format(response.status, await response.json()))
+            return await response.json()
 
     async def upload_compressed_data(self, directory_path, filename, release_id):
         url = self.get_assets_upload_url(release_id, filename)
@@ -77,11 +96,13 @@ class GitHubRelease:
             data = file.read()
             return data
 
-    def compress_exported_files(self, directory_path, release_version):
-        archive_name = "vane2_data_{0}.tar.gz".format(release_version)
+    def compress_exported_files(self, directory_path, filename, file_pattern=None):
+        file_pattern = file_pattern or ["*.json"]
+        archive_name = "%s.tar.gz" % filename
         with tarfile.open(join(directory_path, archive_name), "w:gz") as tar_archive:
-            files_to_compress = glob(join(directory_path, "*.json"))
-            for file_path in files_to_compress:
-                file_name = file_path[len(directory_path + "/"):]
-                tar_archive.add(file_path, file_name)
+            for pattern in file_pattern:
+                files_to_compress = glob(join(directory_path, pattern))
+                for file_path in files_to_compress:
+                    file_name = file_path[len(directory_path + "/"):]
+                    tar_archive.add(file_path, file_name)
             return archive_name
