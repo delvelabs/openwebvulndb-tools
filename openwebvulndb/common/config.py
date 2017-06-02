@@ -15,8 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import os
 import os.path
 
 
 DEFAULT_PATH = os.path.join(os.getcwd(), "data")
+EXPORT_PATH = os.path.join(os.getcwd(), "dist/vane2_data")

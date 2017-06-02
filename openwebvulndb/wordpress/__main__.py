@@ -17,7 +17,7 @@
 
 from argparse import ArgumentParser
 from random import shuffle
-from os.path import join, dirname
+from os.path import join
 import os
 
 from openwebvulndb import app
@@ -28,6 +28,7 @@ from ..common.securityfocus.database_tools import update_securityfocus_database,
     download_vulnerability_entry
 from .vane2.exporter import Exporter
 from ..common.logs import logger
+from ..common.config import EXPORT_PATH
 
 
 def list_plugins(loop, repository):
@@ -58,7 +59,7 @@ def vane_export(vane_importer, storage, input_path):
 
 
 def vane2_export(storage, github_release, loop):
-    export_path = join(dirname(__file__), "../../dist/vane2_data")
+    export_path = EXPORT_PATH
     exporter = Exporter(storage)
 
     environment_variables = ["VANE2_REPO_OWNER", "VANE2_REPO_NAME", "VANE2_REPO_PASSWORD"]
