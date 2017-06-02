@@ -61,6 +61,12 @@ def vane2_export(storage, github_release, loop):
     export_path = join(dirname(__file__), "../../dist/vane2_data")
     exporter = Exporter(storage)
 
+    environment_variables = ["VANE2_REPO_OWNER", "VANE2_REPO_NAME", "VANE2_REPO_PASSWORD"]
+    for env_variable in environment_variables:
+        if env_variable not in os.environ:
+            logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
+            return
+
     equal_versions = exporter.export_wordpress(export_path)
     for version in equal_versions:
         logger.info(version)
@@ -78,15 +84,13 @@ def vane2_export(storage, github_release, loop):
 
     exporter.export_vulnerabilities(export_path)
 
-    if "VANE2_REPO_PASSWORD" in os.environ:
-        github_release.set_repository_settings("NicolasAubry", os.environ["VANE2_REPO_PASSWORD"], "vane_data_test")
-        try:
-            loop.run_until_complete(github_release.release_vane_data(export_path))
-            logger.info("Vane data successfully released.")
-        except (Exception, RuntimeError) as e:
-            logger.exception(e)
-    else:
-        logger.error("VANE2_REPO_PASSWORD environment variable must be defined to push Vane2 data to repository.")
+    github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
+                                           os.environ["VANE2_REPO_NAME"])
+    try:
+        loop.run_until_complete(github_release.release_vane_data(export_path))
+        logger.info("Vane data successfully released.")
+    except (Exception, RuntimeError) as e:
+        logger.exception(e)
 
 
 def populate_versions(loop, repository_hasher, storage):
