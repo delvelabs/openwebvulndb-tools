@@ -29,6 +29,7 @@ from ..common.securityfocus.database_tools import update_securityfocus_database,
 from .vane2.exporter import Exporter
 from ..common.logs import logger
 from ..common.config import EXPORT_PATH
+from .vane2.release import GitHubRelease
 
 
 def list_plugins(loop, repository):
@@ -58,7 +59,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, github_release, loop, create_release=False, commit_number=None, release_version=None):
+def vane2_export(storage, aiohttp_session, loop, create_release=False, commit_number=None, release_version=None):
     export_path = EXPORT_PATH
     exporter = Exporter(storage)
 
@@ -85,6 +86,7 @@ def vane2_export(storage, github_release, loop, create_release=False, commit_num
     #
     # exporter.export_vulnerabilities(export_path)
 
+    github_release = GitHubRelease(aiohttp_session)
     github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
                                            os.environ["VANE2_REPO_NAME"])
     try:
@@ -93,6 +95,7 @@ def vane2_export(storage, github_release, loop, create_release=False, commit_num
         logger.info("Vane data successfully released.")
     except (Exception, RuntimeError, ValueError) as e:
         logger.exception(e)
+    aiohttp_session.close()
 
 
 def populate_versions(loop, repository_hasher, storage):
