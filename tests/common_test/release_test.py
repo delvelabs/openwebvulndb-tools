@@ -91,14 +91,14 @@ class TestGitHubRelease(TestCase):
         self.release.get_latest_release = make_mocked_coro(return_value={})
 
         with self.assertRaises(ValueError):
-            await self.release.release_data(self.dir_path, "filename_", create_release=True, commit_number=None)
+            await self.release.release_data(self.dir_path, "filename_", create_release=True, target_commitish=None)
 
     @async_test()
     async def test_release_data_raise_value_error_if_create_release_is_true_but_release_version_is_none(self):
         self.release.get_latest_release = make_mocked_coro(return_value={})
 
         with self.assertRaises(ValueError):
-            await self.release.release_data(self.dir_path, "filename_", create_release=True, commit_number='123abc',
+            await self.release.release_data(self.dir_path, "filename_", create_release=True, target_commitish='123abc',
                                             release_version=None)
 
     @async_test()
@@ -107,7 +107,7 @@ class TestGitHubRelease(TestCase):
         self.release.compress_exported_files = MagicMock()
         self.release.upload_compressed_data = make_mocked_coro()
 
-        await self.release.release_data(self.dir_path, "filename_", create_release=True, commit_number='123abc',
+        await self.release.release_data(self.dir_path, "filename_", create_release=True, target_commitish='123abc',
                                         release_version="1.0")
 
         self.release.create_release.assert_called_once_with("123abc", "1.0")

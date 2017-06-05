@@ -38,21 +38,21 @@ class GitHubRelease:
         self.repository_owner = repository_owner
         self.repository_password = repository_password
 
-    async def release_data(self, directory_path, filename, create_release=False, commit_number=None,
+    async def release_data(self, directory_path, filename, create_release=False, target_commitish=None,
                            release_version=None):
         if create_release:
-            if commit_number is None:
-                raise ValueError("Cannot create a release if commit_number is none.")
+            if target_commitish is None:
+                raise ValueError("Cannot create a release if target_commitish is none.")
             if release_version is None:
                 raise ValueError("Cannot create a release if release_version is none.")
-            latest_release = await self.create_release(commit_number, release_version)
+            latest_release = await self.create_release(target_commitish, release_version)
         else:
             latest_release = await self.get_latest_release()
             release_version = self.get_release_version(latest_release)
             if release_version is None:
-                raise ValueError("Cannot add exported data to release if no previous release exists.")
-        compressed_filename = self.compress_exported_files(directory_path, filename + release_version)
-        await self.upload_compressed_data(directory_path, compressed_filename, latest_release['id'])
+                raise ValueError("Cannot add an asset to release if no previous release exists.")
+        archive_name = self.compress_exported_files(directory_path, filename + release_version)
+        await self.upload_compressed_data(directory_path, archive_name, latest_release['id'])
 
     async def get_latest_release(self):
         url = self.url + "/releases/latest"
@@ -67,9 +67,9 @@ class GitHubRelease:
             latest_version = None
         return latest_version
 
-    async def create_release(self, commit, version, name=None):
+    async def create_release(self, target_commitish, version, name=None):
         url = self.url + "/releases"
-        data = {'tag_name': version, 'target_commitish': commit, 'name': name or version}
+        data = {'tag_name': version, 'target_commitish': target_commitish, 'name': name or version}
         authentication = BasicAuth(self.repository_owner, password=self.repository_password)
         async with self.aiohttp_session.post(url, data=json.dumps(data), auth=authentication) as response:
             if response.status != 201:

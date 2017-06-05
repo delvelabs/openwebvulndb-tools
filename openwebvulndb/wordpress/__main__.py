@@ -59,7 +59,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, aiohttp_session, loop, create_release=False, commit_number=None, release_version=None):
+def vane2_export(storage, aiohttp_session, loop, create_release=False, target_commitish=None, release_version=None):
     export_path = EXPORT_PATH
     exporter = Exporter(storage)
 
@@ -90,7 +90,7 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, commit_nu
     github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
                                            os.environ["VANE2_REPO_NAME"])
     try:
-        loop.run_until_complete(github_release.release_data(export_path, "vane2_data_", create_release, commit_number,
+        loop.run_until_complete(github_release.release_data(export_path, "vane2_data_", create_release, target_commitish,
                                                             release_version))
         logger.info("Vane data successfully released.")
     except (Exception, RuntimeError, ValueError) as e:
@@ -148,7 +148,8 @@ parser.add_argument('-i', '--input-path', dest='input_path',
 parser.add_argument('-f', '--input-file', dest='input_file',
                     help='Cached input file')
 parser.add_argument('--create-release', dest='create_release', action='store_true', help='Create a new GitHub release')
-parser.add_argument('--commit-number', dest='commit_number', help='SHA number of the commit used for the new release')
+parser.add_argument('--target-commitish', dest='target_commitish', help='Branch name or SHA number of the commit used '
+                                                                        'for the new release')
 parser.add_argument('--release-version', dest='release_version', help='version of the new release')
 
 args = parser.parse_args()
@@ -161,7 +162,7 @@ try:
                     bugtraq_id=args.bugtraq_id,
                     dest_folder=args.dest_folder,
                     create_release=args.create_release,
-                    commit_number=args.commit_number,
+                    target_commitish=args.target_commitish,
                     release_version=args.release_version)
     local.call(operations[args.action])
 except KeyboardInterrupt:
