@@ -15,17 +15,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import os
 from argparse import ArgumentParser
+from os.path import join
 from random import shuffle
-from os.path import join, dirname
 
 from openwebvulndb import app
+from openwebvulndb.common.release import GitHubRelease
 from .repository import WordPressRepository
 from .vane import VaneImporter, VaneVersionRebuild
-from ..common.parallel import ParallelWorker
-from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, download_vulnerability_entry
 from .vane2.exporter import Exporter
+from ..common.config import EXPORT_PATH
 from ..common.logs import logger
+from ..common.parallel import ParallelWorker
+from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
+    download_vulnerability_entry
 
 
 def list_plugins(loop, repository):
@@ -55,30 +59,43 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, input_path):
-    if input_path:
-        input_path = join(dirname(__file__), input_path)
-    else:
-        input_path = dirname(__file__)
-
+def vane2_export(storage, aiohttp_session, loop, create_release=False, target_commitish=None, release_version=None):
+    export_path = EXPORT_PATH
     exporter = Exporter(storage)
 
-    equal_versions = exporter.export_wordpress(input_path)
+    environment_variables = ["VANE2_REPO_OWNER", "VANE2_REPO_NAME", "VANE2_REPO_PASSWORD"]
+    for env_variable in environment_variables:
+        if env_variable not in os.environ:
+            logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
+            return
+
+    equal_versions = exporter.export_wordpress(export_path)
     for version in equal_versions:
         logger.info(version)
-    exporter.dump_meta("wordpress", input_path)
+    exporter.dump_meta("wordpress", export_path)
 
-    exporter.export_plugins(input_path, only_popular=True)
-    exporter.export_plugins(input_path, only_vulnerable=True)
-    exporter.export_plugins(input_path)
-    exporter.dump_meta("plugins", input_path)
+    exporter.export_plugins(export_path, only_popular=True)
+    exporter.export_plugins(export_path, only_vulnerable=True)
+    exporter.export_plugins(export_path)
+    exporter.dump_meta("plugins", export_path)
 
-    exporter.export_themes(input_path, only_popular=True)
-    exporter.export_themes(input_path, only_vulnerable=True)
-    exporter.export_themes(input_path)
-    exporter.dump_meta("themes", input_path)
+    exporter.export_themes(export_path, only_popular=True)
+    exporter.export_themes(export_path, only_vulnerable=True)
+    exporter.export_themes(export_path)
+    exporter.dump_meta("themes", export_path)
+    
+    exporter.export_vulnerabilities(export_path)
 
-    exporter.export_vulnerabilities(input_path)
+    github_release = GitHubRelease(aiohttp_session)
+    github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
+                                           os.environ["VANE2_REPO_NAME"])
+    try:
+        loop.run_until_complete(github_release.release_data(export_path, "vane2_data_", create_release, target_commitish,
+                                                            release_version))
+        logger.info("Vane data successfully released.")
+    except (Exception, RuntimeError, ValueError) as e:
+        logger.exception(e)
+    aiohttp_session.close()
 
 
 def populate_versions(loop, repository_hasher, storage):
@@ -130,6 +147,10 @@ parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
 parser.add_argument('-f', '--input-file', dest='input_file',
                     help='Cached input file')
+parser.add_argument('--create-release', dest='create_release', action='store_true', help='Create a new GitHub release')
+parser.add_argument('--target-commitish', dest='target_commitish', help='Branch name or SHA number of the commit used '
+                                                                        'for the new release')
+parser.add_argument('--release-version', dest='release_version', help='version of the new release')
 
 args = parser.parse_args()
 
@@ -139,7 +160,10 @@ try:
                     input_path=args.input_path,
                     input_file=args.input_file,
                     bugtraq_id=args.bugtraq_id,
-                    dest_folder=args.dest_folder)
+                    dest_folder=args.dest_folder,
+                    create_release=args.create_release,
+                    target_commitish=args.target_commitish,
+                    release_version=args.release_version)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass

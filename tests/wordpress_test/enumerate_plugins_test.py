@@ -16,11 +16,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from yarl import URL
-from aiohttp import ClientResponse, ClientTimeoutError
+from aiohttp import ClientResponse
+from asyncio import TimeoutError
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file, async_test, fake_future
+from fixtures import read_file, async_test, fake_future, ClientSessionMock
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
 from openwebvulndb.common import Meta, Repository
@@ -154,8 +155,8 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'better-wp-security.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock())
-        handler.session.get.return_value = fake_future(my_response, loop)
+        aiohttp_session = ClientSessionMock(get_response=my_response)
+        handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session)
 
         plugin = await handler.fetch_plugin('better-wp-security')
 
@@ -165,7 +166,7 @@ class EnumeratePluginsTest(TestCase):
     @async_test()
     async def test_fetch_plugin_fails_to_request(self, loop):
         handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock())
-        handler.session.get.side_effect = ClientTimeoutError()
+        handler.session.get.side_effect = TimeoutError()
 
         with self.assertRaises(RepositoryUnreachable):
             await handler.fetch_plugin('better-wp-security')
@@ -184,8 +185,8 @@ class EnumeratePluginsTest(TestCase):
         my_response.headers = {'Content-Type': 'application/json'}
         my_response._content = read_file(__file__, 'popular-plugins.json').encode('utf8')
 
-        handler = WordPressRepository(loop=loop, aiohttp_session=MagicMock(), storage=MagicMock())
-        handler.session.get.return_value = fake_future(my_response, loop)
+        aiohttp_session = ClientSessionMock(get_response=my_response)
+        handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session, storage=MagicMock())
         handler.storage.read_meta.side_effect = [meta_1, meta_2, meta_3]
 
         await handler.mark_popular_plugins()

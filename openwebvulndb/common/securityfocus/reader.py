@@ -31,13 +31,12 @@ match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plug
 
 class SecurityFocusReader:
 
-    def __init__(self, storage, vulnerability_manager=None, aiohttp_session=None):
+    def __init__(self, storage, vulnerability_manager=None):
         self.storage = storage
         if vulnerability_manager is None:
             self.vulnerability_manager = VulnerabilityManager(storage=storage)
         else:
             self.vulnerability_manager = vulnerability_manager
-        self.aiohttp_session = aiohttp_session
         self.cpe_mapper = CPEMapper(storage=storage)
         self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()

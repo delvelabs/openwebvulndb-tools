@@ -58,11 +58,10 @@ class WordPressRepository:
 
     async def fetch(self, url, parser):
         try:
-            response = await self.session.get(url)
-            data = await response.text()
-            response.close()
-
-            return parser.parse(data)
+            async with self.session.get(url) as response:
+                data = await response.text()
+                response.close()
+                return parser.parse(data)
         except SoftwareNotFound:
             raise
         except:
@@ -93,22 +92,20 @@ class WordPressRepository:
         return await self._mark_popular_from_api("themes", 100)
 
     async def _mark_popular_from_api(self, group, count):
-        response = await self.session.get('http://api.wordpress.org/{group}/info/1.1/'
+        async with self.session.get('http://api.wordpress.org/{group}/info/1.1/'
                                           '?action=query_{group}&request[browse]=popular&request[per_page]={count}'.
-                                          format(group=group, count=count))
-        data = await response.json()
-        response.close()
+                                          format(group=group, count=count)) as response:
+            data = await response.json()
+            for entry in data[group]:
+                slug = "{group}/{partial}".format(group=group, partial=entry["slug"])
+                try:
+                    meta = self.storage.read_meta(slug)
+                    meta.is_popular = True
 
-        for entry in data[group]:
-            slug = "{group}/{partial}".format(group=group, partial=entry["slug"])
-            try:
-                meta = self.storage.read_meta(slug)
-                meta.is_popular = True
-
-                if meta.dirty:
-                    self.storage.write_meta(meta)
-            except FileNotFoundError:
-                logger.warn("%s/META.json not found for popular plugin", slug)
+                    if meta.dirty:
+                        self.storage.write_meta(meta)
+                except FileNotFoundError:
+                    logger.warn("%s/META.json not found for popular plugin", slug)
 
     async def perform_lookup(self, current, obtain, fetch, default):
         current = current()
