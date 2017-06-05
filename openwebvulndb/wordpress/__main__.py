@@ -69,22 +69,22 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
             logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
             return
 
-    # equal_versions = exporter.export_wordpress(export_path)
-    # for version in equal_versions:
-    #     logger.info(version)
-    # exporter.dump_meta("wordpress", export_path)
-    #
-    # exporter.export_plugins(export_path, only_popular=True)
-    # exporter.export_plugins(export_path, only_vulnerable=True)
-    # exporter.export_plugins(export_path)
-    # exporter.dump_meta("plugins", export_path)
-    #
-    # exporter.export_themes(export_path, only_popular=True)
-    # exporter.export_themes(export_path, only_vulnerable=True)
-    # exporter.export_themes(export_path)
-    # exporter.dump_meta("themes", export_path)
-    #
-    # exporter.export_vulnerabilities(export_path)
+    equal_versions = exporter.export_wordpress(export_path)
+    for version in equal_versions:
+        logger.info(version)
+    exporter.dump_meta("wordpress", export_path)
+
+    exporter.export_plugins(export_path, only_popular=True)
+    exporter.export_plugins(export_path, only_vulnerable=True)
+    exporter.export_plugins(export_path)
+    exporter.dump_meta("plugins", export_path)
+
+    exporter.export_themes(export_path, only_popular=True)
+    exporter.export_themes(export_path, only_vulnerable=True)
+    exporter.export_themes(export_path)
+    exporter.dump_meta("themes", export_path)
+    
+    exporter.export_vulnerabilities(export_path)
 
     github_release = GitHubRelease(aiohttp_session)
     github_release.set_repository_settings(os.environ["VANE2_REPO_OWNER"], os.environ["VANE2_REPO_PASSWORD"],
