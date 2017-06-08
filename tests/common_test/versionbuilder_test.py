@@ -126,3 +126,31 @@ class TestVersionBuilder(TestCase):
         self.assertIn("file1", file_paths)
         self.assertIn("file2", file_paths)
         self.assertIn("file3", file_paths)
+
+    def test_get_file_paths_from_version_list_exclude_files_beginning_with_trunk(self):
+        signature0 = Signature(path="wp-content/plugins/my-plugin/trunk/file0", hash="1")
+        signature1 = Signature(path="wp-content/plugins/my-plugin/file1", hash="2")
+        signature2 = Signature(path="wp-content/plugins/my-plugin/file2", hash="3")
+        signature3 = Signature(path="wp-content/plugins/my-plugin/trunk/file3", hash="4")
+        version = VersionDefinition(version="1.2", signatures=[signature0, signature1, signature2, signature3])
+        version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
+
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        self.assertEqual(len(file_paths), 2)
+        self.assertIn(signature1.path, file_paths)
+        self.assertIn(signature2.path, file_paths)
+
+    def test_get_file_paths_from_version_list_exclude_files_beginning_with_tags(self):
+        signature0 = Signature(path="wp-content/plugins/my-plugin/tags/1.0/file0", hash="1")
+        signature1 = Signature(path="wp-content/plugins/my-plugin/file1", hash="2")
+        signature2 = Signature(path="wp-content/plugins/my-plugin/file2", hash="3")
+        signature3 = Signature(path="wp-content/plugins/my-plugin/tags/1.0/file3", hash="4")
+        version = VersionDefinition(version="1.2", signatures=[signature0, signature1, signature2, signature3])
+        version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
+
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        self.assertEqual(len(file_paths), 2)
+        self.assertIn(signature1.path, file_paths)
+        self.assertIn(signature2.path, file_paths)

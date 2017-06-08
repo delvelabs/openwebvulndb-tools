@@ -61,5 +61,13 @@ class VersionBuilder:
         file_paths = set()
         for version_definition in version_list.versions:
             for signature in version_definition.signatures:
-                file_paths.add(signature.path)
+                if not self.exclude_file(signature.path, version_list.key):
+                    file_paths.add(signature.path)
         return list(file_paths)
+
+    def exclude_file(self, file_path, key):
+        exclude_trunk = "wp-content/%s/trunk/" % key
+        exclude_tags = "wp-content/%s/tags/" % key
+        if exclude_tags in file_path or exclude_trunk in file_path:
+            return True
+        return False

@@ -124,7 +124,7 @@ def find_svn_fails(storage):
         try:
             file_list = storage._read(FileListSchema(), key, 'versions_new.json')
             for file in file_list.files:
-                if "%s/tags/" % key in file.path:
+                if "%s/branches/" % key in file.path:
                     tag_fails += 1
                     key_fail = True
             if key_fail:
