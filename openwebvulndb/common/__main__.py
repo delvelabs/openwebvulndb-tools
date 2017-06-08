@@ -18,6 +18,8 @@
 from argparse import ArgumentParser
 
 from openwebvulndb import app
+from .versionbuilder import VersionBuilder
+from .schemas import FileListSchema
 
 
 def find_identity_files(storage, input_key):
@@ -47,8 +49,97 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                 if not v.affected_versions or any(r.fixed_in is None for r in v.affected_versions):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
+
+def change_version_format(storage, keep_old=True):
+    version_builder = VersionBuilder()
+    keys = ["mu", "wordpress", "plugins", "themes"]
+    for key in keys:
+        for _key in storage.list_directories(key):
+            keys.append("{0}/{1}".format(key, _key))
+    for key in keys:
+        print(key)
+        try:
+            version_list = storage.read_versions(key)
+            file_list = version_builder.create_file_list_from_version_list(version_list)
+            if file_list is not None:
+                if keep_old:
+                    storage._write(FileListSchema(), file_list, "versions_new.json")
+                else:
+                    storage._write(FileListSchema(), file_list, "versions.json")
+        except FileNotFoundError:
+            pass
+
+
+def check_if_old_versions_equal_new_versions(storage):
+    keys = ["mu", "wordpress", "plugins", "themes"]
+    for key in keys:
+        for _key in storage.list_directories(key):
+            keys.append("{0}/{1}".format(key, _key))
+    count = 0
+    for key in keys:
+        try:
+            version_list = storage.read_versions(key)
+            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
+            total_files = set()
+            for version_definition in version_list.versions:
+                for signature in version_definition.signatures:
+                    total_files.add(signature.path)
+            if len(total_files) != len(file_list.files):
+                print("Error, missing file for %s" % key)
+            else:
+                for file in file_list.files:
+                    check_if_hash_and_version_for_files_are_ok(file, version_list)
+            count += 1
+        except FileNotFoundError:
+            pass
+    print("%d files checked" % count)
+
+
+def check_if_hash_and_version_for_files_are_ok(file, version_list):
+    file_path = file.path
+    hash_versions = {}
+    for version_definition in version_list.versions:
+        for signature in version_definition.signatures:
+            if signature.path == file_path:
+                if signature.hash in hash_versions:
+                    hash_versions[signature.hash].add(version_definition.version)
+                else:
+                    hash_versions[signature.hash] = {version_definition.version}
+
+    for file_signature in file.signatures:
+        if len(file_signature.versions) != len(hash_versions[file_signature.hash]) or len(file_signature.versions) != \
+                len(set(version for version in file_signature.versions) & hash_versions[file_signature.hash]):
+            print("Error, missing version for {0} in {1}".format(file_path, version_list.key))
+
+
+def find_svn_fails(storage):
+    tag_fails = 0
+    key_fails = 0
+    keys = ["mu", "wordpress", "plugins", "themes"]
+    for key in keys:
+        for _key in storage.list_directories(key):
+            keys.append("{0}/{1}".format(key, _key))
+    for key in keys:
+        key_fail = False
+        try:
+            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
+            for file in file_list.files:
+                if "%s/tags/" % key in file.path:
+                    tag_fails += 1
+                    key_fail = True
+            if key_fail:
+                key_fails += 1
+        except FileNotFoundError:
+            pass
+    print(tag_fails)
+    print(key_fails)
+
+
 operations = dict(find_identity_files=find_identity_files,
-                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities)
+                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
+                  change_version_format=change_version_format,
+                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions,
+                  find_svn_fails=find_svn_fails)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")

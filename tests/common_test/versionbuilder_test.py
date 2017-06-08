@@ -26,11 +26,48 @@ class TestVersionBuilder(TestCase):
     def setUp(self):
         self.version_builder = VersionBuilder()
 
-    def test_create_from_version_list_file_create_file_with_all_file_signatures_for_file_path(self):
+    def test_create_file_list_from_version_list_return_all_hash_regroup_by_files(self):
+        signature0 = Signature(path="file", hash="12345")
+        signature1 = Signature(path="readme", hash="54321")
+        signature2 = Signature(path="readme", hash="56789")
+        version0 = VersionDefinition(version="1.0", signatures=[signature0, signature1])
+        version1 = VersionDefinition(version="1.1", signatures=[signature0, signature1])
+        version2 = VersionDefinition(version="1.2", signatures=[signature0, signature2])
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+
+        file_list = self.version_builder.create_file_list_from_version_list(version_list)
+
+        file = [file for file in file_list.files if file.path == "file"][0]
+        self.assertEqual(file.path, "file")
+        self.assertEqual(len(file.signatures), 1)
+        self.assertEqual(file.signatures[0].hash, "12345")
+        self.assertEqual(len(file.signatures[0].versions), 3)
+
+        readme = [file for file in file_list.files if file.path == "readme"][0]
+        self.assertEqual(readme.path, "readme")
+        self.assertEqual(len(readme.signatures), 2)
+        self.assertEqual(readme.signatures[0].hash, "54321")
+        self.assertEqual(len(readme.signatures[0].versions), 2)
+        self.assertIn("1.0", readme.signatures[0].versions)
+        self.assertIn("1.1", readme.signatures[0].versions)
+        self.assertEqual(readme.signatures[1].hash, "56789")
+        self.assertEqual(readme.signatures[1].versions, ["1.2"])
+
+    def test_create_file_list_from_version_list_return_none_if_no_signature_in_version_definitions(self):
+        version0 = VersionDefinition(version="1.0")
+        version1 = VersionDefinition(version="1.1")
+        version2 = VersionDefinition(version="1.2")
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+
+        file_list = self.version_builder.create_file_list_from_version_list(version_list)
+
+        self.assertIsNone(file_list)
+
+    def test_create_file_from_version_list_file_create_file_with_all_file_signatures_for_file_path(self):
         version_list = VersionList(producer="producer", key="key", versions=[])
         self.version_builder.get_file_signatures = MagicMock(return_value=["signatures"])
 
-        file = self.version_builder.create_from_version_list("file", version_list)
+        file = self.version_builder.create_file_from_version_list("file", version_list)
 
         self.assertEqual(file.path, "file")
         self.version_builder.get_file_signatures.assert_called_once_with("file", version_list)
