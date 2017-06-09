@@ -24,9 +24,13 @@ from openwebvulndb.common.models import Signature, VersionDefinition, VersionLis
 class TestVersionBuilder(TestCase):
 
     def setUp(self):
+        def exclude_useless_files_for_identification(file_paths, version_list):
+            return file_paths
         self.version_builder = VersionBuilder()
+        self.version_builder.exclude_useless_files_for_identification = exclude_useless_files_for_identification
 
     def test_create_file_list_from_version_list_return_all_hash_regroup_by_files(self):
+
         signature0 = Signature(path="file", hash="12345")
         signature1 = Signature(path="readme", hash="54321")
         signature2 = Signature(path="readme", hash="56789")
@@ -154,3 +158,103 @@ class TestVersionBuilder(TestCase):
         self.assertEqual(len(file_paths), 2)
         self.assertIn(signature1.path, file_paths)
         self.assertIn(signature2.path, file_paths)
+
+    def test_limit_files_amount_keep_all_files_if_total_lower_than_limit(self):
+        max_files = 100
+        version = VersionDefinition(version="1.2")
+        for i in range(0, 99):
+            version.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+        version_list = VersionList(producer="producer", key="key", versions=[version])
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        filtered_file_paths = self.version_builder.limit_files_amount(file_paths, version_list, max_files)
+
+        self.assertEqual(file_paths, filtered_file_paths)
+
+    def test_limit_files_amount_remove_exceeding_files_arbitrarily_if_all_files_have_same_value_for_identification(self):
+        max_files = 100
+        version = VersionDefinition(version="1.2")
+        for i in range(0, 200):
+            version.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+        version_list = VersionList(producer="producer", key="key", versions=[version])
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        filtered_file_paths = self.version_builder.limit_files_amount(file_paths, version_list, max_files)
+
+        self.assertEqual(len(filtered_file_paths), max_files)
+
+    def test_limit_files_amount_keep_best_files_for_version_identification(self):
+        max_files = 50
+        version0 = VersionDefinition(version="1.0")
+        version1 = VersionDefinition(version="1.1")
+        version2 = VersionDefinition(version="1.2")
+        for i in range(0, 50):
+            useless_signature = Signature(path="file%d" % i, hash=str(i))
+            version0.signatures.append(useless_signature)
+            version1.signatures.append(useless_signature)
+            version2.signatures.append(useless_signature)
+
+        for i in range(0, 50):
+            version0.signatures.append(Signature(path="%dfile" % i, hash=str(i)))
+            version1.signatures.append(Signature(path="%dfile" % i, hash="A%d" % i))
+            version2.signatures.append(Signature(path="%dfile" % i, hash="B%d" % i))
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        filtered_file_paths = self.version_builder.limit_files_amount(file_paths, version_list, max_files)
+
+        self.assertTrue(all(path.endswith("file") for path in filtered_file_paths))
+        self.assertEqual(len(filtered_file_paths), max_files)
+
+    def test_limit_files_amount_keep_at_most_max_files(self):
+        max_files = 50
+        version0 = VersionDefinition(version="1.0")  # 100 files, 50 will be kept
+        version1 = VersionDefinition(version="1.1")  # 50 diff between 1.1 and 1.0, 25 will be kept
+        version2 = VersionDefinition(version="1.2")  # 25 diff between 1.2 and 1.1, 25 will be kept
+        for i in range(0, 100):
+            version0.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+
+        version1.signatures.extend(version0.signatures)
+        for i in range(0, 50):
+            version1.signatures[i] = Signature(path="file%d" % i, hash="%dA" % i)
+        version2.signatures.extend(version1.signatures)
+        for i in range(75, 100):
+            version2.signatures[i] = Signature(path="file%d" % i, hash="%dA" % i)
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        filtered_file_paths = self.version_builder.limit_files_amount(file_paths, version_list, max_files)
+
+        self.assertEqual(len(filtered_file_paths), max_files)
+
+    def test_get_diff_between_versions_return_all_files_that_differ_or_appear_between_versions(self):
+        version0 = VersionDefinition(version="1.0")
+        version1 = VersionDefinition(version="1.1")
+        version2 = VersionDefinition(version="1.2")
+        for i in range(0, 5):  # All versions are equal
+            same_signature = Signature(path="file%d" % i, hash=str(i))
+            version0.signatures.append(same_signature)
+            version1.signatures.append(same_signature)
+            version2.signatures.append(same_signature)
+        for i in range(5, 10):  # 5 diff between each version
+            version0.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+            version1.signatures.append(Signature(path="file%d" % i, hash="A%d" % i))
+            version2.signatures.append(Signature(path="file%d" % i, hash="B%d" % i))
+        for i in range(10, 15):  # 10 diff between 1.0 and 1.1
+            version0.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+            version1.signatures.append(Signature(path="file%d" % i, hash="A%d" % i))
+            version2.signatures.append(Signature(path="file%d" % i, hash="A%d" % i))
+        for i in range(15, 20):  # 10 diff between 1.1 and 1.2
+            version0.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+            version1.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+            version2.signatures.append(Signature(path="file%d" % i, hash="A%d" % i))
+        for i in range(20, 25):  # 15 diff between 1.1 and 1.2
+            version1.signatures.append(Signature(path="file%d" % i, hash=str(i)))
+            version2.signatures.append(Signature(path="file%d" % i, hash="A%d" % i))
+
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+
+        diff_list = self.version_builder._get_diff_between_versions(version_list)
+
+        self.assertEqual(len(diff_list["1.1"]), 10)
+        self.assertEqual(len(diff_list["1.2"]), 10)

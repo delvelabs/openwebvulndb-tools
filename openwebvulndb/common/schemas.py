@@ -189,7 +189,7 @@ class FileSignatureSchema(Schema):
         ordered = True
 
     hash = fields.String(required=True)
-    algo = fields.String(required=True)
+    #algo = fields.String(required=True)
     versions = fields.List(fields.String, required=False)
 
     @post_load

@@ -20,6 +20,8 @@ from argparse import ArgumentParser
 from openwebvulndb import app
 from .versionbuilder import VersionBuilder
 from .schemas import FileListSchema
+import re
+from collections import Counter
 
 
 def find_identity_files(storage, input_key):
@@ -52,12 +54,14 @@ def find_unclosed_vulnerabilities(storage, input_filter):
 
 def change_version_format(storage, keep_old=True):
     version_builder = VersionBuilder()
-    keys = ["mu", "wordpress", "plugins", "themes"]
+    keys = ["themes/simple-business-wp_zj_test"]#["mu", "wordpress", "plugins", "themes"]
+    #for key in keys:
+    #    for _key in storage.list_directories(key):
+    #        keys.append("{0}/{1}".format(key, _key))
+    progress = 0
     for key in keys:
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    for key in keys:
-        print(key)
+        progress += 1
+        print_progress("{0} / {1} component".format(progress, len(keys)))
         try:
             version_list = storage.read_versions(key)
             file_list = version_builder.create_file_list_from_version_list(version_list)
@@ -135,11 +139,63 @@ def find_svn_fails(storage):
     print(key_fails)
 
 
+def find_lib(storage):
+    libs = []
+    keys = ["mu", "wordpress", "plugins", "themes"]
+    for key in keys:
+        for _key in storage.list_directories(key):
+            keys.append("{0}/{1}".format(key, _key))
+    progress = 0
+    for key in keys:
+        progress += 1
+        print_progress("{0} / {1} component".format(progress, len(keys)))
+        try:
+            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
+            for file in file_list.files:
+                if "/lib/" in file.path:
+                    lib = re.search("/lib/[^/]+/", file.path)
+                    if lib is not None:
+                        libs.append(lib.group())
+        except FileNotFoundError:
+            pass
+    libs = Counter(libs)
+    for lib in libs.most_common():
+        print(lib)
+
+
+def print_progress(string):
+    print("\r%s" % string, end="")
+
+
+def count_files_per_component(storage):
+    def sort_by_files(file_list):
+        return len(file_list.files)
+    component_files = []
+    keys = ["mu", "wordpress", "plugins", "themes"]
+    progress = 0
+    for key in keys:
+        progress += 1
+        print_progress("{0} / {1} component".format(progress, len(keys)))
+        for _key in storage.list_directories(key):
+            keys.append("{0}/{1}".format(key, _key))
+    for key in keys:
+        try:
+            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
+            if len(file_list.files) != 0:
+                component_files.append(file_list)
+        except FileNotFoundError:
+            pass
+    component_files = sorted(component_files, key=sort_by_files, reverse=True)
+    with open("file_path_count2", "wt") as fp:
+        for component in component_files:
+            fp.write("{0}: {1} files\n".format(component.key, len(component.files)))
+
+
 operations = dict(find_identity_files=find_identity_files,
                   find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
                   change_version_format=change_version_format,
-                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions,
-                  find_svn_fails=find_svn_fails)
+                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions, find_lib=find_lib,
+                  find_svn_fails=find_svn_fails, count_files_per_component=count_files_per_component)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
