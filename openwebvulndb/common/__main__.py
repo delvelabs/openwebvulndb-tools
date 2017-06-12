@@ -19,7 +19,7 @@ from argparse import ArgumentParser
 
 from openwebvulndb import app
 from .versionbuilder import VersionBuilder
-from .schemas import FileListSchema
+from .schemas import FileListSchema, VersionListSchema
 import re
 from collections import Counter
 
@@ -116,53 +116,6 @@ def check_if_hash_and_version_for_files_are_ok(file, version_list):
             print("Error, missing version for {0} in {1}".format(file_path, version_list.key))
 
 
-def find_svn_fails(storage):
-    tag_fails = 0
-    key_fails = 0
-    keys = ["mu", "wordpress", "plugins", "themes"]
-    for key in keys:
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    for key in keys:
-        key_fail = False
-        try:
-            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
-            for file in file_list.files:
-                if "%s/branches/" % key in file.path:
-                    tag_fails += 1
-                    key_fail = True
-            if key_fail:
-                key_fails += 1
-        except FileNotFoundError:
-            pass
-    print(tag_fails)
-    print(key_fails)
-
-
-def find_lib(storage):
-    libs = []
-    keys = ["mu", "wordpress", "plugins", "themes"]
-    for key in keys:
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    progress = 0
-    for key in keys:
-        progress += 1
-        print_progress("{0} / {1} component".format(progress, len(keys)))
-        try:
-            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
-            for file in file_list.files:
-                if "/lib/" in file.path:
-                    lib = re.search("/lib/[^/]+/", file.path)
-                    if lib is not None:
-                        libs.append(lib.group())
-        except FileNotFoundError:
-            pass
-    libs = Counter(libs)
-    for lib in libs.most_common():
-        print(lib)
-
-
 def print_progress(string):
     print("\r%s" % string, end="")
 
@@ -194,8 +147,8 @@ def count_files_per_component(storage):
 operations = dict(find_identity_files=find_identity_files,
                   find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
                   change_version_format=change_version_format,
-                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions, find_lib=find_lib,
-                  find_svn_fails=find_svn_fails, count_files_per_component=count_files_per_component)
+                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions,
+                  count_files_per_component=count_files_per_component)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
