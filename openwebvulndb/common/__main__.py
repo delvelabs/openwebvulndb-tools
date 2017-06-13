@@ -19,9 +19,7 @@ from argparse import ArgumentParser
 
 from openwebvulndb import app
 from .versionbuilder import VersionBuilder
-from .schemas import FileListSchema, VersionListSchema
-import re
-from collections import Counter
+from .schemas import FileListSchema
 
 
 def find_identity_files(storage, input_key):
