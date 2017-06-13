@@ -189,7 +189,6 @@ class FileSignatureSchema(Schema):
         ordered = True
 
     hash = fields.String(required=True)
-    algo = fields.String(required=True)
     versions = fields.List(fields.String, required=False)
 
     @post_load
@@ -215,6 +214,7 @@ class FileListSchema(Schema):
 
     key = fields.String(required=True)
     producer = fields.String(required=True)
+    hash_algo = fields.String(required=True)
     files = fields.Nested(FileSchema, many=True, required=False)
 
     @post_load

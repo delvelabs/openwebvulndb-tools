@@ -26,40 +26,27 @@ class VersionBuilder:
         self.exclude_files(version_list)
         if self.is_version_list_empty(version_list):
             return None
-        self.recreate_version_list(version_list, files_to_keep_per_version)
+        self._shrink_version_list(version_list, files_to_keep_per_version)
         file_list = FileList(key=version_list.key, producer=version_list.producer)
         file_paths = self.get_file_paths_from_version_list(version_list)
         for file_path in file_paths:
-            file = self.create_file_from_version_list(file_path, version_list)
+            file = self._create_file_from_version_list(file_path, version_list)
             file_list.files.append(file)
         return file_list
 
-    def create_file_from_version_list(self, file_path, version_list):
-        file_signatures = self.get_file_signatures(file_path, version_list)
-        return File(path=file_path, signatures=file_signatures)
-
-    def get_file_signatures(self, file_path, version_list):
-        file_signatures = []
+    def _create_file_from_version_list(self, file_path, version_list):
+        file = File(path=file_path)
         for version_definition in version_list.versions:
             signature = self.get_signature(file_path, version_definition)
             if signature is not None:
-                hash = signature.hash
-                file_signature = self.get_file_signature_for_hash(hash, file_signatures)
+                file_signature = file.get_signature(signature.hash, create_missing=True)
                 file_signature.versions.append(version_definition.version)
-        return file_signatures
+        return file
 
     def get_signature(self, file_path, version_definition):
         for signature in version_definition.signatures:
             if file_path == signature.path:
                 return signature
-
-    def get_file_signature_for_hash(self, hash, files_signature_list):
-        for file_signature in files_signature_list:
-            if hash == file_signature.hash:
-                return file_signature
-        file_signature = FileSignature(hash=hash)
-        files_signature_list.append(file_signature)
-        return file_signature
 
     def get_file_paths_from_version_list(self, version_list):
         file_paths = set()
@@ -81,7 +68,7 @@ class VersionBuilder:
                 files_to_keep = set(self.get_file_paths_in_version_definition(version_definition)) - files_to_remove
                 self._remove_files_from_version(version_definition, files_to_keep)
 
-    def recreate_version_list(self, version_list, files_per_version):
+    def _shrink_version_list(self, version_list, files_per_version):
         if any(len(version.signatures) > files_per_version for version in version_list.versions):
             if len(version_list.versions) == 1:
                 # will return a set of arbitrarily chosen files.
@@ -195,15 +182,6 @@ class VersionImporter:
         for file in file_list.files:
             for file_signature in file.signatures:
                 for version in file_signature.versions:
-                    version_definition = self.get_version_definition(version, version_list)
-                    signature = Signature(path=file.path, hash=file_signature.hash, algo=file_signature.algo)
-                    version_definition.signatures.append(signature)
+                    version_definition = version_list.get_version(version, create_missing=True)
+                    version_definition.add_signature(path=file.path, hash=file_signature.hash, algo=file_list.hash_algo)
         return version_list
-
-    def get_version_definition(self, version, version_list):
-        for version_definition in version_list.versions:
-            if version_definition.version == version:
-                return version_definition
-        version_definition = VersionDefinition(version=version)
-        version_list.versions.append(version_definition)
-        return version_definition

@@ -137,7 +137,7 @@ class VersionRebuild:
                 if signature.hash in signatures:
                     signatures[signature.hash].versions.append(version.version)
                 else:
-                    file_signature = FileSignature(hash=signature.hash, algo=signature.algo)
+                    file_signature = FileSignature(hash=signature.hash)
                     file_signature.versions.append(version.version)
                     signatures[signature.hash] = file_signature
         return [file_signature for file_signature in signatures.values()]

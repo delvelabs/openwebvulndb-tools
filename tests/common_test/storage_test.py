@@ -45,20 +45,19 @@ VERSIONS_FILE_DATA = """
 {
     "key": "plugins/better-wp-security",
     "producer": "SubversionFetcher",
+    "hash_algo": "SHA256",
     "files": [
         {
             "path": "wp-content/plugins/better-wp-security/readme.txt",
             "signatures": [
                 {
                     "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    "algo": "SHA256",
                     "versions": [
                         "1.0"
                     ]
                 },
                 {
                     "hash": "266b841cbf4e462e1ddd6b8d59cb2e0678182f13525d6e16221676a9066cbd78",
-                    "algo": "SHA256",
                     "versions": [
                         "1.1"
                     ]

@@ -260,9 +260,10 @@ class FileListGroup(Model):
 
 class FileList(Model):
 
-    def init(self, *, producer, key, files=None):
+    def init(self, *, producer, key, hash_algo="SHA256", files=None):
         self.producer = producer
         self.key = key
+        self.hash_algo = hash_algo
         self.files = files or []
 
 
@@ -272,10 +273,19 @@ class File(Model):
         self.path = path
         self.signatures = signatures or []
 
+    def get_signature(self, hash, *, create_missing=False):
+        for signature in self.signatures:
+            if signature.hash == hash:
+                return signature
+        if create_missing:
+            signature = FileSignature(hash=hash)
+            self.signatures.append(signature)
+            return signature
+        return None
+
 
 class FileSignature(Model):
 
-    def init(self, *, hash, algo="SHA256", versions=None):
+    def init(self, *, hash, versions=None):
         self.hash = hash
-        self.algo = algo
         self.versions = versions or []

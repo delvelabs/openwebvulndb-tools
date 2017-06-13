@@ -19,7 +19,7 @@ from argparse import ArgumentParser
 
 from openwebvulndb import app
 from .versionbuilder import VersionBuilder
-from .schemas import FileListSchema
+from .schemas import FileListSchema, VersionListSchema
 
 
 def find_identity_files(storage, input_key):
@@ -61,7 +61,7 @@ def change_version_format(storage, keep_old=True):
         progress += 1
         print_progress("{0} / {1} component".format(progress, len(keys)))
         try:
-            version_list = storage.read_versions(key)
+            version_list = storage._read(VersionListSchema(), key, "versions.json")
             file_list = version_builder.create_file_list_from_version_list(version_list)
             if file_list is not None:
                 if keep_old:
