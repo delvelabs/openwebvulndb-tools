@@ -17,7 +17,7 @@
 
 from unittest import TestCase
 from unittest.mock import MagicMock
-from openwebvulndb.common.versionbuilder import VersionBuilder
+from openwebvulndb.common.versionbuilder import VersionBuilder, VersionImporter
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList, FileSignature, File, FileList
 
 
@@ -367,3 +367,29 @@ class TestVersionBuilder(TestCase):
         diff = self.version_builder._compare_versions_signatures(previous_version, current_version)
 
         self.assertEqual(len(diff), 0)
+
+
+class TestVersionImporter(TestCase):
+
+    def setUp(self):
+        self.importer = VersionImporter()
+
+    def test_import_version_list(self):
+        file_list = FileList(key="key", producer="producer")
+        for i in range(10):
+            file = File(path="file%d" % i)
+            for j in range(5):
+                file.signatures.append(FileSignature(hash=j+i, algo="SHA256", versions=["1.%d" % j]))
+            file_list.files.append(file)
+
+        version_list = self.importer.import_version_list(file_list)
+
+        self.assertEqual(version_list.key, file_list.key)
+        self.assertEqual(version_list.producer, file_list.producer)
+        self.assertEqual(len(version_list.versions), 5)
+        for version in version_list.versions:
+            self.assertEqual(len(version.signatures), 10)
+            for i in range(10):
+                self.assertIn("file%d" % i, [signature.path for signature in version.signatures])
+                signature = version.signatures[i]
+                self.assertEqual(signature.hash, int(version.version[-1]) + int(signature.path[-1]))

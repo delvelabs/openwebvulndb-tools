@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from .models import FileSignature, File, FileList
+from .models import FileSignature, File, FileList, VersionList, VersionDefinition, Signature
 from collections import Counter
 from .version import parse
 
@@ -185,3 +185,25 @@ class VersionBuilder:
     def is_version_list_empty(self, version_list):
         if len(version_list.versions) == 0 or all(len(version.signatures) == 0 for version in version_list.versions):
             return True
+
+
+class VersionImporter:
+    """Convert a FileList model to a VersionList model."""
+
+    def import_version_list(self, file_list):
+        version_list = VersionList(key=file_list.key, producer=file_list.producer)
+        for file in file_list.files:
+            for file_signature in file.signatures:
+                for version in file_signature.versions:
+                    version_definition = self.get_version_definition(version, version_list)
+                    signature = Signature(path=file.path, hash=file_signature.hash, algo=file_signature.algo)
+                    version_definition.signatures.append(signature)
+        return version_list
+
+    def get_version_definition(self, version, version_list):
+        for version_definition in version_list.versions:
+            if version_definition.version == version:
+                return version_definition
+        version_definition = VersionDefinition(version=version)
+        version_list.versions.append(version_definition)
+        return version_definition

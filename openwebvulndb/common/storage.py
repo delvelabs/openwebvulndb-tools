@@ -21,10 +21,11 @@ from os.path import join, dirname
 from os import makedirs, scandir, walk
 from contextlib import contextmanager
 
-from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema
+from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema, FileListSchema
 from .serialize import serialize
 from .config import DEFAULT_PATH
 from .logs import logger
+from .versionbuilder import VersionImporter, VersionBuilder
 
 
 class Storage:
@@ -59,10 +60,14 @@ class Storage:
                 yield self.read_vulnerabilities(key, parts.group(1))
 
     def write_versions(self, vlist):
-        self._write(VersionListSchema(), vlist, "versions.json")
+        exporter = VersionBuilder()
+        file_list = exporter.create_file_list_from_version_list(vlist)
+        self._write(FileListSchema(), file_list, "versions.json")
 
     def read_versions(self, key):
-        return self._read(VersionListSchema(), key, 'versions.json')
+        importer = VersionImporter()
+        file_list = self._read(FileListSchema(), key, 'versions.json')
+        return importer.import_version_list(file_list)
 
     def list_directories(self, path):
         try:

@@ -270,7 +270,7 @@ class File(Model):
 
     def init(self, *, path, signatures=None):
         self.path = path
-        self.signatures = signatures
+        self.signatures = signatures or []
 
 
 class FileSignature(Model):
