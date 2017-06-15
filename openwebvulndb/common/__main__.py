@@ -52,7 +52,7 @@ def find_unclosed_vulnerabilities(storage, input_filter):
 
 def change_version_format(storage, keep_old=True):
     version_builder = VersionBuilder()
-    keys = ["mu", "wordpress", "plugins", "themes"]
+    keys = ["mu"]#, "wordpress", "plugins", "themes"]
     for key in keys:
         for _key in storage.list_directories(key):
             keys.append("{0}/{1}".format(key, _key))
@@ -73,25 +73,19 @@ def change_version_format(storage, keep_old=True):
 
 
 def check_if_old_versions_equal_new_versions(storage):
-    keys = ["mu", "wordpress", "plugins", "themes"]
+    keys = ["mu"] #, "wordpress", "plugins", "themes"]
     for key in keys:
         for _key in storage.list_directories(key):
             keys.append("{0}/{1}".format(key, _key))
     count = 0
     for key in keys:
         try:
-            version_list = storage.read_versions(key)
+            version_list = storage._read(VersionListSchema(), key, 'versions.json')
             file_list = storage._read(FileListSchema(), key, 'versions_new.json')
-            total_files = set()
-            for version_definition in version_list.versions:
-                for signature in version_definition.signatures:
-                    total_files.add(signature.path)
-            if len(total_files) != len(file_list.files):
-                print("Error, missing file for %s" % key)
-            else:
-                for file in file_list.files:
-                    check_if_hash_and_version_for_files_are_ok(file, version_list)
+            for file in file_list.files:
+                check_if_hash_and_version_for_files_are_ok(file, version_list)
             count += 1
+            print_progress(str(count))
         except FileNotFoundError:
             pass
     print("%d files checked" % count)
@@ -111,7 +105,8 @@ def check_if_hash_and_version_for_files_are_ok(file, version_list):
     for file_signature in file.signatures:
         if len(file_signature.versions) != len(hash_versions[file_signature.hash]) or len(file_signature.versions) != \
                 len(set(version for version in file_signature.versions) & hash_versions[file_signature.hash]):
-            print("Error, missing version for {0} in {1}".format(file_path, version_list.key))
+            print("Error, missing version for {0} in {1}: {2} in versions, {3} in new versions".format(
+                file_path, version_list.key, hash_versions[file_signature.hash], file_signature.versions))
 
 
 def print_progress(string):

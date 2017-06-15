@@ -197,7 +197,7 @@ class TestVersionBuilder(TestCase):
 
         self.assertEqual(len(version_list.versions[0].signatures), 10)
 
-    def test_shrink_version_list_add_files_to_diff_to_have_max_files_per_version_if_less_diff_than_max(self):
+    def test_shrink_version_list_add_files_from_most_common_files_to_version_files_if_less_changing_files_than_max(self):
         version0 = VersionDefinition(version="1.0")
         version1 = VersionDefinition(version="1.1")
         version2 = VersionDefinition(version="1.2")
@@ -205,25 +205,33 @@ class TestVersionBuilder(TestCase):
             version0.add_signature(path="file%d" % i, hash=str(i))
             version1.add_signature(path="file%d" % i, hash=str(i))
         for i in range(0, 4):
-            version2.add_signature(path="file%d" % (i + 15), hash=str(i * 2))
+            version2.add_signature(path="file%d" % (i + 15), hash=str(i))
             version2.add_signature(path="file%d" % i, hash="hash")
-        for i in range(4, 6):
+        for i in range(4, 8):
             version2.add_signature(path="file%d" % i, hash=str(i))
-        # only one difference between the two versions
         version1.add_signature(path="fileA", hash="unique_hash")
+
+        # file0-7 are the most common files
+        # file0-3 and file15-18 are diff for 1.2 (8 diff)
+        # fileA is the diff for 1.1
+        # file0-7, file15-18 and fileA are always kept, plus 2 files randomly choose from file6-14 (equally common in diff): 15 files total
+
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
 
         self.version_builder._shrink_version_list(version_list, files_per_version=10)
 
+        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+
+        self.assertEqual(len(file_paths), 15)
         self.assertEqual(len(version0.signatures), 10)
-        self.assertEqual(len(version1.signatures), 10)
-        self.assertEqual(len(version2.signatures), 10)
-        self.assertIn("fileA", [signature.path for signature in version1.signatures])
-        for i in range(0, 4):
-            self.assertIn("file%d" % i, [signature.path for signature in version2.signatures])
-            self.assertIn("file%d" % (i + 15), [signature.path for signature in version2.signatures])
-        for i in range(4, 6):
-            self.assertIn("file%d" % i, [signature.path for signature in version2.signatures])
+        self.assertEqual(len(version1.signatures), 11)
+        self.assertEqual(len(version2.signatures), 12)
+        self.assertIn("fileA", file_paths)
+        for i in range(0, 8):
+            self.assertIn("file%d" % i, file_paths)
+        for i in range(15, 19):
+            self.assertIn("file%d" % i, file_paths)
+        self.assertEqual(file_paths & set("file%d" % i for i in range(8, 15)), 2)  # check that 2 files are arbitrarily kept from these files.
 
     def test_shrink_version_list_keep_max_files_from_most_common_files_if_no_changes_between_version(self):
         version0 = VersionDefinition(version="1.0")
@@ -239,6 +247,45 @@ class TestVersionBuilder(TestCase):
         self.assertEqual(len(version0.signatures), 10)
         for i in range(0, 10):
             self.assertIn("file%d" % i, [signature.path for signature in version0.signatures])
+
+    def test_set_version_files_add_all_files_already_in_other_differences(self):
+        version0 = VersionDefinition(version="1.0")
+        version1 = VersionDefinition(version="1.1")
+        version2 = VersionDefinition(version="1.2")
+        identity_files = set()
+        for i in range(0, 5):  # Files common to all the version
+            version0.add_signature(path="file%d" % i, hash=str(i))
+            version1.add_signature(path="file%d" % i, hash=str(i))
+            version2.add_signature(path="file%d" % i, hash=str(i))
+        for i in range(5, 10):  # Files changing in all versions
+            version0.add_signature(path="file%d" % i, hash='A')
+            version1.add_signature(path="file%d" % i, hash='B')
+            version2.add_signature(path="file%d" % i, hash='C')
+            identity_files.add("file%d" % i)
+        for i in range(10, 15):  # Files changing in version 1.1
+            version1.add_signature(path="file%d" % i, hash='B')
+            version2.add_signature(path="file%d" % i, hash='B')
+            identity_files.add("file%d" % i)
+        for i in range(15, 17):  # Files only in version 1.2
+            version2.add_signature(path="file%d" % i, hash="hash")
+            identity_files.add("file%d" % i)
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+
+        version0_files = self.version_builder._get_identity_files_for_version(version0, version_list, identity_files, files_per_version=10)
+        identity_files |= version0_files
+        version1_files = self.version_builder._get_identity_files_for_version(version1, version_list, identity_files, files_per_version=10)
+        identity_files |= version1_files
+        version2_files = self.version_builder._get_identity_files_for_version(version2, version_list, identity_files, files_per_version=10)
+
+        self.assertEqual(10, len(version0.signatures))  # Only 10 files for version 1.0, so they are all kept
+        self.assertEqual(15, len(version1.signatures))  # 10 files are changing in 1.1 + 5 files already kept by 1.0 but no changing in 1.1
+        self.assertEqual(17, len(version2.signatures))  # 7 files changing in 1.2 + 5 from 1.1 + 5 from 1.0
+        for i in range(0, 10):
+            self.assertIn("file%d" % i, version0_files)
+        for i in range(0, 15):
+            self.assertIn("file%d" % i, version1_files)
+        for i in range(0, 17):
+            self.assertIn("file%d" % i, version2_files)
 
     def test_get_diff_between_versions_set_all_files_as_diff_for_first_version(self):
         version0 = VersionDefinition(version="1.0")

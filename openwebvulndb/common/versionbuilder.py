@@ -37,10 +37,12 @@ class VersionBuilder:
     def _create_file_from_version_list(self, file_path, version_list):
         file = File(path=file_path)
         for version_definition in version_list.versions:
+            print("file {0} is in version {1}".format([_file.path for _file in version_definition.signatures if _file.path == file_path], version_definition.version))
             signature = self.get_signature(file_path, version_definition)
             if signature is not None:
                 file_signature = file.get_signature(signature.hash, create_missing=True)
                 file_signature.versions.append(version_definition.version)
+                print("adding version {0} to {1}".format(version_definition.version, file_path))
         return file
 
     def get_signature(self, file_path, version_definition):
@@ -76,19 +78,31 @@ class VersionBuilder:
                 self._remove_files_from_version(version_list.versions[0], files_to_keep)
             else:
                 differences_between_versions = self._get_diff_between_versions(version_list, files_per_version)
+                print(differences_between_versions)
+                identity_files = set()
+                for differences in differences_between_versions.values():
+                    identity_files |= differences
                 for version in version_list.versions:
-                    self._set_version_files(version, version_list, differences_between_versions, files_per_version)
+                    identity_files |= self._get_identity_files_for_version(version, version_list, identity_files, files_per_version)
+                for version in version_list.versions:
+                    self._set_version_files(version, version_list, identity_files, files_per_version)
 
-    def _set_version_files(self, version, version_list, differences_between_versions, files_per_version):
-        files_to_keep = differences_between_versions[version.version]
-        if len(files_to_keep) < files_per_version:
+    def _get_identity_files_for_version(self, version, version_list, identity_files, files_per_version):
+        files_in_version = set(self.get_file_paths_in_version_definition(version))
+        identity_files_for_version = identity_files & files_in_version
+        if len(identity_files_for_version) < files_per_version:
             most_common_files = self._get_most_common_files_present_in_version(version_list, version, files_per_version)
-            new_files = set(most_common_files) - files_to_keep
-            missing_file_count = files_per_version - len(files_to_keep)
+            new_files = set(most_common_files) - identity_files_for_version
+            missing_file_count = files_per_version - len(identity_files_for_version)
             files_to_add = [file for file in most_common_files if file in new_files]
             if len(files_to_add) > missing_file_count:
                 files_to_add = files_to_add[:missing_file_count]
-            files_to_keep.update(files_to_add)
+            identity_files_for_version.update(files_to_add)
+        return identity_files_for_version
+
+    def _set_version_files(self, version, version_list, identity_files, files_per_version):
+        files_in_version = set(self.get_file_paths_in_version_definition(version))
+        files_to_keep = identity_files & files_in_version
         self._remove_files_from_version(version, files_to_keep)
 
     def _remove_files_from_version(self, version, files_to_keep):
@@ -132,7 +146,6 @@ class VersionBuilder:
                 if file_path == file:
                     return file_count
             return 0
-
         for version, diff in differences_between_versions.items():
             if len(diff) > files_to_keep_per_diff:
                 sorted_files = sorted(diff, reverse=True, key=lambda file: sort_files_by_occurrences(file))
