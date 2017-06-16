@@ -231,7 +231,7 @@ class TestVersionBuilder(TestCase):
             self.assertIn("file%d" % i, file_paths)
         for i in range(15, 19):
             self.assertIn("file%d" % i, file_paths)
-        self.assertEqual(file_paths & set("file%d" % i for i in range(8, 15)), 2)  # check that 2 files are arbitrarily kept from these files.
+        self.assertEqual(len(file_paths & set("file%d" % i for i in range(8, 15))), 2)  # check that 2 files are arbitrarily kept from these files.
 
     def test_shrink_version_list_keep_max_files_from_most_common_files_if_no_changes_between_version(self):
         version0 = VersionDefinition(version="1.0")
@@ -330,21 +330,46 @@ class TestVersionBuilder(TestCase):
         self.assertEqual(len(diff_list["1.2"]), 10)
 
     def test_keep_most_common_file_in_all_diff_for_each_diff(self):
-        diff_1_0 = ["file0", "file1", "file2", "file3", "file4"]
-        diff_1_1 = ["file2", "file3"]
-        diff_1_2 = ["file3", "file5", "file6"]
+        diff_1_0 = {"file0", "file1", "file2", "file3", "file4"}
+        diff_1_1 = {"file2", "file3"}
+        diff_1_2 = {"file3", "file5"}
         differences_between_versions = {"1.0": diff_1_0, "1.1": diff_1_1, "1.2": diff_1_2}
 
-        self.version_builder._keep_most_common_file_in_all_diff_for_each_diff(differences_between_versions, 2)
+        self.version_builder._keep_most_common_file_in_all_diff_for_each_diff(differences_between_versions, None, 2)
 
-        self.assertEqual(len(differences_between_versions["1.0"]), 2)
-        self.assertIn("file2", differences_between_versions["1.0"])
-        self.assertIn("file3", differences_between_versions["1.0"])
-        self.assertEqual(len(differences_between_versions["1.1"]), 2)
-        self.assertIn("file2", differences_between_versions["1.1"])
-        self.assertIn("file3", differences_between_versions["1.1"])
+        self.assertEqual(differences_between_versions["1.0"], {"file3", "file2"})
+        self.assertEqual(differences_between_versions["1.1"], {"file3", "file2"})
         self.assertEqual(len(differences_between_versions["1.2"]), 2)
-        self.assertIn("file3", differences_between_versions["1.2"])
+
+    def test_keep_most_common_file_in_all_diff_for_each_diff_use_most_common_files_if_too_many_diff_with_same_count(self):
+        diff_1_0 = {"file0", "file1", "file3", "file4"}  # file3-4 will be kept
+        diff_1_1 = {"file2", "file5", "file6"}  # file5-6 will be kept
+        diff_1_2 = {"file7", "file8", "file9"}  # file 7-8 will be kept
+        diff_1_3 = {"file7", "file8"}
+        differences_between_versions = {"1.0": diff_1_0, "1.1": diff_1_1, "1.2": diff_1_2, "1.3": diff_1_3}
+        version0 = VersionDefinition(version="1.0")
+        version1 = VersionDefinition(version="1.1")
+        version2 = VersionDefinition(version="1.2")
+        version3 = VersionDefinition(version="1.3")
+        for i in range(0, 5):
+            version0.add_signature(path="file%d" % i, hash=i)
+        for i in range(2, 7):
+            version1.add_signature(path="file%d" % i, hash=i)
+        for i in range(4, 10):
+            version2.add_signature(path="file%d" % i, hash=i)
+            version3.add_signature(path="file%d" % i, hash=i)
+        # file count:
+        # file0, file1: 1
+        # file2, file3, file7, file8, file9: 2
+        # file5, file6: 3
+        # file4: 4
+        version_list = VersionList(key="key", producer="producer", versions=[version0, version1, version2, version3])
+        self.version_builder._keep_most_common_file_in_all_diff_for_each_diff(differences_between_versions, version_list, 2)
+
+        self.assertEqual(differences_between_versions["1.0"], {"file3", "file4"})
+        self.assertEqual(differences_between_versions["1.1"], {"file5", "file6"})
+        self.assertEqual(differences_between_versions["1.2"], {"file7", "file8"})
+        self.assertEqual(differences_between_versions["1.3"], {"file7", "file8"})
 
     def test_get_most_common_files(self):
         version0 = VersionDefinition(version="1.0")
