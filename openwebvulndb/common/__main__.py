@@ -52,7 +52,7 @@ def find_unclosed_vulnerabilities(storage, input_filter):
 
 def change_version_format(storage, keep_old=True):
     version_builder = VersionBuilder()
-    keys = ["mu"]#, "wordpress", "plugins", "themes"]
+    keys = ["mu", "wordpress", "plugins", "themes"]
     for key in keys:
         for _key in storage.list_directories(key):
             keys.append("{0}/{1}".format(key, _key))
@@ -73,7 +73,7 @@ def change_version_format(storage, keep_old=True):
 
 
 def check_if_old_versions_equal_new_versions(storage):
-    keys = ["mu"] #, "wordpress", "plugins", "themes"]
+    keys = ["mu", "wordpress", "plugins", "themes"]
     for key in keys:
         for _key in storage.list_directories(key):
             keys.append("{0}/{1}".format(key, _key))
@@ -86,7 +86,7 @@ def check_if_old_versions_equal_new_versions(storage):
                 check_if_hash_and_version_for_files_are_ok(file, version_list)
             count += 1
             print_progress(str(count))
-        except FileNotFoundError:
+        except (FileNotFoundError, Exception):
             pass
     print("%d files checked" % count)
 

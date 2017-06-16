@@ -19,6 +19,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 from openwebvulndb.common.versionbuilder import VersionBuilder, VersionImporter
 from openwebvulndb.common.models import Signature, VersionDefinition, VersionList, FileSignature, File, FileList
+from collections import Counter
 
 
 class TestVersionBuilder(TestCase):
@@ -66,10 +67,12 @@ class TestVersionBuilder(TestCase):
 
         self.assertIsNone(file_list)
 
-    def test_create_file_list_from_version_list_recreate_version_list(self):
+    def test_create_file_list_from_version_list_shrink_version_list_if_too_many_files_per_version(self):
         self.version_builder._shrink_version_list = MagicMock()
         self.version_builder.is_version_list_empty = MagicMock(return_value=False)
-        version_list = VersionList(key="key", producer="producer")
+        signatures = [Signature(path=str(i), hash=i) for i in range(0, 100)]
+        version_list = VersionList(key="key", producer="producer",
+                                   versions=[VersionDefinition(version="1.0", signatures=signatures)])
 
         self.version_builder.create_file_list_from_version_list(version_list, files_to_keep_per_version=50)
 
@@ -171,22 +174,6 @@ class TestVersionBuilder(TestCase):
         self.assertIn(signature1, version.signatures)
         self.assertIn(signature2, version.signatures)
 
-    def test_shrink_version_list_do_nothing_if_total_amount_of_files_is_lower_than_max(self):
-        version0 = VersionDefinition(version="1.0")
-        version1 = VersionDefinition(version="1.1")
-        version2 = VersionDefinition(version="1.2")
-        for i in range(0, 5):
-            version0.add_signature(path="file%d" % i, hash=str(i))
-            version1.add_signature(path="file%d" % i, hash="A%d" % i)
-            version2.add_signature(path="file%d" % i, hash="B%d" % i)
-        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
-
-        self.version_builder._shrink_version_list(version_list, files_per_version=10)
-
-        self.assertEqual(version_list.versions[0], version0)
-        self.assertEqual(version_list.versions[1], version1)
-        self.assertEqual(version_list.versions[2], version2)
-
     def test_shrink_version_list_choose_files_arbitrarily_if_only_one_version_and_more_files_than_max(self):
         version = VersionDefinition(version="1.0")
         for i in range(0, 15):
@@ -197,7 +184,7 @@ class TestVersionBuilder(TestCase):
 
         self.assertEqual(len(version_list.versions[0].signatures), 10)
 
-    def test_shrink_version_list_add_files_from_most_common_files_to_version_files_if_less_changing_files_than_max(self):
+    def test_shrink_version_list_use_common_files_if_not_enough_diff_per_between_versions(self):
         version0 = VersionDefinition(version="1.0")
         version1 = VersionDefinition(version="1.1")
         version2 = VersionDefinition(version="1.2")
@@ -248,7 +235,7 @@ class TestVersionBuilder(TestCase):
         for i in range(0, 10):
             self.assertIn("file%d" % i, [signature.path for signature in version0.signatures])
 
-    def test_set_version_files_add_all_files_already_in_other_differences(self):
+    def test_shrink_version_list_use_the_same_files_for_all_versions(self):
         version0 = VersionDefinition(version="1.0")
         version1 = VersionDefinition(version="1.1")
         version2 = VersionDefinition(version="1.2")
@@ -271,15 +258,19 @@ class TestVersionBuilder(TestCase):
             identity_files.add("file%d" % i)
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
 
-        version0_files = self.version_builder._get_identity_files_for_version(version0, version_list, identity_files, files_per_version=10)
-        identity_files |= version0_files
-        version1_files = self.version_builder._get_identity_files_for_version(version1, version_list, identity_files, files_per_version=10)
-        identity_files |= version1_files
-        version2_files = self.version_builder._get_identity_files_for_version(version2, version_list, identity_files, files_per_version=10)
+        #version0_files = self.version_builder._get_identity_files_for_version(version0, version_list, identity_files, files_per_version=10)
+        #identity_files |= version0_files
+        #version1_files = self.version_builder._get_identity_files_for_version(version1, version_list, identity_files, files_per_version=10)
+        #identity_files |= version1_files
+        #version2_files = self.version_builder._get_identity_files_for_version(version2, version_list, identity_files, files_per_version=10)
+        self.version_builder._shrink_version_list(version_list, 10)
 
         self.assertEqual(10, len(version0.signatures))  # Only 10 files for version 1.0, so they are all kept
         self.assertEqual(15, len(version1.signatures))  # 10 files are changing in 1.1 + 5 files already kept by 1.0 but no changing in 1.1
         self.assertEqual(17, len(version2.signatures))  # 7 files changing in 1.2 + 5 from 1.1 + 5 from 1.0
+        version0_files = [signature.path for signature in version0.signatures]
+        version1_files = [signature.path for signature in version1.signatures]
+        version2_files = [signature.path for signature in version2.signatures]
         for i in range(0, 10):
             self.assertIn("file%d" % i, version0_files)
         for i in range(0, 15):
@@ -287,18 +278,18 @@ class TestVersionBuilder(TestCase):
         for i in range(0, 17):
             self.assertIn("file%d" % i, version2_files)
 
-    def test_get_diff_between_versions_set_all_files_as_diff_for_first_version(self):
+    def test_get_differences_between_versions_set_all_files_as_diff_for_first_version(self):
         version0 = VersionDefinition(version="1.0")
         version1 = VersionDefinition(version="1.1")
         for i in range(0, 5):
             version0.add_signature(path="file%d" % i, hash=str(i))
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1])
 
-        diff_list = self.version_builder._get_diff_between_versions(version_list, 14)
+        diff_list = self.version_builder._get_differences_between_versions(version_list, 14)
 
         self.assertEqual(len(diff_list["1.0"]), 5)
 
-    def test_get_diff_between_versions_return_all_files_that_differ_or_are_added_between_versions(self):
+    def test_get_differences_between_versions_return_all_files_that_differ_or_are_added_between_versions(self):
         version0 = VersionDefinition(version="1.0")
         version1 = VersionDefinition(version="1.1")
         version2 = VersionDefinition(version="1.2")
@@ -324,24 +315,29 @@ class TestVersionBuilder(TestCase):
 
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
 
-        diff_list = self.version_builder._get_diff_between_versions(version_list, 10)
+        diff_list = self.version_builder._get_differences_between_versions(version_list, 10)
 
         self.assertEqual(len(diff_list["1.1"]), 10)
         self.assertEqual(len(diff_list["1.2"]), 10)
 
-    def test_keep_most_common_file_in_all_diff_for_each_diff(self):
+    def test_keep_most_common_differences_between_versions(self):
         diff_1_0 = {"file0", "file1", "file2", "file3", "file4"}
         diff_1_1 = {"file2", "file3"}
         diff_1_2 = {"file3", "file5"}
         differences_between_versions = {"1.0": diff_1_0, "1.1": diff_1_1, "1.2": diff_1_2}
+        file_count = Counter()
+        for diff in differences_between_versions:
+            for file in diff:
+                file_count[file] = 1
+        self.version_builder._get_counter_for_files = MagicMock(return_value=file_count)
 
-        self.version_builder._keep_most_common_file_in_all_diff_for_each_diff(differences_between_versions, None, 2)
+        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions, None, 2)
 
         self.assertEqual(differences_between_versions["1.0"], {"file3", "file2"})
         self.assertEqual(differences_between_versions["1.1"], {"file3", "file2"})
         self.assertEqual(len(differences_between_versions["1.2"]), 2)
 
-    def test_keep_most_common_file_in_all_diff_for_each_diff_use_most_common_files_if_too_many_diff_with_same_count(self):
+    def test_keep_most_common_differences_between_versions_use_most_common_files_if_too_many_diff_with_same_count(self):
         diff_1_0 = {"file0", "file1", "file3", "file4"}  # file3-4 will be kept
         diff_1_1 = {"file2", "file5", "file6"}  # file5-6 will be kept
         diff_1_2 = {"file7", "file8", "file9"}  # file 7-8 will be kept
@@ -364,7 +360,7 @@ class TestVersionBuilder(TestCase):
         # file5, file6: 3
         # file4: 4
         version_list = VersionList(key="key", producer="producer", versions=[version0, version1, version2, version3])
-        self.version_builder._keep_most_common_file_in_all_diff_for_each_diff(differences_between_versions, version_list, 2)
+        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions, version_list, 2)
 
         self.assertEqual(differences_between_versions["1.0"], {"file3", "file4"})
         self.assertEqual(differences_between_versions["1.1"], {"file5", "file6"})
