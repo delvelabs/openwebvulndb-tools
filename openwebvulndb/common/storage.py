@@ -18,7 +18,7 @@
 import re
 from json.decoder import JSONDecodeError
 from os.path import join, dirname
-from os import makedirs, scandir, walk
+from os import makedirs, scandir, walk, remove
 from contextlib import contextmanager
 
 from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema, FileListSchema
@@ -67,8 +67,13 @@ class Storage:
 
     def read_versions(self, key):
         importer = VersionImporter()
-        file_list = self._read(FileListSchema(), key, 'versions.json')
-        return importer.import_version_list(file_list)
+        try:
+            file_list = self._read(FileListSchema(), key, 'versions.json')
+            return importer.import_version_list(file_list)
+        except Exception:  # If read of new versions file failed, try to read it in old file format
+            vlist = self._read(VersionListSchema(), key, 'versions.json')
+            logger.warn("Use of VersionListSchema to store versions file is deprecated. Use convert_versions_files to convert your database to new file format.")
+            return vlist
 
     def list_directories(self, path):
         try:
@@ -132,3 +137,29 @@ class Storage:
         self._prepare_path(path)
         with self._open('w', path, *args) as fp:
             fp.write(data)
+
+    def _remove(self, *args):
+        remove(self._path(*args))
+
+    def convert_versions_files(self):
+        version_builder = VersionBuilder()
+        keys = ["mu", "wordpress", "plugins", "themes"]
+        for key in keys:
+            for _key in self.list_directories(key):
+                keys.append("{0}/{1}".format(key, _key))
+        for key in keys:
+            try:  # Check if file is already in new format. An exception will be raised if not.
+                self._read(FileListSchema(), key, "versions.json")
+                continue
+            except FileNotFoundError:
+                pass
+            except Exception:
+                try:
+                    version_list = self._read(VersionListSchema(), key, "versions.json")
+                    file_list = version_builder.create_file_list_from_version_list(version_list)
+                    if file_list is None:
+                        self._remove(key, "versions.json")
+                    else:
+                        self._write(FileListSchema(), file_list, "versions.json")
+                except FileNotFoundError:
+                    pass

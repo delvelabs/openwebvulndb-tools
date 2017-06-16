@@ -18,7 +18,6 @@
 from argparse import ArgumentParser
 
 from openwebvulndb import app
-from .versionbuilder import VersionBuilder
 from .schemas import FileListSchema, VersionListSchema
 
 
@@ -50,26 +49,8 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
 
-def change_version_format(storage, keep_old=False):
-    version_builder = VersionBuilder()
-    keys = ["mu", "wordpress", "plugins", "themes"]
-    for key in keys:
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    progress = 0
-    for key in keys:
-        progress += 1
-        print_progress("{0} / {1} component".format(progress, len(keys)))
-        try:
-            version_list = storage._read(VersionListSchema(), key, "versions.json")
-            file_list = version_builder.create_file_list_from_version_list(version_list)
-            if file_list is not None:
-                if keep_old:
-                    storage._write(FileListSchema(), file_list, "versions_new.json")
-                else:
-                    storage._write(FileListSchema(), file_list, "versions.json")
-        except FileNotFoundError:
-            pass
+def change_version_format(storage):
+    storage.convert_versions_files()
 
 
 def check_if_old_versions_equal_new_versions(storage):
