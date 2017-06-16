@@ -50,7 +50,7 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
 
-def change_version_format(storage, keep_old=True):
+def change_version_format(storage, keep_old=False):
     version_builder = VersionBuilder()
     keys = ["mu", "wordpress", "plugins", "themes"]
     for key in keys:

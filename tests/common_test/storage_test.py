@@ -21,6 +21,7 @@ from unittest.mock import mock_open, patch, call, MagicMock
 from fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
+from openwebvulndb.common.schemas import VersionListSchema
 
 
 META_FILE_DATA = """
@@ -227,6 +228,7 @@ class StorageTest(TestCase):
                 patch('openwebvulndb.common.storage.open', m, create=True), \
                 patch('openwebvulndb.common.storage.makedirs') as makedirs:
             storage = Storage('/some/path')
+            storage._cache = MagicMock()
 
             vlist = VersionList(key="plugins/better-wp-security",
                                 producer="SubversionFetcher")
@@ -290,3 +292,22 @@ class StorageTest(TestCase):
 
             self.assertEqual(["hello", "world", "test"], list(lines))
             m.assert_called_with('/some/path/test.txt', 'r')
+
+    def test_cache(self):
+        m = mock_open()
+
+        with \
+                patch('openwebvulndb.common.storage.open', m, create=True), \
+                patch('openwebvulndb.common.storage.makedirs') as makedirs:
+            storage = Storage('/some/path')
+
+            vlist = VersionList(key="plugins/better-wp-security", producer="SubversionFetcher")
+
+            storage._cache(VersionListSchema(), vlist, "versions_old.json")
+
+            makedirs.assert_called_once_with('/some/path/.cache/plugins/better-wp-security', mode=0o755, exist_ok=True)
+            m.assert_called_with('/some/path/.cache/plugins/better-wp-security/versions_old.json', 'w')
+
+            handle = m()
+            handle.write.assert_called_once_with('{\n    "key": "plugins/better-wp-security",\n    '
+                                                 '"producer": "SubversionFetcher"\n}')

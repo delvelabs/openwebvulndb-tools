@@ -74,9 +74,9 @@ class TestVersionBuilder(TestCase):
         version_list = VersionList(key="key", producer="producer",
                                    versions=[VersionDefinition(version="1.0", signatures=signatures)])
 
-        self.version_builder.create_file_list_from_version_list(version_list, files_to_keep_per_version=50)
+        self.version_builder.create_file_list_from_version_list(version_list, 50)
 
-        self.version_builder._shrink_version_list.assert_called_once_with(version_list, 50)
+        self.version_builder._shrink_version_list.assert_called_once_with()
 
     def test_create_file_from_version_list_regroup_all_versions_with_identical_hash_for_file_in_same_file_signature_model(self):
         signature0 = Signature(path="file", hash="12345")
@@ -85,9 +85,10 @@ class TestVersionBuilder(TestCase):
         version1 = VersionDefinition(version="1.1", signatures=[signature0, signature1])
         version2 = VersionDefinition(version="1.2", signatures=[signature0, signature1])
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        self.version_builder.version_list = version_list
 
-        file0 = self.version_builder._create_file_from_version_list("file", version_list)
-        file1 = self.version_builder._create_file_from_version_list("readme", version_list)
+        file0 = self.version_builder._create_file_from_version_list("file")
+        file1 = self.version_builder._create_file_from_version_list("readme")
 
         file_signature0 = file0.signatures[0]
         file_signature1 = file1.signatures[0]
@@ -123,8 +124,9 @@ class TestVersionBuilder(TestCase):
         version1 = VersionDefinition(version="1.1", signatures=[signature0, signature1, signature3])
         version2 = VersionDefinition(version="1.2", signatures=[signature4, signature2])
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        self.version_builder.version_list = version_list
 
-        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+        file_paths = self.version_builder.get_file_paths_from_version_list()
 
         self.assertEqual(len(file_paths), 4)
         self.assertIn("file0", file_paths)
@@ -139,8 +141,9 @@ class TestVersionBuilder(TestCase):
         signature3 = Signature(path="wp-content/plugins/my-plugin/trunk/file3", hash="4")
         version = VersionDefinition(version="1.2", signatures=[signature0, signature1, signature2, signature3])
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
+        self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files(version_list)
+        self.version_builder.exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -153,8 +156,9 @@ class TestVersionBuilder(TestCase):
         signature3 = Signature(path="wp-content/plugins/my-plugin/tags/1.0/file3", hash="4")
         version = VersionDefinition(version="1.2", signatures=[signature0, signature1, signature2, signature3])
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
+        self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files(version_list)
+        self.version_builder.exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -167,8 +171,9 @@ class TestVersionBuilder(TestCase):
         signature3 = Signature(path="wp-content/plugins/my-plugin/branches/file3", hash="4")
         version = VersionDefinition(version="1.2", signatures=[signature0, signature1, signature2, signature3])
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
+        self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files(version_list)
+        self.version_builder.exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -179,8 +184,10 @@ class TestVersionBuilder(TestCase):
         for i in range(0, 15):
             version.add_signature(path="file%d" % i, hash=str(i))
         version_list = VersionList(producer="producer", key="key", versions=[version])
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 10
 
-        self.version_builder._shrink_version_list(version_list, files_per_version=10)
+        self.version_builder._shrink_version_list()
 
         self.assertEqual(len(version_list.versions[0].signatures), 10)
 
@@ -204,10 +211,12 @@ class TestVersionBuilder(TestCase):
         # file0-7, file15-18 and fileA are always kept, plus 2 files randomly choose from file6-14 (equally common in diff): 15 files total
 
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 10
 
-        self.version_builder._shrink_version_list(version_list, files_per_version=10)
+        self.version_builder._shrink_version_list()
 
-        file_paths = self.version_builder.get_file_paths_from_version_list(version_list)
+        file_paths = self.version_builder.get_file_paths_from_version_list()
 
         self.assertEqual(len(file_paths), 15)
         self.assertEqual(len(version0.signatures), 10)
@@ -228,8 +237,10 @@ class TestVersionBuilder(TestCase):
             version0.signatures.append(same_signature)
             version1.signatures.append(same_signature)
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1])
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 10
 
-        self.version_builder._shrink_version_list(version_list, 10)
+        self.version_builder._shrink_version_list()
 
         self.assertEqual(len(version0.signatures), 10)
         for i in range(0, 10):
@@ -257,13 +268,10 @@ class TestVersionBuilder(TestCase):
             version2.add_signature(path="file%d" % i, hash="hash")
             identity_files.add("file%d" % i)
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 10
 
-        #version0_files = self.version_builder._get_identity_files_for_version(version0, version_list, identity_files, files_per_version=10)
-        #identity_files |= version0_files
-        #version1_files = self.version_builder._get_identity_files_for_version(version1, version_list, identity_files, files_per_version=10)
-        #identity_files |= version1_files
-        #version2_files = self.version_builder._get_identity_files_for_version(version2, version_list, identity_files, files_per_version=10)
-        self.version_builder._shrink_version_list(version_list, 10)
+        self.version_builder._shrink_version_list()
 
         self.assertEqual(10, len(version0.signatures))  # Only 10 files for version 1.0, so they are all kept
         self.assertEqual(15, len(version1.signatures))  # 10 files are changing in 1.1 + 5 files already kept by 1.0 but no changing in 1.1
@@ -284,8 +292,10 @@ class TestVersionBuilder(TestCase):
         for i in range(0, 5):
             version0.add_signature(path="file%d" % i, hash=str(i))
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1])
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 14
 
-        diff_list = self.version_builder._get_differences_between_versions(version_list, 14)
+        diff_list = self.version_builder._get_differences_between_versions()
 
         self.assertEqual(len(diff_list["1.0"]), 5)
 
@@ -314,11 +324,12 @@ class TestVersionBuilder(TestCase):
             version2.add_signature(path="file%d" % i, hash=str(i))
 
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
+        self.version_builder.version_list = version_list
 
-        diff_list = self.version_builder._get_differences_between_versions(version_list, 10)
+        diff_list = self.version_builder._get_differences_between_versions()
 
         self.assertEqual(len(diff_list["1.1"]), 10)
-        self.assertEqual(len(diff_list["1.2"]), 10)
+        self.assertEqual(len(diff_list["1.2"]), 15)
 
     def test_keep_most_common_differences_between_versions(self):
         diff_1_0 = {"file0", "file1", "file2", "file3", "file4"}
@@ -330,8 +341,9 @@ class TestVersionBuilder(TestCase):
             for file in diff:
                 file_count[file] = 1
         self.version_builder._get_counter_for_files = MagicMock(return_value=file_count)
+        self.version_builder.files_per_version = 2
 
-        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions, None, 2)
+        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions)
 
         self.assertEqual(differences_between_versions["1.0"], {"file3", "file2"})
         self.assertEqual(differences_between_versions["1.1"], {"file3", "file2"})
@@ -360,60 +372,15 @@ class TestVersionBuilder(TestCase):
         # file5, file6: 3
         # file4: 4
         version_list = VersionList(key="key", producer="producer", versions=[version0, version1, version2, version3])
-        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions, version_list, 2)
+        self.version_builder.version_list = version_list
+        self.version_builder.files_per_version = 2
+
+        self.version_builder._keep_most_common_differences_between_versions(differences_between_versions)
 
         self.assertEqual(differences_between_versions["1.0"], {"file3", "file4"})
         self.assertEqual(differences_between_versions["1.1"], {"file5", "file6"})
         self.assertEqual(differences_between_versions["1.2"], {"file7", "file8"})
         self.assertEqual(differences_between_versions["1.3"], {"file7", "file8"})
-
-    def test_get_most_common_files(self):
-        version0 = VersionDefinition(version="1.0")
-        version1 = VersionDefinition(version="1.1")
-        version2 = VersionDefinition(version="1.2")
-        # most common files
-        signature0 = Signature(path="file0", hash="1")
-        signature1 = Signature(path="file1", hash="2")
-        version0.signatures.append(signature0)
-        version1.signatures.append(signature0)
-        version2.signatures.append(signature0)
-        version0.signatures.append(signature1)
-        version1.signatures.append(signature1)
-        version2.signatures.append(signature1)
-        # Only in 1.1 and 1.2
-        version1.add_signature(path="file2", hash="3")
-        version2.add_signature(path="file2", hash="4")
-        # only in 1.0
-        version0.add_signature(path="file3", hash="5")
-        version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
-
-        three_most_common_files = self.version_builder._get_most_common_files(version_list, 3)
-        two_most_common_files = self.version_builder._get_most_common_files(version_list, 2)
-
-        self.assertIn("file0", three_most_common_files)
-        self.assertIn("file1", three_most_common_files)
-        self.assertIn("file2", three_most_common_files)
-        self.assertNotIn("file3", three_most_common_files)
-        self.assertIn("file0", two_most_common_files)
-        self.assertIn("file1", two_most_common_files)
-        self.assertNotIn("file2", two_most_common_files)
-        self.assertNotIn("file3", two_most_common_files)
-
-    def test_get_most_common_files_present_in_version_return_files_in_given_version_and_common_to_most_versions(self):
-        version = VersionDefinition(version="1.0")
-        version.add_signature(path="file0", hash="1")
-        version.add_signature(path="file1", hash="2")
-        version.add_signature(path="file2", hash="3")
-        self.version_builder._get_most_common_files = MagicMock(return_value=["file0", "file1", "file3", "file4",
-                                                                              "file2"])
-
-        files = self.version_builder._get_most_common_files_present_in_version("version_list", version, 2)
-
-        self.assertIn("file0", files)
-        self.assertIn("file1", files)
-        self.assertNotIn("file2", files)  # won't be returned because only two files are required and it's the least common file.
-        self.assertNotIn("file3", files)
-        self.assertNotIn("file4", files)
 
     def test_compare_signature_dont_return_files_that_are_removed_in_current_version(self):
         file0 = Signature(path="file0", hash="0")

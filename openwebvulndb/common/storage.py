@@ -63,6 +63,7 @@ class Storage:
         exporter = VersionBuilder()
         file_list = exporter.create_file_list_from_version_list(vlist)
         self._write(FileListSchema(), file_list, "versions.json")
+        self._cache(VersionListSchema(), vlist, "versions_old.json")
 
     def read_versions(self, key):
         importer = VersionImporter()
@@ -124,3 +125,10 @@ class Storage:
 
     def _path(self, *args):
         return join(self.base_path, *args)
+
+    def _cache(self, schema, item, *args):
+        data, errors = serialize(schema, item)
+        path = join(".cache", item.key)
+        self._prepare_path(path)
+        with self._open('w', path, *args) as fp:
+            fp.write(data)
