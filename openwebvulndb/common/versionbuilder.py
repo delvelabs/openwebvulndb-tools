@@ -26,56 +26,60 @@ class VersionBuilder:
         self.version_list = None
         self.files_per_version = 0
 
-    def create_file_list_from_version_list(self, version_list, files_per_version=50):
+    def create_file_list_from_version_list(self, version_list, files_per_version=50, producer=None):
         self.version_list = version_list
         self.files_per_version = files_per_version
-        self.exclude_files()
-        if self.is_version_list_empty():
+        if self._prepare_version_list():
+            file_list = FileList(key=version_list.key, producer=producer or version_list.producer)
+            file_paths = self._get_file_paths_from_version_list()
+            for file_path in file_paths:
+                file = self._create_file_from_version_list(file_path)
+                file_list.files.append(file)
+            return file_list
+        else:
             return None
-        self._shrink_version_list()
-        file_list = FileList(key=version_list.key, producer=version_list.producer)
-        file_paths = self.get_file_paths_from_version_list()
-        for file_path in file_paths:
-            file = self._create_file_from_version_list(file_path)
-            file_list.files.append(file)
-        return file_list
 
     def update_file_list(self, file_list, version_list, files_per_version=50):
         self.version_list = version_list
         self.files_per_version = files_per_version
-        self.exclude_files()
-        if self.is_version_list_empty():
-            return
+        if self._prepare_version_list():
+            new_files = self._get_file_paths_from_version_list() - set(file.path for file in file_list.files)
+            for file in file_list.files:
+                file_list.files[file_list.files.index(file)] = self._create_file_from_version_list(file.path)
+            for file_path in new_files:
+                file = self._create_file_from_version_list(file_path)
+                file_list.files.append(file)
+
+    def _prepare_version_list(self):
+        self._exclude_files()
+        if self._is_version_list_empty():
+            return False
         self._shrink_version_list()
-        new_files = self.get_file_paths_from_version_list() - set(file.path for file in file_list.files)
-        for file in file_list.files:
-            file_list.files[file_list.files.index(file)] = self._create_file_from_version_list(file.path)
-        for file_path in new_files:
-            file = self._create_file_from_version_list(file_path)
-            file_list.files.append(file)
+        return True
 
     def _create_file_from_version_list(self, file_path):
         file = File(path=file_path)
         for version_definition in self.version_list.versions:
-            signature = self.get_signature(file_path, version_definition)
+            signature = self._get_signature(file_path, version_definition)
             if signature is not None:
                 file_signature = file.get_signature(signature.hash, create_missing=True)
                 file_signature.versions.append(version_definition.version)
         self._sort_file_signatures(file)
         return file
 
-    def get_signature(self, file_path, version_definition):
+    def _get_signature(self, file_path, version_definition):
         for signature in version_definition.signatures:
             if file_path == signature.path:
                 return signature
+        return None
 
-    def get_file_paths_from_version_list(self):
+    def _get_file_paths_from_version_list(self):
         file_paths = set()
         for version_definition in self.version_list.versions:
             file_paths.update(self._get_paths_in_version(version_definition))
         return file_paths
 
-    def exclude_files(self):
+    def _exclude_files(self):
         key = self.version_list.key
         exclude_trunk = "wp-content/%s/trunk/" % key
         exclude_tags = "wp-content/%s/tags/" % key
@@ -122,7 +126,7 @@ class VersionBuilder:
     def _set_files_for_version(self, version, files_to_keep):
         signatures_to_keep = []
         for file in files_to_keep:
-            signatures_to_keep.append(self.get_signature(file, version))
+            signatures_to_keep.append(self._get_signature(file, version))
         version.signatures = signatures_to_keep
 
     def _get_differences_between_versions(self):
@@ -143,9 +147,9 @@ class VersionBuilder:
         common_files = files_in_current_version & files_in_previous_version
 
         for file_path in common_files:
-            signature0 = self.get_signature(file_path, previous_version)
-            signature1 = self.get_signature(file_path, current_version)
-            if signature0.hash != signature1.hash:
+            old_signature = self._get_signature(file_path, previous_version)
+            new_signature = self._get_signature(file_path, current_version)
+            if old_signature.hash != new_signature.hash:
                 diff.add(file_path)
         return diff
 
@@ -155,10 +159,12 @@ class VersionBuilder:
 
         for version, diff in differences_between_versions.items():
             if len(diff) > self.files_per_version:
+                # Sort files by occurrences in the differences between versions, in case of equality files are sorted
+                # by occurrences in versions.
                 sorted_files = sorted(diff, reverse=True, key=lambda file: file_counter[file])
                 sorted_files = sorted(sorted_files, reverse=True, key=lambda file: diff_counter[file])
                 differences_between_versions[version] = set(sorted_files[:self.files_per_version])
-            # Update the counter, so the next versions doesn't count diff removed from this version.
+                # Update the counter, so the next versions doesn't count diff removed from this version.
                 diff_counter = Counter(file for diff in differences_between_versions.values() for file in diff)
 
     def _sort_versions(self):
@@ -174,7 +180,7 @@ class VersionBuilder:
         for signature in version_definition.signatures:
             yield signature.path
 
-    def is_version_list_empty(self):
+    def _is_version_list_empty(self):
         if len(self.version_list.versions) == 0 or\
                 all(len(version.signatures) == 0 for version in self.version_list.versions):
             return True
@@ -198,9 +204,20 @@ class VersionImporter:
 
     def import_version_list(self, file_list):
         version_list = VersionList(key=file_list.key, producer=file_list.producer)
+        for version in self._get_versions(file_list):
+            version_definition = version_list.get_version(version, create_missing=True)
+            self._add_signatures_for_version(file_list, version_definition)
+        return version_list
+
+    def _add_signatures_for_version(self, file_list, version_definition):
         for file in file_list.files:
             for file_signature in file.signatures:
-                for version in file_signature.versions:
-                    version_definition = version_list.get_version(version, create_missing=True)
+                if version_definition.version in file_signature.versions:
                     version_definition.add_signature(path=file.path, hash=file_signature.hash, algo=file_list.hash_algo)
-        return version_list
+
+    def _get_versions(self, file_list):
+        versions = set()
+        for file in file_list.files:
+            for file_signature in file.signatures:
+                versions.update(file_signature.versions)
+        return versions

@@ -69,7 +69,7 @@ class TestVersionBuilder(TestCase):
 
     def test_create_file_list_from_version_list_shrink_version_list_if_too_many_files_per_version(self):
         self.version_builder._shrink_version_list = MagicMock()
-        self.version_builder.is_version_list_empty = MagicMock(return_value=False)
+        self.version_builder._is_version_list_empty = MagicMock(return_value=False)
         signatures = [Signature(path=str(i), hash=i) for i in range(0, 100)]
         version_list = VersionList(key="key", producer="producer",
                                    versions=[VersionDefinition(version="1.0", signatures=signatures)])
@@ -146,7 +146,7 @@ class TestVersionBuilder(TestCase):
 
         self.assertEqual(file_list.files[0].signatures[0].versions, ["1.0", "1.1", "1.2"])
 
-    def test_create_file_from_version_list_regroup_all_versions_with_identical_hash_for_file_in_same_file_signature_model(self):
+    def test_create_file_from_version_list_regroup_all_versions_with_equal_hash_for_file_in_same_file_signature(self):
         signature0 = Signature(path="file", hash="12345")
         signature1 = Signature(path="readme", hash="54321")
         version0 = VersionDefinition(version="1.0", signatures=[signature0, signature1])
@@ -174,9 +174,9 @@ class TestVersionBuilder(TestCase):
         signature2 = Signature(path="file2", hash="3")
         version = VersionDefinition(version="1.0", signatures=[signature0, signature1, signature2])
 
-        sign0 = self.version_builder.get_signature("file0", version)
-        sign1 = self.version_builder.get_signature("file1", version)
-        sign2 = self.version_builder.get_signature("file2", version)
+        sign0 = self.version_builder._get_signature("file0", version)
+        sign1 = self.version_builder._get_signature("file1", version)
+        sign2 = self.version_builder._get_signature("file2", version)
 
         self.assertEqual(sign0, signature0)
         self.assertEqual(sign1, signature1)
@@ -194,7 +194,7 @@ class TestVersionBuilder(TestCase):
         version_list = VersionList(producer="producer", key="key", versions=[version0, version1, version2])
         self.version_builder.version_list = version_list
 
-        file_paths = self.version_builder.get_file_paths_from_version_list()
+        file_paths = self.version_builder._get_file_paths_from_version_list()
 
         self.assertEqual(len(file_paths), 4)
         self.assertIn("file0", file_paths)
@@ -211,7 +211,7 @@ class TestVersionBuilder(TestCase):
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
         self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files()
+        self.version_builder._exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -226,7 +226,7 @@ class TestVersionBuilder(TestCase):
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
         self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files()
+        self.version_builder._exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -241,7 +241,7 @@ class TestVersionBuilder(TestCase):
         version_list = VersionList(producer="producer", key="plugins/my-plugin", versions=[version])
         self.version_builder.version_list = version_list
 
-        self.version_builder.exclude_files()
+        self.version_builder._exclude_files()
 
         self.assertEqual(len(version.signatures), 2)
         self.assertIn(signature1, version.signatures)
@@ -284,7 +284,7 @@ class TestVersionBuilder(TestCase):
 
         self.version_builder._shrink_version_list()
 
-        file_paths = self.version_builder.get_file_paths_from_version_list()
+        file_paths = self.version_builder._get_file_paths_from_version_list()
 
         self.assertEqual(len(file_paths), 15)
         self.assertEqual(len(version0.signatures), 10)

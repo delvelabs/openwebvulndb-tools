@@ -18,7 +18,6 @@
 from argparse import ArgumentParser
 
 from openwebvulndb import app
-from .schemas import FileListSchema, VersionListSchema
 
 
 def find_identity_files(storage, input_key):
@@ -49,80 +48,8 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
 
-def change_version_format(storage):
-    storage.convert_versions_files()
-
-
-def check_if_old_versions_equal_new_versions(storage):
-    keys = ["mu", "wordpress", "plugins", "themes"]
-    for key in keys:
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    count = 0
-    for key in keys:
-        try:
-            version_list = storage._read(VersionListSchema(), key, 'versions.json')
-            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
-            for file in file_list.files:
-                check_if_hash_and_version_for_files_are_ok(file, version_list)
-            count += 1
-            print_progress(str(count))
-        except (FileNotFoundError, Exception):
-            pass
-    print("%d files checked" % count)
-
-
-def check_if_hash_and_version_for_files_are_ok(file, version_list):
-    file_path = file.path
-    hash_versions = {}
-    for version_definition in version_list.versions:
-        for signature in version_definition.signatures:
-            if signature.path == file_path:
-                if signature.hash in hash_versions:
-                    hash_versions[signature.hash].add(version_definition.version)
-                else:
-                    hash_versions[signature.hash] = {version_definition.version}
-
-    for file_signature in file.signatures:
-        if len(file_signature.versions) != len(hash_versions[file_signature.hash]) or len(file_signature.versions) != \
-                len(set(version for version in file_signature.versions) & hash_versions[file_signature.hash]):
-            print("Error, missing version for {0} in {1}: {2} in versions, {3} in new versions".format(
-                file_path, version_list.key, hash_versions[file_signature.hash], file_signature.versions))
-
-
-def print_progress(string):
-    print("\r%s" % string, end="")
-
-
-def count_files_per_component(storage):
-    def sort_by_files(file_list):
-        return len(file_list.files)
-    component_files = []
-    keys = ["mu", "wordpress", "plugins", "themes"]
-    progress = 0
-    for key in keys:
-        progress += 1
-        print_progress("{0} / {1} component".format(progress, len(keys)))
-        for _key in storage.list_directories(key):
-            keys.append("{0}/{1}".format(key, _key))
-    for key in keys:
-        try:
-            file_list = storage._read(FileListSchema(), key, 'versions_new.json')
-            if len(file_list.files) != 0:
-                component_files.append(file_list)
-        except FileNotFoundError:
-            pass
-    component_files = sorted(component_files, key=sort_by_files, reverse=True)
-    with open("file_path_count2", "wt") as fp:
-        for component in component_files:
-            fp.write("{0}: {1} files\n".format(component.key, len(component.files)))
-
-
 operations = dict(find_identity_files=find_identity_files,
-                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
-                  change_version_format=change_version_format,
-                  check_if_old_versions_equal_new_versions=check_if_old_versions_equal_new_versions,
-                  count_files_per_component=count_files_per_component)
+                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")

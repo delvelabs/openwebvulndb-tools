@@ -69,9 +69,7 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
             logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
             return
 
-    equal_versions = exporter.export_wordpress(export_path)
-    for version in equal_versions:
-        logger.info(version)
+    exporter.export_wordpress(export_path)
     exporter.dump_meta("wordpress", export_path)
 
     exporter.export_plugins(export_path, only_popular=True)
@@ -127,6 +125,10 @@ def load_cve(loop, cve_reader, input_file):
         loop.run_until_complete(cve_reader.read_api("http://cve.circl.lu/api/search/wordpress/wordpress"))
 
 
+def change_version_format(storage):
+    storage.convert_versions_files()
+
+
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
@@ -136,7 +138,8 @@ operations = dict(list_themes=list_themes,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
                   create_securityfocus_database=create_securityfocus_database,
-                  download_vulnerability_entry=download_vulnerability_entry
+                  download_vulnerability_entry=download_vulnerability_entry,
+                  change_version_format=change_version_format
                   )
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")

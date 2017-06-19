@@ -20,7 +20,7 @@ from openwebvulndb.common.serialize import serialize
 from openwebvulndb.common.schemas import FileListGroupSchema, FileListSchema, VulnerabilityListGroupSchema, \
     MetaListSchema
 from openwebvulndb.common.models import VulnerabilityListGroup, VulnerabilityList, MetaList
-from .versionrebuild import VersionRebuild
+from openwebvulndb.common.versionbuilder import VersionBuilder
 from os.path import join
 
 
@@ -28,15 +28,16 @@ class Exporter:
 
     def __init__(self, storage):
         self.storage = storage
-        self.version_rebuild = VersionRebuild(self.storage)
+        self.version_rebuild = VersionBuilder()
 
     def export_plugins(self, export_path, only_popular=False, only_vulnerable=False):
         plugin_list = FileListGroup(key="plugins", producer="Vane2Export")
         for plugin_key in self._list_keys("plugins", only_popular, only_vulnerable):
-            self.version_rebuild.update(plugin_key)
-            plugin_file_list = self.version_rebuild.file_list
-            if len(plugin_file_list.files) > 0:
-                plugin_list.file_lists.append(plugin_file_list)
+            version_list = self.storage.read_versions(plugin_key)
+            file_list = self.version_rebuild.create_file_list_from_version_list(version_list, files_per_version=2,
+                                                                                producer="Vane2Export")
+            if file_list is not None:
+                plugin_list.file_lists.append(file_list)
 
         file_name = self._get_export_file_name(export_path, "plugins", only_popular, only_vulnerable)
         self._dump(file_name, plugin_list, FileListGroupSchema())
@@ -44,20 +45,22 @@ class Exporter:
     def export_themes(self, export_path, only_popular=False, only_vulnerable=False):
         theme_list = FileListGroup(key="themes", producer="Vane2Export")
         for theme_key in self._list_keys("themes", only_popular, only_vulnerable):
-            self.version_rebuild.update(theme_key)
-            theme_file_list = self.version_rebuild.file_list
-            if len(theme_file_list.files) > 0:
-                theme_list.file_lists.append(theme_file_list)
+            version_list = self.storage.read_versions(theme_key)
+            file_list = self.version_rebuild.create_file_list_from_version_list(version_list, files_per_version=2,
+                                                                                producer="Vane2Export")
+            if file_list is not None:
+                theme_list.file_lists.append(file_list)
 
         file_name = self._get_export_file_name(export_path, "themes", only_popular, only_vulnerable)
         self._dump(file_name, theme_list, FileListGroupSchema())
 
     def export_wordpress(self, export_path):
-        equal_versions = self.version_rebuild.update("wordpress")
-        wordpress_file_list = self.version_rebuild.file_list
-        file_name = self._get_export_file_name(export_path, "wordpress", False, False)
-        self._dump(file_name, wordpress_file_list, FileListSchema())
-        return equal_versions
+        version_list = self.storage.read_versions("wordpress")
+        file_list = self.version_rebuild.create_file_list_from_version_list(version_list, files_per_version=2,
+                                                                            producer="Vane2Export")
+        if file_list is not None:
+            file_name = self._get_export_file_name(export_path, "wordpress", False, False)
+            self._dump(file_name, file_list, FileListSchema())
 
     def export_vulnerabilities(self, export_path):
         vulnerability_list_group = VulnerabilityListGroup(producer="vane2_export")
