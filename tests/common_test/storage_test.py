@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from unittest.mock import mock_open, patch, call, MagicMock
+from unittest.mock import mock_open, patch, call, MagicMock, ANY
 
 from fixtures import file_path
 
@@ -64,6 +64,18 @@ VERSIONS_FILE_DATA = """
                     ]
                 }
             ]
+        }
+    ]
+}""".strip()
+
+OLD_VERSIONS_FILE_DATA = """
+{
+    "key": "plugins/better-wp-security",
+    "producer": "SubversionFetcher",
+    "versions": [
+        {
+            "version": "1.4",
+            "signatures": [{"path":"path/to/file", "algo": "SHA256", "hash": "abcdef123456"}]
         }
     ]
 }""".strip()
@@ -214,8 +226,34 @@ class StorageTest(TestCase):
 
         with patch('openwebvulndb.common.storage.open', m, create=True):
             storage = Storage('/some/path')
+            storage._read_from_cache = MagicMock(side_effect=FileNotFoundError())
 
             vlist = storage.read_versions("plugins/better-wp-security")
+            self.assertIsInstance(vlist, VersionList)
+            self.assertEqual(vlist.producer, "SubversionFetcher")
+
+            m.assert_called_with('/some/path/plugins/better-wp-security/versions.json', 'r')
+
+    def test_read_versions_read_from_local_cache_if_file_exists(self):
+        m = mock_open(read_data=VERSIONS_FILE_DATA)
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+
+            vlist = storage.read_versions("plugins/better-wp-security")
+
+            m.assert_called_with('/some/path/.cache/plugins/better-wp-security/versions_old.json', 'r')
+
+    def test_read_versions_use_old_format_if_new_schema_failed_to_load(self):
+        m = mock_open(read_data=OLD_VERSIONS_FILE_DATA)
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+            storage._read_from_cache = MagicMock(side_effect=FileNotFoundError())
+
+            vlist = storage.read_versions("plugins/better-wp-security")
+
+            self.assertEqual(vlist.versions[0].signatures[0].hash, "abcdef123456")
             self.assertIsInstance(vlist, VersionList)
             self.assertEqual(vlist.producer, "SubversionFetcher")
 
@@ -228,7 +266,7 @@ class StorageTest(TestCase):
                 patch('openwebvulndb.common.storage.open', m, create=True), \
                 patch('openwebvulndb.common.storage.makedirs') as makedirs:
             storage = Storage('/some/path')
-            storage._cache = MagicMock()
+            storage._write_to_cache = MagicMock()
 
             vlist = VersionList(key="plugins/better-wp-security",
                                 producer="SubversionFetcher")
@@ -245,6 +283,17 @@ class StorageTest(TestCase):
 
             handle = m()
             handle.write.assert_called_once_with(VERSIONS_FILE_DATA)
+
+    def test_write_versions_write_version_list_to_local_cache(self):
+        storage = Storage('/some/path')
+        storage._write_to_cache = MagicMock()
+        storage._write = MagicMock()
+
+        vlist = VersionList(key="plugins/better-wp-security",
+                            producer="SubversionFetcher")
+        storage.write_versions(vlist)
+
+        storage._write_to_cache.assert_called_once_with(ANY, vlist, "versions_old.json")
 
     def test_read_path_empty(self):
         empty = file_path(__file__, '')
@@ -293,7 +342,7 @@ class StorageTest(TestCase):
             self.assertEqual(["hello", "world", "test"], list(lines))
             m.assert_called_with('/some/path/test.txt', 'r')
 
-    def test_cache(self):
+    def test_write_to_cache(self):
         m = mock_open()
 
         with \
@@ -303,7 +352,7 @@ class StorageTest(TestCase):
 
             vlist = VersionList(key="plugins/better-wp-security", producer="SubversionFetcher")
 
-            storage._cache(VersionListSchema(), vlist, "versions_old.json")
+            storage._write_to_cache(VersionListSchema(), vlist, "versions_old.json")
 
             makedirs.assert_called_once_with('/some/path/.cache/plugins/better-wp-security', mode=0o755, exist_ok=True)
             m.assert_called_with('/some/path/.cache/plugins/better-wp-security/versions_old.json', 'w')
@@ -311,3 +360,16 @@ class StorageTest(TestCase):
             handle = m()
             handle.write.assert_called_once_with('{\n    "key": "plugins/better-wp-security",\n    '
                                                  '"producer": "SubversionFetcher"\n}')
+
+    def test_read_from_cache_file_not_found(self):
+        m = mock_open()
+        m.side_effect = FileNotFoundError()
+
+        with patch('openwebvulndb.common.storage.open', m, create=True):
+            storage = Storage('/some/path')
+            vlist = VersionList(key="plugins/better-wp-security", producer="SubversionFetcher")
+
+            with self.assertRaises(FileNotFoundError):
+                storage._read_from_cache(VersionListSchema(), vlist.key, "versions_old.json")
+
+            m.assert_called_with('/some/path/.cache/plugins/better-wp-security/versions_old.json', 'r')

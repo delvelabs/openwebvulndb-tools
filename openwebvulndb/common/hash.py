@@ -51,11 +51,12 @@ class RepositoryHasher:
             required_versions = VersionCompare.sorted(repository_versions - stored_versions)
 
             for v in required_versions:
-                update_required = True
                 try:
                     signatures = await self.collect_for_version(workspace, v, prefix=prefix)
-                    desc = version_list.get_version(v, create_missing=True)
-                    desc.signatures = signatures
+                    if len(signatures) > 0:
+                        desc = version_list.get_version(v, create_missing=True)
+                        desc.signatures = signatures
+                        update_required = True
                 except DirectoryExpected:
                     pass  # Bad version, skip
         except ExecutionFailure as e:

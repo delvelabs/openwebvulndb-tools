@@ -20,10 +20,11 @@ from unittest.mock import MagicMock, call, patch, mock_open
 from contextlib import contextmanager
 
 from fixtures import async_test
+from aiohttp.test_utils import make_mocked_coro
 
 from openwebvulndb.common.errors import ExecutionFailure, DirectoryExpected
 from openwebvulndb.common.hash import HashCollector, Hasher, VersionChecker, RepositoryHasher
-from openwebvulndb.common.models import Signature, VersionList, Meta, Repository
+from openwebvulndb.common.models import Signature, VersionList, Meta, Repository, VersionDefinition
 
 
 class HashCollectorTest(TestCase):
@@ -351,9 +352,7 @@ class RepositoryHasherTest(TestCase):
             call(workspace, "1.0", prefix="wp-content/plugins/a-plugin"),
         ], any_order=False)
 
-        expect = VersionList(producer="RepositoryHasher", key="plugins/a-plugin")
-
-        hasher.storage.write_versions.assert_called_with(expect)
+        hasher.storage.write_versions.assert_not_called()
 
     @async_test()
     async def test_skip_bad_branches(self, fake_future):
@@ -417,3 +416,18 @@ class RepositoryHasherTest(TestCase):
             collector.collect.assert_called_with()
 
             workspace.to_version.assert_called_with("2.1")
+
+    @async_test()
+    async def test_collect_for_workspace_do_not_write_versions_if_empty_signatures(self):
+        hasher = RepositoryHasher(storage=MagicMock(), hasher=Hasher("SHA256"))
+        hasher.collect_for_version = make_mocked_coro(return_value=[])
+        hasher.get_version_list = MagicMock(return_value=VersionList(key="plugins/plugin-key", producer="unittest",
+                                                                     versions=[VersionDefinition(version="1.0")]))
+        workspace = MagicMock()
+        workspace.list_versions = make_mocked_coro(return_value=["1.2"])
+        hasher.storage.write_versions = MagicMock()
+
+        await hasher.collect_for_workspace("plugins/plugin-key", workspace)
+
+        hasher.collect_for_version.assert_called_once_with(workspace, "1.2", prefix="")
+        hasher.storage.write_versions.assert_not_called()

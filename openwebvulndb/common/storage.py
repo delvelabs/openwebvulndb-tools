@@ -60,20 +60,24 @@ class Storage:
                 yield self.read_vulnerabilities(key, parts.group(1))
 
     def write_versions(self, vlist):
+        self._write_to_cache(VersionListSchema(), vlist, "versions_old.json")
         exporter = VersionBuilder()
         file_list = exporter.create_file_list_from_version_list(vlist)
-        self._write(FileListSchema(), file_list, "versions.json")
-        self._cache(VersionListSchema(), vlist, "versions_old.json")
+        if file_list is not None:
+            self._write(FileListSchema(), file_list, "versions.json")
 
     def read_versions(self, key):
         importer = VersionImporter()
         try:
-            file_list = self._read(FileListSchema(), key, 'versions.json')
-            return importer.import_version_list(file_list)
-        except Exception:  # If read of new versions file failed, try to read it in old file format
-            vlist = self._read(VersionListSchema(), key, 'versions.json')
-            logger.warn("Use of VersionListSchema to store versions file is deprecated. Use convert_versions_files to convert your database to new file format.")
-            return vlist
+            return self._read_from_cache(VersionListSchema(), key, 'versions_old.json')
+        except FileNotFoundError:
+            try:
+                file_list = self._read(FileListSchema(), key, 'versions.json')
+                return importer.import_version_list(file_list)
+            except Exception:  # If read of new versions file failed, try to read it in old file format
+                vlist = self._read(VersionListSchema(), key, 'versions.json')
+                logger.warn("Use of VersionListSchema to store versions file is deprecated. Use convert_versions_files to convert your database to new file format.")
+                return vlist
 
     def list_directories(self, path):
         try:
@@ -131,7 +135,7 @@ class Storage:
     def _path(self, *args):
         return join(self.base_path, *args)
 
-    def _cache(self, schema, item, *args):
+    def _write_to_cache(self, schema, item, *args):
         data, errors = serialize(schema, item)
         path = join(".cache", item.key)
         self._prepare_path(path)
@@ -153,7 +157,7 @@ class Storage:
                 continue
             except FileNotFoundError:
                 pass
-            except Exception:
+            except Exception:  # File in old version format.
                 try:
                     version_list = self._read(VersionListSchema(), key, "versions.json")
                     file_list = version_builder.create_file_list_from_version_list(version_list)
@@ -163,3 +167,9 @@ class Storage:
                         self._write(FileListSchema(), file_list, "versions.json")
                 except FileNotFoundError:
                     pass
+
+    def _read_from_cache(self, schema, key, filename):
+        try:
+            return self._read(schema, ".cache", key, filename)
+        except FileNotFoundError as e:
+            raise e
