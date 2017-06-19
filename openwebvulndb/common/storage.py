@@ -62,9 +62,14 @@ class Storage:
     def write_versions(self, vlist):
         self._write_to_cache(VersionListSchema(), vlist, "versions_old.json")
         exporter = VersionBuilder()
-        file_list = exporter.create_file_list_from_version_list(vlist)
-        if file_list is not None:
+        try:
+            file_list = self._read(FileListSchema(), vlist.key, "versions.json")
+            exporter.update_file_list(file_list, vlist)
             self._write(FileListSchema(), file_list, "versions.json")
+        except FileNotFoundError:
+            file_list = exporter.create_file_list_from_version_list(vlist)
+            if file_list is not None:
+                self._write(FileListSchema(), file_list, "versions.json")
 
     def read_versions(self, key):
         importer = VersionImporter()

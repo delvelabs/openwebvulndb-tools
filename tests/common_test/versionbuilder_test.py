@@ -78,6 +78,74 @@ class TestVersionBuilder(TestCase):
 
         self.version_builder._shrink_version_list.assert_called_once_with()
 
+    def test_update_file_list(self):
+        signature0 = Signature(path="file", hash="12345")
+        signature1 = Signature(path="readme", hash="54321")
+        signature2 = Signature(path="readme", hash="56789")
+        version0 = VersionDefinition(version="1.0", signatures=[signature0, signature1])
+        version1 = VersionDefinition(version="1.1", signatures=[signature0, signature1])
+        version2 = VersionDefinition(version="1.2", signatures=[signature0, signature2])
+        version_list = VersionList(producer="producer", key="key", versions=[version0, version1])
+        file_list = self.version_builder.create_file_list_from_version_list(version_list)
+        version_list.versions.append(version2)
+
+        self.version_builder.update_file_list(file_list, version_list)
+
+        file = [file for file in file_list.files if file.path == "file"][0]
+        self.assertEqual(file.path, "file")
+        self.assertEqual(len(file.signatures), 1)
+        self.assertEqual(file.signatures[0].hash, "12345")
+        self.assertEqual(len(file.signatures[0].versions), 3)
+
+        readme = [file for file in file_list.files if file.path == "readme"][0]
+        self.assertEqual(readme.path, "readme")
+        self.assertEqual(len(readme.signatures), 2)
+        self.assertEqual(readme.signatures[0].hash, "54321")
+        self.assertEqual(len(readme.signatures[0].versions), 2)
+        self.assertIn("1.0", readme.signatures[0].versions)
+        self.assertIn("1.1", readme.signatures[0].versions)
+        self.assertEqual(readme.signatures[1].hash, "56789")
+        self.assertEqual(readme.signatures[1].versions, ["1.2"])
+
+    def test_update_file_list_keep_file_order_and_append_new_file_at_end(self):
+        self.version_builder._shrink_version_list = MagicMock()
+        signature0 = Signature(path="path/to/files/abc.html", hash="12345")
+        signature1 = Signature(path="path/to/files/file.js", hash="12345")
+        signature2 = Signature(path="path/to/files/js/file.js", hash="12345")
+        signature3 = Signature(path="path/to/files/readme.txt", hash="12345")
+        signature4 = Signature(path="path/to/files/style/color.css", hash="12345")
+        signature5 = Signature(path="path/to/files/style/style.css", hash="12345")
+        signature6 = Signature(path="path/to/files/style/color.css", hash="23456")
+        signature7 = Signature(path="path/to/files/readme.txt", hash="23456")
+        signatures = [signature0, signature1, signature2, signature3, signature4]
+        version_list = VersionList(key="key", producer="producer",
+                                   versions=[VersionDefinition(version="1.0", signatures=signatures)])
+        file_list = self.version_builder.create_file_list_from_version_list(version_list, 50)
+        initial_file_order = [file.path for file in file_list.files]
+        version = version_list.get_version("1.1", create_missing=True)
+        version.signatures = [signature5, signature6, signature7]
+
+        self.version_builder.update_file_list(file_list, version_list, 50)
+
+        for i in range(len(initial_file_order)):
+            self.assertEqual(file_list.files[i].path, initial_file_order[i])
+        self.assertEqual(signature5.path, file_list.files[-1].path)
+
+    def test_update_file_list_set_versions_in_order_when_adding_versions_to_signature(self):
+        self.version_builder._shrink_version_list = MagicMock()
+        version_list = VersionList(key="key", producer="producer")
+        version0 = version_list.get_version(version="1.0", create_missing=True)
+        version0.add_signature("file", "hash")
+        version1 = version_list.get_version(version="1.1", create_missing=True)
+        version1.add_signature("file", "hash")
+        file_list = self.version_builder.create_file_list_from_version_list(version_list, 50)
+        version2 = version_list.get_version("1.2", create_missing=True)
+        version2.add_signature("file", "hash")
+
+        self.version_builder.update_file_list(file_list, version_list, 50)
+
+        self.assertEqual(file_list.files[0].signatures[0].versions, ["1.0", "1.1", "1.2"])
+
     def test_create_file_from_version_list_regroup_all_versions_with_identical_hash_for_file_in_same_file_signature_model(self):
         signature0 = Signature(path="file", hash="12345")
         signature1 = Signature(path="readme", hash="54321")

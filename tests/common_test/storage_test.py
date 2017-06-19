@@ -22,6 +22,7 @@ from fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
 from openwebvulndb.common.schemas import VersionListSchema
+from openwebvulndb.common.models import File, FileList, FileSignature
 
 
 META_FILE_DATA = """
@@ -267,6 +268,7 @@ class StorageTest(TestCase):
                 patch('openwebvulndb.common.storage.makedirs') as makedirs:
             storage = Storage('/some/path')
             storage._write_to_cache = MagicMock()
+            storage._read = MagicMock(side_effect=FileNotFoundError())
 
             vlist = VersionList(key="plugins/better-wp-security",
                                 producer="SubversionFetcher")
@@ -283,6 +285,30 @@ class StorageTest(TestCase):
 
             handle = m()
             handle.write.assert_called_once_with(VERSIONS_FILE_DATA)
+
+    def test_write_versions_update_existing_file_list(self):
+        version_builder_mock = MagicMock()
+        file_list_schema = MagicMock()
+        with patch("openwebvulndb.common.storage.VersionBuilder", MagicMock(return_value=version_builder_mock)), \
+                patch("openwebvulndb.common.storage.FileListSchema", MagicMock(return_value=file_list_schema)):
+            storage = Storage('/some/path')
+            file_list = FileList(key="key", producer="producer",
+                                 files=[File(path="file0", signatures=[FileSignature(hash="0", versions=["1.0"])])])
+            storage._write_to_cache = MagicMock()
+            storage._read = MagicMock(return_value=file_list)
+            storage._write = MagicMock()
+            vlist = VersionList(key="key", producer="producer")
+            v = vlist.get_version("1.0", create_missing=True)
+            v.add_signature("file0", "0"),
+            v = vlist.get_version("1.1", create_missing=True)
+            v.add_signature("file0", "1")
+            v.add_signature("file1", "1")
+
+            storage.write_versions(vlist)
+
+            storage._read.assert_called_once_with(file_list_schema, "key", "versions.json")
+            storage._write.assert_called_once_with(file_list_schema, file_list, "versions.json")
+            version_builder_mock.update_file_list.assert_called_once_with(file_list, vlist)
 
     def test_write_versions_write_version_list_to_local_cache(self):
         storage = Storage('/some/path')

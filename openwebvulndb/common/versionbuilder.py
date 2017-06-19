@@ -40,6 +40,20 @@ class VersionBuilder:
             file_list.files.append(file)
         return file_list
 
+    def update_file_list(self, file_list, version_list, files_per_version=50):
+        self.version_list = version_list
+        self.files_per_version = files_per_version
+        self.exclude_files()
+        if self.is_version_list_empty():
+            return
+        self._shrink_version_list()
+        new_files = self.get_file_paths_from_version_list() - set(file.path for file in file_list.files)
+        for file in file_list.files:
+            file_list.files[file_list.files.index(file)] = self._create_file_from_version_list(file.path)
+        for file_path in new_files:
+            file = self._create_file_from_version_list(file_path)
+            file_list.files.append(file)
+
     def _create_file_from_version_list(self, file_path):
         file = File(path=file_path)
         for version_definition in self.version_list.versions:
@@ -47,6 +61,7 @@ class VersionBuilder:
             if signature is not None:
                 file_signature = file.get_signature(signature.hash, create_missing=True)
                 file_signature.versions.append(version_definition.version)
+        self._sort_file_signatures(file)
         return file
 
     def get_signature(self, file_path, version_definition):
@@ -169,6 +184,13 @@ class VersionBuilder:
         for version in self.version_list.versions:
             file_counter.update(file_path for file_path in self._get_paths_in_version(version) if file_path in paths)
         return file_counter
+
+    def _sort_file_signatures(self, file):
+        # Sort the versions in each signatures, and the signatures in version order, to prevent unnecessary changes to
+        # the versions files when updating.
+        for file_signature in file.signatures:
+            file_signature.versions.sort(key=lambda version: parse(version))
+        file.signatures.sort(key=lambda _signature: parse(_signature.versions[0]))
 
 
 class VersionImporter:
