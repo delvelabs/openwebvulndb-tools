@@ -47,7 +47,6 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                 if not v.affected_versions or any(r.fixed_in is None for r in v.affected_versions):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
-
 operations = dict(find_identity_files=find_identity_files,
                   find_unclosed_vulnerabilities=find_unclosed_vulnerabilities)
 
