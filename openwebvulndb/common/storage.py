@@ -153,26 +153,18 @@ class Storage:
 
     def convert_versions_files(self):
         version_builder = VersionBuilder()
-        keys = ["mu", "wordpress", "plugins", "themes"]
-        for key in keys:
-            for _key in self.list_directories(key):
-                keys.append("{0}/{1}".format(key, _key))
-        for key in keys:
-            try:  # Check if file is already in new format. An exception will be raised if not.
-                self._read(FileListSchema(), key, "versions.json")
-                continue
-            except FileNotFoundError:
-                pass
-            except Exception:  # File in old version format.
-                try:
+        for key, path, dirs, files in self.walk():
+            if "versions.json" in files:
+                try:  # Check if file is already in new format. An exception will be raised if not.
+                    self._read(FileListSchema(), key, "versions.json")
+                    print("already converted")
+                except Exception:  # File in old version format.
                     version_list = self._read(VersionListSchema(), key, "versions.json")
                     file_list = version_builder.create_file_list_from_version_list(version_list)
                     if file_list is None:
                         self._remove(key, "versions.json")
                     else:
                         self._write(FileListSchema(), file_list, "versions.json")
-                except FileNotFoundError:
-                    pass
 
     def _read_from_cache(self, schema, key, filename):
         try:
