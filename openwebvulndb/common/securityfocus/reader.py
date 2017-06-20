@@ -18,7 +18,7 @@
 import json
 import re
 from openwebvulndb.common.logs import logger
-from openwebvulndb.common.models import Reference, VersionRange
+from openwebvulndb.common.models import Reference, VersionRange, VersionNotFound
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
@@ -104,10 +104,26 @@ class SecurityFocusReader:
             apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
-        from_url = self._identify_from_url(entry['references_parser'])
-        if from_url is not None:
-            return from_url
-        return self._identify_from_title(entry)
+        target = self._identify_from_url(entry['references_parser'])
+        if target is None:
+            target = self._identify_from_title(entry)
+        if target is not None and self._validate_target(target, entry):
+            return target
+        else:
+            return None
+
+    def _validate_target(self, target_key, entry):
+        try:
+            version_list = self.storage.read_versions(target_key)
+            for version in entry['info_parser'].get_vulnerable_versions():
+                version_list.get_version(version)
+            for version in entry['info_parser'].get_not_vulnerable_versions():
+                version_list.get_version(version)
+        except FileNotFoundError:
+            pass
+        except VersionNotFound:
+            return False
+        return True
 
     def _identify_from_url(self, references_parser):
         for reference in references_parser.get_references():

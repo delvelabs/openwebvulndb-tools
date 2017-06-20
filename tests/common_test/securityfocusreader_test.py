@@ -23,7 +23,7 @@ from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 from openwebvulndb.common.storage import Storage
 from openwebvulndb.common.manager import VulnerabilityManager
 from openwebvulndb.common.errors import VulnerabilityNotFound
-from openwebvulndb.common.models import VulnerabilityList, Vulnerability, Reference
+from openwebvulndb.common.models import VulnerabilityList, Vulnerability, Reference, VersionList
 from datetime import datetime
 import json
 import os
@@ -36,6 +36,19 @@ class TargetIdentificationTest(unittest.TestCase):
     def setUp(self):
         self.storage = MagicMock()
         self.reader = SecurityFocusReader(self.storage)
+
+    def test_identify_target_validate_target_found(self):
+        entry = {'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['references_parser'].get_references.return_value = []
+        entry['info_parser'].get_title.return_value = \
+            "WordPress WP Statistics CVE-2017-2136 HTML Injection Vulnerability"
+        self.reader._validate_target = MagicMock(return_value=False)
+        self.reader._identify_from_title = MagicMock(return_value="wordpress")
+
+        self.assertIsNone(self.reader.identify_target(entry))
+
+        self.reader._validate_target.assert_called_once_with("wordpress", entry)
+
 
     def test_identify_plugin_from_url(self):
         entry = dict()
@@ -123,7 +136,19 @@ class TargetIdentificationTest(unittest.TestCase):
         entry=dict()
         entry["info_parser"] = info_parser
         entry["references_parser"] = references_parser
-        self.assertEqual(self.reader.identify_target(entry), None)
+        self.assertIsNone(self.reader.identify_target(entry))
+
+    def test_validate_target_return_false_if_fixed_is_not_a_valid_version_for_target(self):
+        info_parser = MagicMock()
+        info_parser.get_title.return_value = "WordPress WP Statistics CVE-2017-2136 HTML Injection Vulnerability"
+        info_parser.get_vulnerable_versions.return_value = ["12.0", "12.0.1", "12.0.2", "12.0.4"]
+        wordpress_versions = VersionList(key="key", producer="producer")
+        wordpress_versions.get_version("4.7.5", create_missing=True)
+        self.storage.read_versions.return_value = wordpress_versions
+        entry = {'info_parser': info_parser}
+
+        self.assertFalse(self.reader._validate_target("wordpress", entry))
+        self.storage.read_versions.assert_called_once_with("wordpress")
 
 
 class SecurityFocusReaderTest(unittest.TestCase):
