@@ -460,6 +460,27 @@ class TestVersionBuilder(TestCase):
 
         self.assertEqual(len(diff), 0)
 
+    def test_get_hash_algo_return_algo_used_by_all_signatures_in_version_list(self):
+        version_list = VersionList(key="key", producer="producer")
+        for i in range(5):
+            version = version_list.get_version("1.%d" % i, create_missing=True)
+            version.add_signature("file0", hash="123", algo="SHA512")
+            version.add_signature("file1", hash="123", algo="SHA512")
+
+        algo = self.version_builder._get_hash_algo(version_list)
+
+        self.assertEqual(algo, "SHA512")
+
+    def test_get_hash_algo_raise_value_error_if_not_all_signature_use_same_algo(self):
+        version_list = VersionList(key="key", producer="producer")
+        for i in range(5):
+            version = version_list.get_version("1.%d" % i, create_missing=True)
+            version.add_signature("file0", hash="123", algo="SHA512")
+            version.add_signature("file1", hash="123", algo="md5")
+
+        with self.assertRaises(ValueError):
+            self.version_builder._get_hash_algo(version_list)
+
 
 class TestVersionImporter(TestCase):
 

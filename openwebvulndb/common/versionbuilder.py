@@ -31,6 +31,7 @@ class VersionBuilder:
         self.files_per_version = files_per_version
         if self._prepare_version_list():
             file_list = FileList(key=version_list.key, producer=producer or version_list.producer)
+            file_list.hash_algo = self._get_hash_algo(version_list)
             file_paths = self._get_file_paths_from_version_list()
             for file_path in file_paths:
                 file = self._create_file_from_version_list(file_path)
@@ -197,6 +198,16 @@ class VersionBuilder:
         for file_signature in file.signatures:
             file_signature.versions.sort(key=lambda version: parse(version))
         file.signatures.sort(key=lambda _signature: parse(_signature.versions[0]))
+
+    def _get_hash_algo(self, version_list):
+        algo = set()
+        for version in version_list.versions:
+            for signature in version.signatures:
+                algo.add(signature.algo)
+        if len(algo) > 1:
+            raise ValueError("Cannot export VersionList to FileList if more than one hashing algorithm is used for "
+                             "the signatures.")
+        return algo.pop()
 
 
 class VersionImporter:
