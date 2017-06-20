@@ -17,7 +17,7 @@
 
 import os
 from argparse import ArgumentParser
-from os.path import join
+from os.path import join, dirname
 from random import shuffle
 
 from openwebvulndb import app
@@ -30,6 +30,9 @@ from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
     download_vulnerability_entry
+from ..common.storage import Storage
+from ..common.models import VersionNotFound
+from ..common.versionbuilder import VersionBuilder
 
 
 def list_plugins(loop, repository):
@@ -126,8 +129,15 @@ def load_cve(loop, cve_reader, input_file):
 
 
 def change_version_format(storage):
-    storage.convert_versions_files()
-
+    version_builder = VersionBuilder()
+    for key, path, dirs, files in storage.walk():
+        if "versions.json" in files:
+            version_list = storage.read_version_list(key)
+            file_list = version_builder.create_file_list_from_version_list(version_list, producer=version_list.producer)
+            if file_list is None:
+                storage.remove(key, "versions.json")
+            else:
+                storage.write_versions(file_list)
 
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,

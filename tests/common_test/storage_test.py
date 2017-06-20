@@ -243,7 +243,7 @@ class StorageTest(TestCase):
 
             vlist = storage.read_versions("plugins/better-wp-security")
 
-            m.assert_called_with('/some/path/.cache/plugins/better-wp-security/versions_old.json', 'r')
+            m.assert_called_with('/some/path/.cache/plugins/better-wp-security/version_list.json', 'r')
 
     def test_read_versions_use_old_format_if_new_schema_failed_to_load(self):
         m = mock_open(read_data=OLD_VERSIONS_FILE_DATA)
@@ -319,7 +319,7 @@ class StorageTest(TestCase):
                             producer="SubversionFetcher")
         storage.write_versions(vlist)
 
-        storage._write_to_cache.assert_called_once_with(ANY, vlist, "versions_old.json")
+        storage._write_to_cache.assert_called_once_with(ANY, vlist, "version_list.json")
 
     def test_read_path_empty(self):
         empty = file_path(__file__, '')
