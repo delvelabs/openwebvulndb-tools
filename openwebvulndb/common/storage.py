@@ -18,13 +18,15 @@
 import re
 from json.decoder import JSONDecodeError
 from os.path import join, dirname
-from os import makedirs, scandir, walk
+from os import makedirs, scandir, walk, remove
 from contextlib import contextmanager
 
-from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema
+from .schemas import MetaSchema, VulnerabilityListSchema, VersionListSchema, FileListSchema
 from .serialize import serialize
 from .config import DEFAULT_PATH
 from .logs import logger
+from .versionbuilder import VersionImporter, VersionBuilder
+from .models import FileList, VersionList
 
 
 class Storage:
@@ -58,10 +60,36 @@ class Storage:
             if parts and not entry.is_dir():
                 yield self.read_vulnerabilities(key, parts.group(1))
 
-    def write_versions(self, vlist):
-        self._write(VersionListSchema(), vlist, "versions.json")
+    def write_versions(self, versions):
+        if isinstance(versions, VersionList):
+            self._write_to_cache(VersionListSchema(), versions, "version_list.json")
+            exporter = VersionBuilder()
+            try:
+                file_list = self._read(FileListSchema(), versions.key, "versions.json")
+                exporter.update_file_list(file_list, versions)
+                self._write(FileListSchema(), file_list, "versions.json")
+            except FileNotFoundError:
+                file_list = exporter.create_file_list_from_version_list(versions)
+                if file_list is not None:
+                    self._write(FileListSchema(), file_list, "versions.json")
+        elif isinstance(versions, FileList):
+            self._write(FileListSchema(), versions, "versions.json")
 
     def read_versions(self, key):
+        importer = VersionImporter()
+        try:
+            return self._read_from_cache(VersionListSchema(), key, 'version_list.json')
+        except FileNotFoundError:
+            try:
+                file_list = self._read(FileListSchema(), key, 'versions.json')
+                return importer.import_version_list(file_list)
+            except Exception:  # If read of new versions file failed, try to read it in old file format
+                vlist = self.read_version_list(key)
+                logger.warn("Using VersionListSchema to store versions file is deprecated. Use change_version_format to"
+                            " convert versions files to new format.")
+                return vlist
+
+    def read_version_list(self, key):
         return self._read(VersionListSchema(), key, 'versions.json')
 
     def list_directories(self, path):
@@ -90,6 +118,22 @@ class Storage:
         for path, dirs, files in walk(self._path(*args)):
             key = path[base_len + 1:]
             yield key, path, dirs, files
+
+    def _write_to_cache(self, schema, item, *args):
+        data, errors = serialize(schema, item)
+        path = join(".cache", item.key)
+        self._prepare_path(path)
+        with self._open('w', path, *args) as fp:
+            fp.write(data)
+
+    def _read_from_cache(self, schema, key, filename):
+        try:
+            return self._read(schema, ".cache", key, filename)
+        except FileNotFoundError as e:
+            raise e
+
+    def _remove(self, *args):
+        remove(self._path(*args))
 
     def _write(self, schema, item, *args):
         data, errors = serialize(schema, item)

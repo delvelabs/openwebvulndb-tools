@@ -17,7 +17,7 @@
 
 import os
 from argparse import ArgumentParser
-from os.path import join
+from os.path import join, dirname
 from random import shuffle
 
 from openwebvulndb import app
@@ -30,6 +30,9 @@ from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
     download_vulnerability_entry
+from ..common.storage import Storage
+from ..common.models import VersionNotFound
+from ..common.versionbuilder import VersionBuilder
 
 
 def list_plugins(loop, repository):
@@ -69,9 +72,7 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
             logger.error("%s environment variable must be defined to push Vane2 data to repository." % env_variable)
             return
 
-    equal_versions = exporter.export_wordpress(export_path)
-    for version in equal_versions:
-        logger.info(version)
+    exporter.export_wordpress(export_path)
     exporter.dump_meta("wordpress", export_path)
 
     exporter.export_plugins(export_path, only_popular=True)
@@ -127,6 +128,17 @@ def load_cve(loop, cve_reader, input_file):
         loop.run_until_complete(cve_reader.read_api("http://cve.circl.lu/api/search/wordpress/wordpress"))
 
 
+def change_version_format(storage):
+    version_builder = VersionBuilder()
+    for key, path, dirs, files in storage.walk():
+        if "versions.json" in files:
+            version_list = storage.read_version_list(key)
+            file_list = version_builder.create_file_list_from_version_list(version_list, producer=version_list.producer)
+            if file_list is None:
+                storage.remove(key, "versions.json")
+            else:
+                storage.write_versions(file_list)
+
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
@@ -136,7 +148,8 @@ operations = dict(list_themes=list_themes,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
                   create_securityfocus_database=create_securityfocus_database,
-                  download_vulnerability_entry=download_vulnerability_entry
+                  download_vulnerability_entry=download_vulnerability_entry,
+                  change_version_format=change_version_format
                   )
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
@@ -150,7 +163,7 @@ parser.add_argument('-f', '--input-file', dest='input_file',
 parser.add_argument('--create-release', dest='create_release', action='store_true', help='Create a new GitHub release')
 parser.add_argument('--target-commitish', dest='target_commitish', help='Branch name or SHA number of the commit used '
                                                                         'for the new release')
-parser.add_argument('--release-version', dest='release_version', help='version of the new release')
+parser.add_argument('--release-version', dest='release_version', help='print version of the new release')
 
 args = parser.parse_args()
 
