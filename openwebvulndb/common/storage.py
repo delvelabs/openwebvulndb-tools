@@ -132,7 +132,7 @@ class Storage:
         except FileNotFoundError as e:
             raise e
 
-    def _remove(self, *args):
+    def remove(self, *args):
         remove(self._path(*args))
 
     def _write(self, schema, item, *args):

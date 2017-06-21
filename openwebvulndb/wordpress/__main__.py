@@ -17,7 +17,7 @@
 
 import os
 from argparse import ArgumentParser
-from os.path import join, dirname
+from os.path import join
 from random import shuffle
 
 from openwebvulndb import app
@@ -30,8 +30,6 @@ from ..common.logs import logger
 from ..common.parallel import ParallelWorker
 from ..common.securityfocus.database_tools import update_securityfocus_database, create_securityfocus_database, \
     download_vulnerability_entry
-from ..common.storage import Storage
-from ..common.models import VersionNotFound
 from ..common.versionbuilder import VersionBuilder
 
 
