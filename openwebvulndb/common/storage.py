@@ -80,14 +80,8 @@ class Storage:
         try:
             return self._read_from_cache(VersionListSchema(), key, 'version_list.json')
         except FileNotFoundError:
-            try:
-                file_list = self._read(FileListSchema(), key, 'versions.json')
-                return importer.import_version_list(file_list)
-            except Exception:  # If read of new versions file failed, try to read it in old file format
-                vlist = self.read_version_list(key)
-                logger.warn("Using VersionListSchema to store versions file is deprecated. Use change_version_format to"
-                            " convert versions files to new format.")
-                return vlist
+            file_list = self._read(FileListSchema(), key, 'versions.json')
+            return importer.import_version_list(file_list)
 
     def read_version_list(self, key):
         return self._read(VersionListSchema(), key, 'versions.json')
