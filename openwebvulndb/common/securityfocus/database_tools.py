@@ -18,12 +18,13 @@
 from openwebvulndb.common.securityfocus.fetcher import SecurityFocusFetcher
 from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 import aiohttp
+import json
 
 
 securityfocus_base_url = "http://www.securityfocus.com/bid/"
 
 
-def update_securityfocus_database(loop, storage, vulnerability_manager, bugtraq_id=None):
+def update_securityfocus_database(loop, storage, vulnerability_manager, cve_reader=None, bugtraq_id=None):
     async def update_database():
         async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
             fetcher = SecurityFocusFetcher(aiohttp_session)
@@ -35,7 +36,11 @@ def update_securityfocus_database(loop, storage, vulnerability_manager, bugtraq_
             for vuln_url in vulnerability_list:
                 vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
                 if vuln_entry is not None:
-                    reader.read_one(vuln_entry)
+                    entry = reader.read_one(vuln_entry)
+                    if cve_reader is not None and entry is not None:
+                        for ref in entry.references:
+                            if ref.type == "cve":
+                                await augment_with_cve_entry(ref.id, aiohttp_session, cve_reader)
 
     loop.run_until_complete(update_database())
 
@@ -64,3 +69,26 @@ def download_vulnerability_entry(loop, dest_folder, bugtraq_id):
     if not bugtraq_id:
         raise Exception("Option required: bugtraq_id")
     loop.run_until_complete(download_entry())
+
+
+async def augment_with_cve_entry(cve_id, aiohttp_session, cve_reader):
+    cve_entry = await fetch_cve_entry(aiohttp_session, "CVE-" + cve_id)
+    if cve_entry is None:
+        return
+    try: # When fetching a single cve entry from the cve api, the vulnerable configuration is a list of dict instead of a list of string
+        vulnerable_configuration = cve_entry["vulnerable_configuration"]
+        cve_entry["vulnerable_configuration"] = []
+        for config in vulnerable_configuration:
+            if isinstance(config, dict):
+                cve_entry["vulnerable_configuration"].append(config["id"])
+            elif isinstance(config, str):
+                cve_entry["vulnerable_configuration"].append(config)
+    except KeyError:
+        return
+    cve_reader.read_one(cve_entry)
+
+
+async def fetch_cve_entry(aiohttp_session, cve_id):
+    url = "https://cve.circl.lu/api/cve/" + cve_id
+    async with aiohttp_session.get(url) as response:
+        return json.loads(await response.text())

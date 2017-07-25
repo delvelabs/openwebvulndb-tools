@@ -75,7 +75,7 @@ class CVEReader:
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
-            logger.info("No suitable target found for %s", entry)
+            logger.info("No suitable target found for %s", entry["id"])
             return
 
         this_ref = Reference(type="cve", id=entry["id"][4:])
