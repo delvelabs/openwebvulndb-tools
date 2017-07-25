@@ -18,7 +18,7 @@
 from argparse import ArgumentParser
 
 from openwebvulndb import app
-from statistics import mean
+from statistics import median
 import json
 import os
 
@@ -63,7 +63,6 @@ def find_cvss_based_on_common_vulnerability_type(storage):
                     if vuln.cvss is not None:
                         types[vuln.reported_type]["cvss"].append(vuln.cvss)
 
-    #sorted_types = sorted(types.keys(), key=lambda key: types[key]["count"], reverse=True)
     cvss_from_type = {}
     sorted_types = types.keys()
     for type in sorted_types:
@@ -71,16 +70,31 @@ def find_cvss_based_on_common_vulnerability_type(storage):
         len_cvss = len(data["cvss"])
         if len_cvss > 0 and len_cvss != data["count"]:  # Don't need the mean f all vuln already have a cvss.
             if len_cvss > 5:  # Else calculated cvss is not significant
-                cvss_mean = mean(data["cvss"])
-                cvss_from_type[type] = cvss_mean
-                print("{0}: \t{1} times in database, \tmean cvss is {2} (from {3} cvss)".format(type, data["count"], cvss_mean, len_cvss))
+                cvss_mean = median(data["cvss"])
+                cvss_from_type[type] = round(cvss_mean, 1)
+                print("{0}: \t{1} times in database, \tmode cvss is {2} (from {3} cvss)".format(type, data["count"], cvss_mean, len_cvss))
     with open(os.path.join(os.path.dirname(__file__), "cvss_from_reported_type.json"), "wt") as fp:
         json.dump(cvss_from_type, fp, indent=4)
 
 
+def set_cvss_based_on_reported_type(storage):
+    find_cvss_based_on_common_vulnerability_type(storage)
+    with open(os.path.join(os.path.dirname(__file__), "cvss_from_reported_type.json")) as fp:
+        cvss_from_types = json.load(fp)
+    for meta in storage.list_meta():
+        for vuln_list in storage.list_vulnerabilities(meta.key):
+            for vuln in vuln_list.vulnerabilities:
+                if vuln.cvss is None and vuln.reported_type in cvss_from_types.keys():
+                    vuln.cvss = cvss_from_types[vuln.reported_type]
+            if vuln_list.dirty:
+                storage.write_vulnerabilities(vuln_list)
+                vuln_list.clean()
+
+
 operations = dict(find_identity_files=find_identity_files,
                   find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
-                  find_cvss_based_on_common_vulnerability_type=find_cvss_based_on_common_vulnerability_type)
+                  find_cvss_based_on_common_vulnerability_type=find_cvss_based_on_common_vulnerability_type,
+                  set_cvss_based_on_reported_type=set_cvss_based_on_reported_type)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
