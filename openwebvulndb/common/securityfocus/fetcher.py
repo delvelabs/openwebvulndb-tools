@@ -30,18 +30,38 @@ class SecurityFocusFetcher:
     def __init__(self, http_session=None):
         self.http_session = http_session
 
-    async def get_list_of_vuln_on_first_page(self, file=None):
+    async def get_vulnerabilities(self, vuln_pages_to_fetch=1):
+        vulnerabilities = []
+        vuln_list = await self.get_vulnerability_list(vuln_pages_to_fetch)
+        for vuln_url in vuln_list:
+            vuln_entry = await self.get_vulnerability_entry(url=vuln_url)
+            if vuln_entry is not None:
+                vulnerabilities.append(vuln_entry)
+        return vulnerabilities
+
+    async def get_vulnerability_list(self, vuln_pages_to_fetch=1, file=None):
+        """vuln_pages_to_fetch: Amount of pages to fetch for vulnerabilities (None for all pages).
+        When searching for vulnerabilities on the security focus website, results are displayed accross multiple pages
+        (30 vulnerabilities per page), with the most recent on the first page"""
         if file is not None:
             return self._parse_page_with_vuln_list(file)
         else:
-            async with self.http_session.post("http://www.securityfocus.com/bid",
-                                              data={'op': 'display_list', 'c': 12, 'vendor': 'WordPress'}) as response:
-                assert response.status == 200
-                html_page = await response.text()
-                output_string = StringIO(html_page)
-                vuln_list = self._parse_page_with_vuln_list(output_string)
-                output_string.close()
-                return vuln_list
+            complete_vuln_list = []
+            vulnerabilities_per_page = 30
+            vuln_index = 0  # The number of the first vuln on the next page to fetch. Increment by 30 to change page because there is 30 vuln per page.
+            while vuln_pages_to_fetch is None or vuln_index < vuln_pages_to_fetch * vulnerabilities_per_page:
+                async with self.http_session.post("http://www.securityfocus.com/bid",
+                                                  data={'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}) as response:
+                    assert response.status == 200
+                    vuln_index += 30
+                    html_page = await response.text()
+                    output_string = StringIO(html_page)
+                    vuln_list = self._parse_page_with_vuln_list(output_string)
+                    if len(vuln_list) == 0:  # The last page has been reached, no more vuln to get.
+                        break
+                    output_string.close()
+                    complete_vuln_list += vuln_list
+            return complete_vuln_list
 
     async def get_list_of_vuln_on_all_pages(self):
         complete_vuln_list = []

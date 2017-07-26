@@ -24,25 +24,10 @@ import json
 securityfocus_base_url = "http://www.securityfocus.com/bid/"
 
 
-def update_securityfocus_database(loop, storage, vulnerability_manager, cve_reader=None, bugtraq_id=None):
-    async def update_database():
-        async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
-            fetcher = SecurityFocusFetcher(aiohttp_session)
-            reader = SecurityFocusReader(storage, vulnerability_manager)
-            if bugtraq_id is None:
-                vulnerability_list = await fetcher.get_list_of_vuln_on_first_page()
-            else:
-                vulnerability_list = [securityfocus_base_url + bugtraq_id]
-            for vuln_url in vulnerability_list:
-                vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
-                if vuln_entry is not None:
-                    entry = reader.read_one(vuln_entry)
-                    if cve_reader is not None and entry is not None:
-                        for ref in entry.references:
-                            if ref.type == "cve":
-                                await augment_with_cve_entry(ref.id, aiohttp_session, cve_reader)
-
-    loop.run_until_complete(update_database())
+def update_securityfocus_database(loop, storage, vulnerability_manager, cve_reader=None, bugtraq_id=None,
+                                  vulnerabilities_pages_to_fetch=1):
+    loop.run_until_complete(update_database(loop, storage, vulnerability_manager, cve_reader, bugtraq_id,
+                                            vulnerabilities_pages_to_fetch))
 
 
 def create_securityfocus_database(loop, storage, vulnerability_manager):
@@ -69,6 +54,31 @@ def download_vulnerability_entry(loop, dest_folder, bugtraq_id):
     if not bugtraq_id:
         raise Exception("Option required: bugtraq_id")
     loop.run_until_complete(download_entry())
+
+
+async def update_database(loop, storage, vulnerability_manager, cve_reader, bugtraq_id, vulnerabilities_pages_to_fetch):
+    async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
+        fetcher = SecurityFocusFetcher(aiohttp_session)
+        reader = SecurityFocusReader(storage, vulnerability_manager)
+        if bugtraq_id is None:
+            vulnerability_list = await fetcher.get_vulnerabilities(vulnerabilities_pages_to_fetch)
+        else:
+            vuln_entry = await fetcher.get_vulnerability_entry(bugtraq_id=bugtraq_id)
+            vulnerability_list = [vuln_entry] if vuln_entry is not None else []
+        await read_vulnerability_entries(vulnerability_list, reader, cve_reader, aiohttp_session)
+
+
+async def read_vulnerability_entries(vulnerabilitiy_entry_list, reader, cve_reader, aiohttp_session):
+    database_entries = []
+    for vuln_entry in vulnerabilitiy_entry_list:
+        db_entry = reader.read_one(vuln_entry)
+        if db_entry is not None:
+            database_entries.append(db_entry)
+    if cve_reader is not None:
+        for entry in database_entries:
+            for ref in entry.references:
+                if ref.type == "cve":
+                    await augment_with_cve_entry(ref.id, aiohttp_session, cve_reader)
 
 
 async def augment_with_cve_entry(cve_id, aiohttp_session, cve_reader):

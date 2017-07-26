@@ -20,8 +20,7 @@ class TestSecurityFocusTools(TestCase):
             "id": "cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"
         }]}
         fake_fetcher = MagicMock()
-        fake_fetcher.get_list_of_vuln_on_first_page = make_mocked_coro(return_value=["vuln_url"])
-        fake_fetcher.get_vulnerability_entry = make_mocked_coro(return_value="vuln_entry")
+        fake_fetcher.get_vulnerabilities = make_mocked_coro(return_value=["vuln_entry"])
         fake_reader = MagicMock()
         fake_reader.read_one.return_value = entry
         vuln_manager = MagicMock()
