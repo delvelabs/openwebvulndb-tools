@@ -180,8 +180,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             plugin_name = match.group()
             plugin_name = plugin_name.lower()
-            plugin_name = re.sub("wordpress ", '', plugin_name)
-            plugin_name = re.sub(" plugin", '', plugin_name)
+            plugin_name = re.sub("wordpress\s+", '', plugin_name)
+            plugin_name = re.sub("\s+plugin", '', plugin_name)
             plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
             if plugin_name in self.storage.list_directories("plugins"):
                 return "plugins/" + plugin_name
@@ -194,8 +194,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             theme_name = match.group()
             theme_name = theme_name.lower()
-            theme_name = re.sub("wordpress ", '', theme_name)
-            theme_name = re.sub(" theme", '', theme_name)
+            theme_name = re.sub("wordpress\s+", '', theme_name)
+            theme_name = re.sub("\s+theme", '', theme_name)
             theme_name = re.sub(" ", '-', theme_name)  # replace spaces with '-'.
             if theme_name in self.storage.list_directories("themes"):
                 return "themes/" + theme_name
