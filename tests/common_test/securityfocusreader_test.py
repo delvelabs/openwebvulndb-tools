@@ -37,25 +37,25 @@ class TargetIdentificationTest(unittest.TestCase):
         self.storage = MagicMock()
         self.reader = SecurityFocusReader(self.storage)
 
-    def test_identify_target_validate_target_found(self):
-        entry = {'info_parser': MagicMock(), 'references_parser': MagicMock()}
-        entry['references_parser'].get_references.return_value = []
-        entry['info_parser'].get_title.return_value = \
-            "WordPress WP Statistics CVE-2017-2136 HTML Injection Vulnerability"
-        self.reader._validate_target = MagicMock(return_value=False)
-        self.reader._identify_from_title = MagicMock(return_value="wordpress")
+    def test_identify_target_search_for_existing_vulnerability_if_entry_has_cve(self):
+        entry = {"info_parser": MagicMock(), "references_parser": MagicMock()}
+        entry["info_parser"].get_cve_id.return_value = ["CVE-2017-1234"]
+        self.reader.vulnerability_manager = MagicMock()
+        existing_vuln = Vulnerability(id="CVE-2017-1234", references=[Reference(type="cve", id="2017-1234")])
+        self.reader._identify_from_cve = MagicMock()
+        self.reader._identify_from_cve.return_value = "plugins/plugin0"
 
-        self.assertIsNone(self.reader.identify_target(entry))
+        target = self.reader.identify_target(entry)
 
-        self.reader._validate_target.assert_called_once_with("wordpress", entry)
-
+        self.reader._identify_from_cve.assert_called_once_with(entry)
+        self.assertEqual(target, "plugins/plugin0")
 
     def test_identify_plugin_from_url(self):
         entry = dict()
         parser = ReferenceTabParser()
         parser.set_html_page(file_path(__file__, "samples/73931/references_tab.html"))
         info_parser = MagicMock()
-        get_cve_method = MagicMock(return_value=None)
+        get_cve_method = MagicMock(return_value=[])
         info_parser.attach_mock(get_cve_method, "get_cve_id")
         entry['info_parser'] = info_parser
         entry['references_parser'] = parser
@@ -65,7 +65,7 @@ class TargetIdentificationTest(unittest.TestCase):
         ref_parser = ReferenceTabParser()
         ref_parser.set_html_page(file_path(__file__, "samples/92142/references_tab.html"))
         info_parser = MagicMock()
-        info_parser.get_cve_id.return_value = None
+        info_parser.get_cve_id.return_value = []
         entry = {
             'info_parser': info_parser,
             'references_parser': ref_parser
@@ -84,6 +84,17 @@ class TargetIdentificationTest(unittest.TestCase):
         entry['info_parser'] = info_parser
         entry['references_parser'] = references_parser
         self.assertEqual(reader.identify_target(entry), "plugins/wassup")
+
+    def test_identify_from_title_validate_target_found_if_fallback_to_wordpress(self):
+        entry = {'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['references_parser'].get_references.return_value = []
+        entry['info_parser'].get_title.return_value = \
+            "WordPress WP Statistics CVE-2017-2136 HTML Injection Vulnerability"
+        self.reader._validate_target = MagicMock(return_value=False)
+
+        self.assertIsNone(self.reader._identify_from_title(entry))
+
+        self.reader._validate_target.assert_called_once_with("wordpress", entry)
 
     def test_identify_plugin_from_meta(self):
         storage = Storage(file_path(__file__, "samples/fake_data"))
@@ -126,7 +137,7 @@ class TargetIdentificationTest(unittest.TestCase):
 
     def test_no_suitable_target(self):
         info_parser = MagicMock()
-        get_cve_id = MagicMock(return_value=None)
+        get_cve_id = MagicMock(return_value=[])
         get_title = MagicMock(return_value="Random title with no clear indication about a plugin name or wordpress")
         info_parser.attach_mock(get_cve_id, "get_cve_id")
         info_parser.attach_mock(get_title, "get_title")
