@@ -138,7 +138,7 @@ class TargetIdentificationTest(unittest.TestCase):
         entry["references_parser"] = references_parser
         self.assertIsNone(self.reader.identify_target(entry))
 
-    def test_validate_target_return_false_if_fixed_is_not_a_valid_version_for_target(self):
+    def test_validate_target_return_false_if_fixed_in_is_not_a_valid_version_for_target(self):
         info_parser = MagicMock()
         info_parser.get_title.return_value = "WordPress WP Statistics CVE-2017-2136 HTML Injection Vulnerability"
         info_parser.get_vulnerable_versions.return_value = ["12.0", "12.0.1", "12.0.2", "12.0.4"]
