@@ -125,12 +125,9 @@ class SecurityFocusReader:
             cve_id = cve_id[4:]  # Remove the "CVE-" before the id.
             reference = Reference(type="cve", id=cve_id)
             for key, path, dirs, files in self.storage.walk():
-                for vlist in self.storage.list_vulnerabilities(key):
-                    for vuln in vlist.vulnerabilities:
-                        if vuln.matches(match_reference=reference):
-                            print(key)
-                            print(vuln.title)
-                            return key
+                if self._find_matching_vulnerability(key, reference) is not None:
+                    return key
+        return None
 
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
@@ -235,6 +232,12 @@ class SecurityFocusReader:
                 return vuln
             except VulnerabilityNotFound:
                 pass
+
+    def _find_matching_vulnerability(self, key, reference):
+        for vlist in self.storage.list_vulnerabilities(key):
+            for vuln in vlist.vulnerabilities:
+                if vuln.matches(match_reference=reference):
+                    return vuln
 
     def _get_possible_existing_references(self, entry):
         possible_references = []
