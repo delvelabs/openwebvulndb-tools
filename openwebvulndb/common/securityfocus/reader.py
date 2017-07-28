@@ -18,7 +18,7 @@
 import json
 import re
 from openwebvulndb.common.logs import logger
-from openwebvulndb.common.models import Reference, VersionRange
+from openwebvulndb.common.models import Reference, VersionRange, VersionNotFound
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
@@ -104,10 +104,14 @@ class SecurityFocusReader:
             apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
-        from_url = self._identify_from_url(entry['references_parser'])
-        if from_url is not None:
-            return from_url
-        return self._identify_from_title(entry)
+        if self.has_cve(entry):
+            target = self._identify_from_cve(entry)
+            if target is not None:
+                return target
+        target = self._identify_from_url(entry['references_parser'])
+        if target is None:
+            target = self._identify_from_title(entry)
+        return target
 
     def _identify_from_url(self, references_parser):
         for reference in references_parser.get_references():
@@ -116,13 +120,37 @@ class SecurityFocusReader:
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
+    def _identify_from_cve(self, entry):
+        for cve_id in entry["info_parser"].get_cve_id():
+            cve_id = cve_id[4:]  # Remove the "CVE-" before the id.
+            reference = Reference(type="cve", id=cve_id)
+            for key, path, dirs, files in self.storage.walk():
+                if self._find_matching_vulnerability(key, reference) is not None:
+                    return key
+        return None
+
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
         if self._is_theme(entry):
             return self._get_theme_name(entry)
         if self._is_wordpress(entry):
-            return "wordpress"
+            # prevent false target identification when titles do not contain plugin/theme keyword for plugin/theme vuln.
+            if self._validate_target("wordpress", entry):
+                return "wordpress"
+
+    def _validate_target(self, target_key, entry):
+        try:
+            version_list = self.storage.read_versions(target_key)
+            for version in entry['info_parser'].get_vulnerable_versions():
+                version_list.get_version(version)
+            for version in entry['info_parser'].get_not_vulnerable_versions():
+                version_list.get_version(version)
+        except FileNotFoundError:
+            pass
+        except VersionNotFound:
+            return False
+        return True
 
     def _is_plugin(self, entry):
         match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Pp]lugin", entry['info_parser'].get_title())
@@ -152,8 +180,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             plugin_name = match.group()
             plugin_name = plugin_name.lower()
-            plugin_name = re.sub("wordpress ", '', plugin_name)
-            plugin_name = re.sub(" plugin", '', plugin_name)
+            plugin_name = re.sub("wordpress\s+", '', plugin_name)
+            plugin_name = re.sub("\s+plugin", '', plugin_name)
             plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
             if plugin_name in self.storage.list_directories("plugins"):
                 return "plugins/" + plugin_name
@@ -166,8 +194,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             theme_name = match.group()
             theme_name = theme_name.lower()
-            theme_name = re.sub("wordpress ", '', theme_name)
-            theme_name = re.sub(" theme", '', theme_name)
+            theme_name = re.sub("wordpress\s+", '', theme_name)
+            theme_name = re.sub("\s+theme", '', theme_name)
             theme_name = re.sub(" ", '-', theme_name)  # replace spaces with '-'.
             if theme_name in self.storage.list_directories("themes"):
                 return "themes/" + theme_name
@@ -205,6 +233,12 @@ class SecurityFocusReader:
             except VulnerabilityNotFound:
                 pass
 
+    def _find_matching_vulnerability(self, key, reference):
+        for vlist in self.storage.list_vulnerabilities(key):
+            for vuln in vlist.vulnerabilities:
+                if vuln.matches(match_reference=reference):
+                    return vuln
+
     def _get_possible_existing_references(self, entry):
         possible_references = []
         securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["info_parser"].get_bugtraq_id())
@@ -241,6 +275,9 @@ class SecurityFocusReader:
             if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or match_website.search(url)):
                 useful_references.append(reference)
         return useful_references
+
+    def has_cve(self, entry):
+        return len(entry["info_parser"].get_cve_id()) > 0
 
 
 class MetaMapper:
