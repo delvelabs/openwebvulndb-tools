@@ -175,10 +175,24 @@ class CVEReader:
                 # Prioritize the nested groups as they are more specific than the platform
                 return next(iter(x for _, x in sorted(valid)))
 
+        # if nothing has been found, attempt to find an existing vulnerability with a reference to the cve number.
+        return self.identify_from_cve(data)
+
     def identify_from_url(self, url):
         match = match_svn.search(url) or match_website.search(url)
         if match:
             return "{group}/{name}".format(group=match.group(1), name=match.group(2))
+
+    def identify_from_cve(self, entry):
+        reference = Reference(type="cve", id=entry["id"][4:])
+        keys = self.known_entries + {"wordpress"}
+        for key in keys:
+            try:
+                self.vulnerability_manager.find_vulnerability(key, match_reference=reference)
+                return key
+            except VulnerabilityNotFound:
+                pass
+        return None
 
     def load_known_data(self):
         if self.known_entries is not False:

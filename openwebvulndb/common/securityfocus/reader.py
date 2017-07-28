@@ -45,6 +45,7 @@ class SecurityFocusReader:
         self.fetcher = SecurityFocusFetcher(aiohttp_session)
         self.cve_reader = CVEReader(storage=storage, vulnerability_manager=vulnerability_manager,
                                     aiohttp_session=aiohttp_session)
+        self.cve_reader.groups = ["plugins", "themes"]
 
     async def read_from_website(self, vuln_pages_to_fetch=1):
         """vuln_pages_to_fetch: Amount of pages to fetch to get the latest vulnerabilities (30 per page, None for all pages)."""
