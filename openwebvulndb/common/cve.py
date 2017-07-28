@@ -184,14 +184,15 @@ class CVEReader:
             return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
     def identify_from_cve(self, entry):
-        reference = Reference(type="cve", id=entry["id"][4:])
-        keys = self.known_entries + {"wordpress"}
-        for key in keys:
-            try:
-                self.vulnerability_manager.find_vulnerability(key, match_reference=reference)
-                return key
-            except VulnerabilityNotFound:
-                pass
+        if "id" in entry:
+            reference = Reference(type="cve", id=entry["id"][4:])
+            keys = self.known_entries + {"wordpress"}
+            for key in keys:
+                try:
+                    self.vulnerability_manager.find_vulnerability(key, match_reference=reference)
+                    return key
+                except VulnerabilityNotFound:
+                    pass
         return None
 
     def load_known_data(self):

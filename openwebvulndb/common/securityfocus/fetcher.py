@@ -63,23 +63,6 @@ class SecurityFocusFetcher:
                     complete_vuln_list += vuln_list
             return complete_vuln_list
 
-    async def get_list_of_vuln_on_all_pages(self):
-        complete_vuln_list = []
-        vuln_index = 0  # The number of the first vuln on the next page to fetch. Increment by 30 to change page because there is 30 vuln per page.
-        while True:
-            async with self.http_session.post("http://www.securityfocus.com/bid",
-                                              data={'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}) as response:
-                assert response.status == 200
-                vuln_index += 30
-                html_page = await response.text()
-                output_string = StringIO(html_page)
-                vuln_list = self._parse_page_with_vuln_list(output_string)
-                if len(vuln_list) == 0:  # The last page has been reached, no more vuln to get.
-                    break
-                complete_vuln_list += vuln_list
-                output_string.close()
-        return complete_vuln_list
-
     async def get_vulnerability_entry(self, bugtraq_id=None, url=None, dest_folder=None):
         """Fetch and return the vulnerability entry with the bugtraq id or the url from the security focus database.
 
