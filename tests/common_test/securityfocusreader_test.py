@@ -18,7 +18,7 @@
 import unittest
 from unittest.mock import MagicMock
 from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser
-from fixtures import file_path
+from fixtures import file_path, ClientSessionMock, async_test
 from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 from openwebvulndb.common.storage import Storage
 from openwebvulndb.common.manager import VulnerabilityManager
@@ -29,6 +29,8 @@ import json
 import os
 import re
 from openwebvulndb.common.manager import ReferenceManager
+from openwebvulndb.common.cve import CVEReader
+from aiohttp.test_utils import make_mocked_coro
 
 
 class TargetIdentificationTest(unittest.TestCase):
@@ -417,3 +419,62 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reader.apply_data(vuln, entry, allow_override=True)
 
         self.assertEqual(vuln.updated_at, updated_at)
+
+    @async_test()
+    async def test_read_cve_entry_if_entry_has_cve_but_producer_is_not_cvereader(self):
+        date = datetime(2017, 7, 25)
+        entry = Vulnerability(id="12345", title="Title", updated_at=date, created_at=date,
+                              references=[Reference(type="cve", id="2017-1234")])
+        # cve entries fetched individually have a dict for the cpe.
+        cve_entry = {"id": "CVE-2017-1234", "cvss": 4.3, "vulnerable_configuration": [{
+            "id": "cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"
+        }]}
+        security_focus_entry = {'id': '12345', 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        security_focus_entry['info_parser'].get_title.return_value = "Title"
+        security_focus_entry['info_parser'].get_cve_id.return_value = ["CVE-2017-1234"]
+        security_focus_entry['references_parser'].get_references.return_value = []
+        security_focus_entry['info_parser'].get_last_update_date.return_value = date
+        self.reader.identify_target = MagicMock(return_value="plugins/plugin")
+        vuln_manager = MagicMock()
+        vuln_manager.find_vulnerability.return_value = entry
+        self.reader.vulnerability_manager.find_vulnerability.return_value=None
+        self.reader.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="securityfocus",
+                                                                                             key="plugins/plugin")
+        fake_response = MagicMock()
+        fake_response.json = make_mocked_coro(return_value=cve_entry)
+        self.reader.cve_reader = CVEReader(storage=None, vulnerability_manager=vuln_manager,
+                                           aiohttp_session=ClientSessionMock(get_response=fake_response))
+        self.reader.cve_reader.range_guesser = MagicMock()
+        self.reader.cve_reader.identify_target = MagicMock()
+        self.reader.fetcher.get_vulnerabilities = make_mocked_coro(return_value=[security_focus_entry])
+
+        await self.reader.read_from_website()
+
+        self.reader.cve_reader.session.get.assert_called_once_with("https://cve.circl.lu/api/cve/" + cve_entry["id"])
+        # Make sure the cve entry has been converted to the usual format for the vulnerable configuration.
+        self.reader.cve_reader.identify_target.assert_called_once_with(
+            {"id": "CVE-2017-1234", "cvss": 4.3,
+             "vulnerable_configuration": ["cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"]})
+        self.assertEqual(entry.cvss, 4.3)
+
+    @async_test()
+    async def test_dont_read_cve_entry_if_entry_has_cve_and_producer_is_cvereader(self):
+        date = datetime(2017, 7, 25)
+        entry = Vulnerability(id="CVE-2017-1234", title="Title", updated_at=date, created_at=date,
+                              references=[Reference(type="bugtraqid", id="12345")])
+        security_focus_entry = {'id': '12345', 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        security_focus_entry['info_parser'].get_title.return_value = "Title"
+        security_focus_entry['info_parser'].get_cve_id.return_value = ["CVE-2017-1234"]
+        security_focus_entry['references_parser'].get_references.return_value = []
+        security_focus_entry['info_parser'].get_last_update_date.return_value = date
+        self.reader.identify_target = MagicMock(return_value="plugins/plugin")
+        self.reader.vulnerability_manager.find_vulnerability.return_value = entry
+        self.reader.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="CVEReader",
+                                                                                             key="plugins/plugin")
+        self.reader.cve_reader = MagicMock()
+        self.reader.cve_reader.read_one_from_api = make_mocked_coro()
+        self.reader.fetcher.get_vulnerabilities = make_mocked_coro(return_value=[security_focus_entry])
+
+        await self.reader.read_from_website()
+
+        self.reader.cve_reader.read_one_from_api.assert_not_called()

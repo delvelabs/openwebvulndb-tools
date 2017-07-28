@@ -58,15 +58,13 @@ def download_vulnerability_entry(loop, dest_folder, bugtraq_id):
 
 async def update_database(loop, storage, vulnerability_manager, cve_reader, bugtraq_id, vulnerabilities_pages_to_fetch):
     async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
-        fetcher = SecurityFocusFetcher(aiohttp_session)
-        reader = SecurityFocusReader(storage, vulnerability_manager)
+        reader = SecurityFocusReader(storage, vulnerability_manager, aiohttp_session=aiohttp_session)
         if bugtraq_id is None:
-            vulnerability_list = await fetcher.get_vulnerabilities(vulnerabilities_pages_to_fetch)
+            await reader.read_from_website(vulnerabilities_pages_to_fetch)
         else:
+            fetcher = SecurityFocusFetcher(aiohttp_session)
             vuln_entry = await fetcher.get_vulnerability_entry(bugtraq_id=bugtraq_id)
-            vulnerability_list = [vuln_entry] if vuln_entry is not None else []
-        await read_vulnerability_entries(vulnerability_list, reader, cve_reader, aiohttp_session)
-
+            reader.read_one(vuln_entry)
 
 async def read_vulnerability_entries(vulnerabilitiy_entry_list, reader, cve_reader, aiohttp_session):
     database_entries = []

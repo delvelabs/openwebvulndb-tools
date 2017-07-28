@@ -24,6 +24,8 @@ from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
 from copy import deepcopy
+from .fetcher import SecurityFocusFetcher
+from ..cve import CVEReader
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -31,7 +33,7 @@ match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plug
 
 class SecurityFocusReader:
 
-    def __init__(self, storage, vulnerability_manager=None):
+    def __init__(self, storage, vulnerability_manager=None, aiohttp_session=None):
         self.storage = storage
         if vulnerability_manager is None:
             self.vulnerability_manager = VulnerabilityManager(storage=storage)
@@ -40,6 +42,22 @@ class SecurityFocusReader:
         self.cpe_mapper = CPEMapper(storage=storage)
         self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()
+        self.fetcher = SecurityFocusFetcher(aiohttp_session)
+        self.cve_reader = CVEReader(storage=storage, vulnerability_manager=vulnerability_manager,
+                                    aiohttp_session=aiohttp_session)
+
+    async def read_from_website(self, vuln_pages_to_fetch=1):
+        """vuln_pages_to_fetch: Amount of pages to fetch to get the latest vulnerabilities (30 per page, None for all pages)."""
+        vuln_entries = await self.fetcher.get_vulnerabilities(vuln_pages_to_fetch=vuln_pages_to_fetch)
+        for vuln_entry in vuln_entries:
+            vuln = self.read_one(vuln_entry)
+            if vuln is not None and not vuln.id.startswith("CVE-"):
+                await self.augment_with_cve(vuln)
+
+    async def augment_with_cve(self, vuln_entry):
+        for ref in vuln_entry.references:
+            if ref.type == "cve":
+                await self.cve_reader.read_one_from_api("CVE-" + ref.id)
 
     def read_file(self, file_name):
         with open(file_name, 'r') as file:
@@ -51,7 +69,7 @@ class SecurityFocusReader:
         target = self.identify_target(entry)
         if target is None:
             logger.info("No suitable target found for %s (%s).", entry["id"], entry["info_parser"].get_title())
-            return
+            return None
         v = self._get_existing_vulnerability(entry, target)
         if v is None:
             producer = self.vulnerability_manager.get_producer_list("securityfocus", target)

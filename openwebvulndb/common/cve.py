@@ -72,6 +72,16 @@ class CVEReader:
             for entry in data:
                 self.read_one(entry)
 
+    async def read_one_from_api(self, cve_id):
+        url = "https://cve.circl.lu/api/cve/" + cve_id
+        async with self.session.get(url) as response:
+            entry = await response.json()
+            if entry is None:
+                logger.info("No entry found for %s" % cve_id)
+                return
+            self._convert_vulnerable_configuration(entry)
+            self.read_one(entry)
+
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
@@ -234,6 +244,20 @@ class CVEReader:
         else:
             return summary
         return summary[0:period] if period > 0 else summary
+
+    def _convert_vulnerable_configuration(self, entry):
+        """When fetching a single cve entry from the cve api, the vulnerable configuration is a list of dict instead of
+         a list of string."""
+        try:
+            vulnerable_configuration = entry["vulnerable_configuration"]
+            entry["vulnerable_configuration"] = []
+            for config in vulnerable_configuration:
+                if isinstance(config, dict):
+                    entry["vulnerable_configuration"].append(config["id"])
+                elif isinstance(config, str):
+                    entry["vulnerable_configuration"].append(config)
+        except KeyError:
+            pass
 
 
 class CPEMapper:
