@@ -226,7 +226,7 @@ class SecurityFocusReader:
 
     def _get_possible_existing_references(self, entry):
         possible_references = []
-        securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["info_parser"].get_bugtraq_id())
+        securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["id"])
         possible_references.append(Reference(type="other", url=securityfocus_url))
         for cve_id in entry["info_parser"].get_cve_id():
             cve_id = cve_id[4:]  # Remove the "CVE-" before the id.

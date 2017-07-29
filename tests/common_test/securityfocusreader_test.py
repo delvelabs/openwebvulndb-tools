@@ -137,14 +137,11 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
     def test_add_plugin_vuln_to_database(self):
         bugtraq_id = "73931"
-        entry = dict()
-        entry['id'] = bugtraq_id
         info_parser = InfoTabParser()
         info_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab.html"))
-        entry['info_parser'] = info_parser
         references_parser = ReferenceTabParser()
         references_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
-        entry['references_parser'] = references_parser
+        entry = {"id": bugtraq_id, "info_parser": info_parser, "references_parser": references_parser}
         self.vulnerability_manager.find_vulnerability.side_effect = VulnerabilityNotFound()
         self.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="security-focus", key="plugins/wassup")
         vuln_entry = self.reader.read_one(entry)
@@ -163,7 +160,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
     def test_add_vuln_to_database_allow_override(self):
         """Test if a more recent vuln entry allow to override an old one."""
-        self.storage.reset_mock()
         bugtraq_id = "73931"
         previous_vuln_entry = Vulnerability(id=bugtraq_id, title="WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability",
                                             reported_type="Input Validation Error", created_at=datetime(2009, 12, 7, 0, 0),
@@ -171,14 +167,11 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.storage.list_vulnerabilities.return_value = [VulnerabilityList(producer="security-focus", key="plugins/wassup",
                                                                             vulnerabilities=[previous_vuln_entry])]
         reader = SecurityFocusReader(self.storage)
-        entry = dict()
-        entry['id'] = bugtraq_id
         info_parser = InfoTabParser()
         info_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab_fake_update_date.html"))
-        entry['info_parser'] = info_parser
         references_parser = ReferenceTabParser()
         references_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
-        entry['references_parser'] = references_parser
+        entry = {"id": bugtraq_id, "info_parser": info_parser, "references_parser": references_parser}
         vuln_entry = reader.read_one(entry)
 
         self.assertEqual(vuln_entry.id, bugtraq_id)
@@ -195,7 +188,6 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
     def test_add_vuln_to_database_no_override(self):
         """Test if a less recent vuln entry can't override a newer one."""
-        self.storage.reset_mock()
         bugtraq_id = "73931"
         previous_vuln_entry = Vulnerability(id=bugtraq_id,
                                             title="WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability",
@@ -205,14 +197,11 @@ class SecurityFocusReaderTest(unittest.TestCase):
                                             references=[Reference(type="bugtraqid", id=bugtraq_id)])
         self.storage.list_vulnerabilities.return_value = [VulnerabilityList(producer="security-focus", key="plugins/wassup", vulnerabilities=[previous_vuln_entry])]
         reader = SecurityFocusReader(self.storage)
-        entry = dict()
-        entry['id'] = bugtraq_id
         info_parser = InfoTabParser()
         info_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab_older_update_date.html"))
-        entry['info_parser'] = info_parser
         references_parser = ReferenceTabParser()
         references_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
-        entry['references_parser'] = references_parser
+        entry = {"id": bugtraq_id, "info_parser": info_parser, "references_parser": references_parser}
         vuln_entry = reader.read_one(entry)
 
         self.assertEqual(vuln_entry.id, bugtraq_id)
@@ -229,21 +218,17 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
     def test_add_multiple_vulnerabilities_to_database(self):
         """Test the security focus reader with a lot of samples."""
-        self.storage.reset_mock()
         self.storage.list_vulnerabilities.return_value = list()
         self.storage.read_vulnerabilities.side_effect = FileNotFoundError()
         self.storage.list_directories.return_value = {"wassup", "onelogin-saml-sso", "nofollow-links", "w3-total-cache"}
         reader = SecurityFocusReader(self.storage)
         bugtraq_id_list = ["73931", "82355", "91076", "92077", "92355", "92572", "92841", "93104"]
         for bugtraq_id in bugtraq_id_list:
-            entry = dict()
-            entry['id'] = bugtraq_id
             info_parser = InfoTabParser()
             info_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/info_tab.html"))
-            entry['info_parser'] = info_parser
             references_parser = ReferenceTabParser()
             references_parser.set_html_page(file_path(__file__, "samples/" + bugtraq_id + "/references_tab.html"))
-            entry['references_parser'] = references_parser
+            entry = {"id": bugtraq_id, "info_parser": info_parser, "references_parser": references_parser}
             vuln_entry = reader.read_one(entry)
 
             self.assertEqual(vuln_entry.id, bugtraq_id)
@@ -340,41 +325,28 @@ class SecurityFocusReaderTest(unittest.TestCase):
 
     def test_get_lowest_version_when_multiple_fixed_in(self):
         """Test that the fixed_in version put in the vuln file by the reader is the lowest one when there is more than one not vuln version"""
-        self.storage.reset_mock()
         self.storage.list_directories.return_value = {"wassup"}
         self.vulnerability_manager.find_vulnerability.side_effect = VulnerabilityNotFound()
         self.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="security-focus", key="plugins/wassup")
-        info_parser = MagicMock()
-        info_parser.get_not_vulnerable_versions.return_value = ["WordPress WassUp 1.7.2", "WordPress WassUp 1.7.1", "WordPress WassUp 1.6.9"]
-        info_parser.get_title.return_value = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
-        info_parser.get_bugtraq_id.return_value = "12345"
-        references_parser = MagicMock()
-        references_parser.get_references.return_value = []
-        entry = {
-            "id": info_parser.get_bugtraq_id(),
-            "info_parser": info_parser,
-            "references_parser": references_parser,
-        }
+        title = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
+        versions = ["WordPress WassUp 1.7.2", "WordPress WassUp 1.7.1", "WordPress WassUp 1.6.9"]
+        entry = self.create_securityfocus_entry(id="12345", title=title, not_vulnerable_versions=versions)
         vuln = self.reader.read_one(entry)
         self.assertEqual(vuln.affected_versions[0].fixed_in, "1.6.9")
 
     def test_remove_useless_references(self):
-        self.storage.reset_mock()
         self.storage.list_directories.return_value = {"wassup"}
         self.vulnerability_manager.find_vulnerability.side_effect = VulnerabilityNotFound()
         self.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="security-focus",
                                                                                       key="plugins/wassup")
         info_parser = MagicMock()
         info_parser.get_title.return_value = "WordPress WassUp Plugin 'main.php' Cross Site Scripting Vulnerability"
-        info_parser.get_bugtraq_id.return_value = "73931"
         references_parser = ReferenceTabParser()
         references_parser.set_html_page(file_path(__file__, "samples/securityfocus_references_tab_with_useless_references.html"))
-        entry = {
-            "id": info_parser.get_bugtraq_id(),
-            "info_parser": info_parser,
-            "references_parser": references_parser,
-        }
+        entry = {"id": "73931", "info_parser": info_parser, "references_parser": references_parser}
+
         vuln = self.reader.read_one(entry)
+
         self.assertEqual(len(vuln.references), 3)  # Only the bugtraqid and the first two references should be in the list.
 
     def test_apply_data_dont_override_updated_at_if_no_other_changes(self):
@@ -383,17 +355,9 @@ class SecurityFocusReaderTest(unittest.TestCase):
         bugtraq_id = "12345"
         vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
         vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id))
-
-        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
-        entry['info_parser'].get_title.return_value = "Title"
-        entry['info_parser'].get_vuln_class.return_value = None
-        entry['info_parser'].get_publication_date.return_value = created_at
-        entry['info_parser'].get_not_vulnerable_versions.return_value = []
-        entry['info_parser'].get_cve_id.return_value = []
-        entry['info_parser'].get_last_update_date.return_value = updated_at
-        entry['references_parser'].get_references.return_value = []
-
-        reader = SecurityFocusReader(None, None)
+        entry = self.create_securityfocus_entry(id=bugtraq_id, title="Title", update_date=updated_at,
+                                                creation_date=created_at)
+        reader = SecurityFocusReader(None)
 
         reader.apply_data(vuln, entry, allow_override=True)
 
@@ -405,16 +369,10 @@ class SecurityFocusReaderTest(unittest.TestCase):
         bugtraq_id = "12345"
         vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
 
-        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
-        entry['info_parser'].get_title.return_value = "Title"
-        entry['info_parser'].get_vuln_class.return_value = None
-        entry['info_parser'].get_publication_date.return_value = created_at
-        entry['info_parser'].get_not_vulnerable_versions.return_value = []
-        entry['info_parser'].get_cve_id.return_value = []
-        entry['info_parser'].get_last_update_date.return_value = updated_at
-        entry['references_parser'].get_references.return_value = [{"url": "http://www.references.example/wordpress"}]
-
-        reader = SecurityFocusReader(None, None)
+        entry = self.create_securityfocus_entry(id=bugtraq_id, title="Title", update_date=updated_at,
+                                                creation_date=created_at,
+                                                references=[{"url": "http://www.references.example/wordpress"}])
+        reader = SecurityFocusReader(None)
 
         reader.apply_data(vuln, entry, allow_override=True)
 
@@ -429,15 +387,12 @@ class SecurityFocusReaderTest(unittest.TestCase):
         cve_entry = {"id": "CVE-2017-1234", "cvss": 4.3, "vulnerable_configuration": [{
             "id": "cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"
         }]}
-        security_focus_entry = {'id': '12345', 'info_parser': MagicMock(), 'references_parser': MagicMock()}
-        security_focus_entry['info_parser'].get_title.return_value = "Title"
-        security_focus_entry['info_parser'].get_cve_id.return_value = ["CVE-2017-1234"]
-        security_focus_entry['references_parser'].get_references.return_value = []
-        security_focus_entry['info_parser'].get_last_update_date.return_value = date
+        security_focus_entry = self.create_securityfocus_entry(id="12345", title="Title", cve_ids=["CVE-2017-1234"],
+                                                               update_date=date)
         self.reader.identify_target = MagicMock(return_value="plugins/plugin")
         vuln_manager = MagicMock()
         vuln_manager.find_vulnerability.return_value = entry
-        self.reader.vulnerability_manager.find_vulnerability.return_value=None
+        self.reader.vulnerability_manager.find_vulnerability.return_value = None
         self.reader.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="securityfocus",
                                                                                              key="plugins/plugin")
         fake_response = MagicMock()
@@ -462,11 +417,8 @@ class SecurityFocusReaderTest(unittest.TestCase):
         date = datetime(2017, 7, 25)
         entry = Vulnerability(id="CVE-2017-1234", title="Title", updated_at=date, created_at=date,
                               references=[Reference(type="bugtraqid", id="12345")])
-        security_focus_entry = {'id': '12345', 'info_parser': MagicMock(), 'references_parser': MagicMock()}
-        security_focus_entry['info_parser'].get_title.return_value = "Title"
-        security_focus_entry['info_parser'].get_cve_id.return_value = ["CVE-2017-1234"]
-        security_focus_entry['references_parser'].get_references.return_value = []
-        security_focus_entry['info_parser'].get_last_update_date.return_value = date
+        security_focus_entry = self.create_securityfocus_entry(id="12345", title="Title", cve_ids=["CVE-2017-1234"],
+                                                               update_date=date)
         self.reader.identify_target = MagicMock(return_value="plugins/plugin")
         self.reader.vulnerability_manager.find_vulnerability.return_value = entry
         self.reader.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="CVEReader",
@@ -478,3 +430,16 @@ class SecurityFocusReaderTest(unittest.TestCase):
         await self.reader.read_from_website()
 
         self.reader.cve_reader.read_one_from_api.assert_not_called()
+
+    def create_securityfocus_entry(self, *, id, title=None, cve_ids=None, references=None, creation_date=None,
+                                   update_date=None, vuln_class=None, not_vulnerable_versions=None):
+        info_parser = MagicMock()
+        info_parser.get_title.return_value = title
+        info_parser.get_cve_id.return_value = cve_ids or []
+        info_parser.get_last_update_date.return_value = update_date
+        info_parser.get_publication_date.return_value = creation_date
+        info_parser.get_vuln_class.return_value = vuln_class
+        info_parser.get_not_vulnerable_versions.return_value = not_vulnerable_versions or []
+        ref_parser = MagicMock()
+        ref_parser.get_references.return_value = references or []
+        return {"id": id, "info_parser": info_parser, "references_parser": ref_parser}
