@@ -154,7 +154,7 @@ parser.add_argument("--dest-folder", dest="dest_folder")
 parser.add_argument("--id", dest="bugtraq_id", help="The bugtraq id of the vulnerability to fetch.")
 parser.add_argument("--pages-to-fetch", dest="vulnerabilities_pages_to_fetch",
                     help="Amount of pages of latest vulnerabilities on security focus website to fetch to update "
-                         "the database (1 by default).", default=1, type=int)
+                         "the database (1 by default, -1 for all pages).", default=1, type=int)
 parser.add_argument('-i', '--input-path', dest='input_path',
                     help='Data source path (vane import)')
 parser.add_argument('-f', '--input-file', dest='input_file',

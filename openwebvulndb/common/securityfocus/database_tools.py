@@ -46,6 +46,8 @@ async def update_database(loop, storage, vulnerability_manager, bugtraq_id, vuln
     async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
         reader = SecurityFocusReader(storage, vulnerability_manager, aiohttp_session=aiohttp_session)
         if bugtraq_id is None:
+            if vulnerabilities_pages_to_fetch == -1:
+                vulnerabilities_pages_to_fetch = None
             await reader.read_from_website(vulnerabilities_pages_to_fetch)
         else:
             fetcher = SecurityFocusFetcher(aiohttp_session)
