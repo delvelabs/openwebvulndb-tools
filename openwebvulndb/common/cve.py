@@ -186,7 +186,7 @@ class CVEReader:
     def identify_from_cve(self, entry):
         if "id" in entry:
             reference = Reference(type="cve", id=entry["id"][4:])
-            keys = self.known_entries + {"wordpress"}
+            keys = self.known_entries | {"wordpress"}
             for key in keys:
                 try:
                     self.vulnerability_manager.find_vulnerability(key, match_reference=reference)

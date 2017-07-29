@@ -29,7 +29,6 @@ import json
 import os
 import re
 from openwebvulndb.common.manager import ReferenceManager
-from openwebvulndb.common.cve import CVEReader
 from aiohttp.test_utils import make_mocked_coro
 
 
@@ -381,36 +380,18 @@ class SecurityFocusReaderTest(unittest.TestCase):
     @async_test()
     async def test_read_cve_entry_if_entry_has_cve_but_producer_is_not_cvereader(self):
         date = datetime(2017, 7, 25)
-        entry = Vulnerability(id="12345", title="Title", updated_at=date, created_at=date,
-                              references=[Reference(type="cve", id="2017-1234")])
-        # cve entries fetched individually have a dict for the cpe.
-        cve_entry = {"id": "CVE-2017-1234", "cvss": 4.3, "vulnerable_configuration": [{
-            "id": "cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"
-        }]}
         security_focus_entry = self.create_securityfocus_entry(id="12345", title="Title", cve_ids=["CVE-2017-1234"],
                                                                update_date=date)
         self.reader.identify_target = MagicMock(return_value="plugins/plugin")
-        vuln_manager = MagicMock()
-        vuln_manager.find_vulnerability.return_value = entry
         self.reader.vulnerability_manager.find_vulnerability.return_value = None
         self.reader.vulnerability_manager.get_producer_list.return_value = VulnerabilityList(producer="securityfocus",
                                                                                              key="plugins/plugin")
-        fake_response = MagicMock()
-        fake_response.json = make_mocked_coro(return_value=cve_entry)
-        self.reader.cve_reader = CVEReader(storage=None, vulnerability_manager=vuln_manager,
-                                           aiohttp_session=ClientSessionMock(get_response=fake_response))
-        self.reader.cve_reader.range_guesser = MagicMock()
-        self.reader.cve_reader.identify_target = MagicMock()
+        self.reader.cve_reader.read_one_from_api = make_mocked_coro()
         self.reader.fetcher.get_vulnerabilities = make_mocked_coro(return_value=[security_focus_entry])
 
         await self.reader.read_from_website()
 
-        self.reader.cve_reader.session.get.assert_called_once_with("https://cve.circl.lu/api/cve/" + cve_entry["id"])
-        # Make sure the cve entry has been converted to the usual format for the vulnerable configuration.
-        self.reader.cve_reader.identify_target.assert_called_once_with(
-            {"id": "CVE-2017-1234", "cvss": 4.3,
-             "vulnerable_configuration": ["cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"]})
-        self.assertEqual(entry.cvss, 4.3)
+        self.reader.cve_reader.read_one_from_api.assert_called_once_with("CVE-2017-1234")
 
     @async_test()
     async def test_dont_read_cve_entry_if_entry_has_cve_and_producer_is_cvereader(self):

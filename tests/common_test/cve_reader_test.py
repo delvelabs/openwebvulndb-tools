@@ -18,7 +18,8 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from datetime import datetime
-from fixtures import freeze_time
+from fixtures import freeze_time, async_test, ClientSessionMock
+from aiohttp.test_utils import make_mocked_coro
 
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.models import Meta, VulnerabilityList, Reference, Vulnerability
@@ -517,6 +518,29 @@ class LookupVulnerabilityTest(TestCase):
         self.reader.apply_data(vuln, vuln_entry)
 
         self.assertEqual(vuln.reported_type, "unknown")
+
+    @async_test()
+    async def test_read_one_from_api(self):
+        date = datetime(2017, 7, 25)
+        entry = Vulnerability(id="CVE-2017-1234", title="Title", updated_at=date, created_at=date,
+                              references=[Reference(type="cve", id="2017-1234")])
+        # cve entries fetched individually have a dict for the cpe.
+        cve_entry = {"id": "CVE-2017-1234", "cvss": 4.3, "vulnerable_configuration": [{
+            "id": "cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"
+        }]}
+        self.manager.find_vulnerability.return_value = entry
+        self.reader.read_one = MagicMock()
+        fake_response = MagicMock()
+        fake_response.json = make_mocked_coro(return_value=cve_entry)
+        self.reader.session = ClientSessionMock(get_response=fake_response)
+
+        await self.reader.read_one_from_api(entry.id)
+
+        self.reader.session.get.assert_called_once_with("https://cve.circl.lu/api/cve/" + entry.id)
+        # Make sure the cve entry has been converted to the usual format for the vulnerable configuration.
+        self.reader.read_one.assert_called_once_with(
+            {"id": "CVE-2017-1234", "cvss": 4.3,
+             "vulnerable_configuration": ["cpe:2.3:a:plugin:plugin:0.1.1:-:-:-:-:wordpress"]})
 
 
 class RangeGuesserTest(TestCase):
