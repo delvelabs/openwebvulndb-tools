@@ -27,8 +27,8 @@ from aiohttp import ClientResponseError
 
 class SecurityFocusFetcher:
 
-    def __init__(self, http_session=None):
-        self.http_session = http_session
+    def __init__(self, aiohttp_session=None):
+        self.aiohttp_session = aiohttp_session
 
     async def get_vulnerabilities(self, vuln_pages_to_fetch=1):
         vulnerabilities = []
@@ -48,12 +48,13 @@ class SecurityFocusFetcher:
         else:
             complete_vuln_list = []
             vulnerabilities_per_page = 30
-            vuln_index = 0  # The number of the first vuln on the next page to fetch. Increment by 30 to change page because there is 30 vuln per page.
+            # The number of the first vuln on the next page to fetch. Increment by 30 to change page (30 vuln per page).
+            vuln_index = 0
             while vuln_pages_to_fetch is None or vuln_index < vuln_pages_to_fetch * vulnerabilities_per_page:
-                async with self.http_session.post("http://www.securityfocus.com/bid",
-                                                  data={'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}) as response:
+                post_data = {'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}
+                async with self.aiohttp_session.post("http://www.securityfocus.com/bid", data=post_data) as response:
                     assert response.status == 200
-                    vuln_index += 30
+                    vuln_index += vulnerabilities_per_page
                     html_page = await response.text()
                     output_string = StringIO(html_page)
                     vuln_list = self._parse_page_with_vuln_list(output_string)
@@ -91,7 +92,7 @@ class SecurityFocusFetcher:
         }
         for page, parser_name in zip(pages_to_fetch, parsers_name):
             try:
-                async with self.http_session.get(url + '/' + page) as html_response:
+                async with self.aiohttp_session.get(url + '/' + page) as html_response:
                     if html_response.status != 200:
                         logger.info("Error when getting {0}. Skipping to next page.".format(url + '/' + page))
                         continue
