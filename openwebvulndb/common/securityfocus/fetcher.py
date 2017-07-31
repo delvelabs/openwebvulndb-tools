@@ -23,6 +23,7 @@ import re
 from openwebvulndb.common.logs import logger
 import os
 from aiohttp import ClientResponseError
+import asyncio
 
 
 class SecurityFocusFetcher:
@@ -94,15 +95,16 @@ class SecurityFocusFetcher:
             try:
                 async with self.aiohttp_session.get(url + '/' + page) as html_response:
                     if html_response.status != 200:
-                        logger.info("Error when getting {0}. Skipping to next page.".format(url + '/' + page))
-                        continue
+                        logger.info("Error when getting {0}/{1} (Status code {2}).".format(url, page,
+                                                                                           html_response.status))
+                        return None
                     raw_html_page = await html_response.text()
                     vuln_entry[parser_name].set_html_page(StringIO(raw_html_page))
                     # If the file doesn't already exists, save it in dest_folder.
                     if dest_folder is not None and not os.path.isfile(os.path.join(dest_folder, page + "tab.html")):
                         with open(os.path.join(dest_folder, page + "_tab.html"), 'wt') as file:
                             file.write(raw_html_page)
-            except ClientResponseError:
+            except (ClientResponseError, asyncio.TimeoutError):
                 logger.info("Error when getting vuln {0}, page {1}.".format(bugtraq_id, page))
                 return None
         return vuln_entry

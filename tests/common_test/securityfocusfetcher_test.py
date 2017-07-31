@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 from fixtures import file_path, async_test, ClientSessionMock
 from aiohttp.test_utils import make_mocked_coro
 from openwebvulndb.common.securityfocus.fetcher import SecurityFocusFetcher
+import asyncio
 
 
 class SecurityFocusFetcherTest(unittest.TestCase):
@@ -51,3 +52,17 @@ class SecurityFocusFetcherTest(unittest.TestCase):
         vuln_entries = await fetcher.get_vulnerabilities()
         self.assertEqual(vuln_entries[0]["id"], "93104")
         self.assertEqual(vuln_entries[1]["id"], "92841")
+
+    @async_test()
+    async def test_get_vulnerability_entry_return_none_if_page_request_raise_exception(self):
+        fetcher = SecurityFocusFetcher(aiohttp_session=ClientSessionMock(get_exception=asyncio.TimeoutError))
+
+        self.assertIsNone(await fetcher.get_vulnerability_entry("12345"))
+
+    @async_test()
+    async def test_get_vulnerability_entry_return_none_if_page_request_response_status_is_not_200(self):
+        fake_get_response = MagicMock()
+        fake_get_response.status = 503
+        fetcher = SecurityFocusFetcher(aiohttp_session=ClientSessionMock(get_response=fake_get_response))
+
+        self.assertIsNone(await fetcher.get_vulnerability_entry("12345"))

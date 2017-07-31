@@ -65,9 +65,9 @@ def fake_future(result, loop):
 
 class ClientSessionMock:
 
-    def __init__(self, get_response=None, post_response=None):
-        self.get = MagicMock(return_value=AsyncContextManagerMock())
-        self.post = MagicMock(return_value=AsyncContextManagerMock())
+    def __init__(self, get_response=None, post_response=None, get_exception=None, post_exception=None):
+        self.get = MagicMock(return_value=AsyncContextManagerMock(), side_effect=get_exception)
+        self.post = MagicMock(return_value=AsyncContextManagerMock(), side_effect=post_exception)
         self.get_response = get_response or MagicMock()
         self.post_response = post_response or MagicMock()
 
