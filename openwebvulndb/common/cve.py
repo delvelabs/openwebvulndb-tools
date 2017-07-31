@@ -72,10 +72,20 @@ class CVEReader:
             for entry in data:
                 self.read_one(entry)
 
+    async def read_one_from_api(self, cve_id):
+        url = "https://cve.circl.lu/api/cve/" + cve_id
+        async with self.session.get(url) as response:
+            entry = await response.json()
+            if entry is None:
+                logger.info("No entry found for %s" % cve_id)
+                return
+            self._convert_vulnerable_configuration(entry)
+            self.read_one(entry)
+
     def read_one(self, entry):
         target = self.identify_target(entry)
         if target is None:
-            logger.info("No suitable target found for %s", entry)
+            logger.info("No suitable target found for %s", entry["id"])
             return
 
         this_ref = Reference(type="cve", id=entry["id"][4:])
@@ -165,10 +175,25 @@ class CVEReader:
                 # Prioritize the nested groups as they are more specific than the platform
                 return next(iter(x for _, x in sorted(valid)))
 
+        # if nothing has been found, attempt to find an existing vulnerability with a reference to the cve number.
+        return self.identify_from_cve(data)
+
     def identify_from_url(self, url):
         match = match_svn.search(url) or match_website.search(url)
         if match:
             return "{group}/{name}".format(group=match.group(1), name=match.group(2))
+
+    def identify_from_cve(self, entry):
+        if "id" in entry:
+            reference = Reference(type="cve", id=entry["id"][4:])
+            keys = self.known_entries | {"wordpress"}
+            for key in keys:
+                try:
+                    self.vulnerability_manager.find_vulnerability(key, match_reference=reference)
+                    return key
+                except VulnerabilityNotFound:
+                    pass
+        return None
 
     def load_known_data(self):
         if self.known_entries is not False:
@@ -234,6 +259,20 @@ class CVEReader:
         else:
             return summary
         return summary[0:period] if period > 0 else summary
+
+    def _convert_vulnerable_configuration(self, entry):
+        """When fetching a single cve entry from the cve api, the vulnerable configuration is a list of dict instead of
+         a list of string."""
+        try:
+            vulnerable_configuration = entry["vulnerable_configuration"]
+            entry["vulnerable_configuration"] = []
+            for config in vulnerable_configuration:
+                if isinstance(config, dict):
+                    entry["vulnerable_configuration"].append(config["id"])
+                elif isinstance(config, str):
+                    entry["vulnerable_configuration"].append(config)
+        except KeyError:
+            pass
 
 
 class CPEMapper:

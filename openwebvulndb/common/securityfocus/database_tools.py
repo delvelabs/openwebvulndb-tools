@@ -23,34 +23,10 @@ import aiohttp
 securityfocus_base_url = "http://www.securityfocus.com/bid/"
 
 
-def update_securityfocus_database(loop, storage, vulnerability_manager, bugtraq_id=None):
-    async def update_database():
-        async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
-            fetcher = SecurityFocusFetcher(aiohttp_session)
-            reader = SecurityFocusReader(storage, vulnerability_manager)
-            if bugtraq_id is None:
-                vulnerability_list = await fetcher.get_list_of_vuln_on_first_page()
-            else:
-                vulnerability_list = [securityfocus_base_url + bugtraq_id]
-            for vuln_url in vulnerability_list:
-                vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
-                if vuln_entry is not None:
-                    reader.read_one(vuln_entry)
-
-    loop.run_until_complete(update_database())
-
-
-def create_securityfocus_database(loop, storage, vulnerability_manager):
-    async def create_database():
-        async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
-            fetcher = SecurityFocusFetcher(aiohttp_session)
-            reader = SecurityFocusReader(storage, vulnerability_manager)
-            vulnerability_list = await fetcher.get_list_of_vuln_on_all_pages()
-            for vuln_url in vulnerability_list:
-                vuln_entry = await fetcher.get_vulnerability_entry(url=vuln_url)
-                reader.read_one(vuln_entry)
-
-    loop.run_until_complete(create_database())
+def update_securityfocus_database(loop, storage, vulnerability_manager, bugtraq_id=None,
+                                  vulnerabilities_pages_to_fetch=1):
+    loop.run_until_complete(update_database(loop, storage, vulnerability_manager, bugtraq_id,
+                                            vulnerabilities_pages_to_fetch))
 
 
 def download_vulnerability_entry(loop, dest_folder, bugtraq_id):
@@ -64,3 +40,16 @@ def download_vulnerability_entry(loop, dest_folder, bugtraq_id):
     if not bugtraq_id:
         raise Exception("Option required: bugtraq_id")
     loop.run_until_complete(download_entry())
+
+
+async def update_database(loop, storage, vulnerability_manager, bugtraq_id, vulnerabilities_pages_to_fetch):
+    async with aiohttp.ClientSession(loop=loop) as aiohttp_session:
+        reader = SecurityFocusReader(storage, vulnerability_manager, aiohttp_session=aiohttp_session)
+        if bugtraq_id is None:
+            if vulnerabilities_pages_to_fetch == -1:
+                vulnerabilities_pages_to_fetch = None
+            await reader.read_from_website(vulnerabilities_pages_to_fetch)
+        else:
+            fetcher = SecurityFocusFetcher(aiohttp_session)
+            vuln_entry = await fetcher.get_vulnerability_entry(bugtraq_id=bugtraq_id)
+            reader.read_one(vuln_entry)
