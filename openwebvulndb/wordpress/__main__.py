@@ -136,18 +136,6 @@ def change_version_format(storage):
             else:
                 storage.write_versions(file_list)
 
-
-def count_cvss(storage):
-    cvss_count = 0
-    for key, path, dirs, files in storage.walk():
-        if files:
-            for vlist in storage.list_vulnerabilities(key):
-                for vuln in vlist.vulnerabilities:
-                    if vuln.cvss is not None:
-                        cvss_count += 1
-    print("There are %d cvss in the database" % cvss_count)
-
-
 operations = dict(list_themes=list_themes,
                   list_plugins=list_plugins,
                   vane_import=vane_import,
@@ -157,8 +145,7 @@ operations = dict(list_themes=list_themes,
                   load_cve=load_cve,
                   update_securityfocus_database=update_securityfocus_database,
                   download_vulnerability_entry=download_vulnerability_entry,
-                  change_version_format=change_version_format,
-                  count_cvss=count_cvss
+                  change_version_format=change_version_format
                   )
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
