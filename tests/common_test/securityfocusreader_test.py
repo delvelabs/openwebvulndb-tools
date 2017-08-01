@@ -132,6 +132,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.storage = MagicMock()
         self.vulnerability_manager = MagicMock()
         self.reader = SecurityFocusReader(self.storage, self.vulnerability_manager)
+        self.reader.cvss_mapper = MagicMock()
 
     def test_add_plugin_vuln_to_database(self):
         bugtraq_id = "73931"
@@ -417,3 +418,37 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reader.apply_data(vuln, entry, allow_override=True)
 
         self.assertEqual(vuln.updated_at, updated_at)
+
+    def test_apply_data_set_calculated_cvss_if_reported_type_in_cvss_mapping_but_no_cvss_and_no_cve(self):
+        self.reader.cvss_mapper.get_cvss_from_vulnerability_type.return_value = 4.3
+        date = datetime(2017, 1, 10)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=date, created_at=date)
+        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['info_parser'].get_title.return_value = "Title"
+        entry['info_parser'].get_vuln_class.return_value = "SQL injection"
+        entry['info_parser'].get_publication_date.return_value = date
+        entry['info_parser'].get_not_vulnerable_versions.return_value = []
+        entry['info_parser'].get_cve_id.return_value = []
+        entry['info_parser'].get_last_update_date.return_value = date
+
+        self.reader.apply_data(vuln, entry)
+
+        self.assertEqual(vuln.cvss, 4.3)
+
+    def test_apply_data_dont_set_calculated_cvss_if_cve_for_entry(self):
+        self.reader.cvss_mapper.get_cvss_from_vulnerability_type.return_value = 4.3
+        date = datetime(2017, 1, 10)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=date, created_at=date)
+        entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
+        entry['info_parser'].get_title.return_value = "Title"
+        entry['info_parser'].get_vuln_class.return_value = "SQL injection"
+        entry['info_parser'].get_publication_date.return_value = date
+        entry['info_parser'].get_not_vulnerable_versions.return_value = []
+        entry['info_parser'].get_cve_id.return_value = ["CVE-1234-1234"]
+        entry['info_parser'].get_last_update_date.return_value = date
+
+        self.reader.apply_data(vuln, entry)
+
+        self.assertIsNone(vuln.cvss)

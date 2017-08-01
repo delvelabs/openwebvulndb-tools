@@ -24,6 +24,7 @@ from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
 from copy import deepcopy
+from statistics import median
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -40,6 +41,7 @@ class SecurityFocusReader:
         self.cpe_mapper = CPEMapper(storage=storage)
         self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()
+        self.cvss_mapper = CvssMapper(storage)
 
     def read_file(self, file_name):
         with open(file_name, 'r') as file:
@@ -77,10 +79,15 @@ class SecurityFocusReader:
                 vuln.title = entry['info_parser'].get_title()
                 added_new_value = True
 
-        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
-            if entry['info_parser'].get_vuln_class() is not None:
+        if entry['info_parser'].get_vuln_class() is not None:
+            if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
                 vuln.reported_type = entry['info_parser'].get_vuln_class()
                 added_new_value = True
+            if vuln.cvss is None and len(entry["info_parser"].get_cve_id()) == 0:
+                cvss = self.cvss_mapper.get_cvss_from_vulnerability_type(entry['info_parser'].get_vuln_class())
+                if cvss is not None:
+                    vuln.cvss = cvss
+                    added_new_value = True
 
         apply_value('created_at', entry['info_parser'].get_publication_date())
 
@@ -270,3 +277,39 @@ class MetaMapper:
         for meta in self.storage.list_meta():
             self.load_meta(meta)
         logger.info("Meta Mapping loaded.")
+
+
+class CvssMapper:
+
+    def __init__(self, storage):
+        self.storage = storage
+        self.cvss_map = {}
+        self.loaded = False
+
+    def load_cvss_mapping(self):
+        types = {}
+        for meta in self.storage.list_meta():
+            for vuln_list in self.storage.list_vulnerabilities(meta.key):
+                for vuln in vuln_list.vulnerabilities:
+                    if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown":
+                        if not vuln.reported_type in types:
+                            types[vuln.reported_type] = {"count": 0, "cvss": []}
+                        types[vuln.reported_type]["count"] += 1
+                        if vuln.cvss is not None:
+                            types[vuln.reported_type]["cvss"].append(vuln.cvss)
+
+        sorted_types = types.keys()
+        for type in sorted_types:
+            data = types[type]
+            len_cvss = len(data["cvss"])
+            if len_cvss > 5:  # Below 5 cvss, the cvss median is not really significant
+                cvss_median = median(data["cvss"])
+                self.cvss_map[type] = round(cvss_median, 1)
+
+    def get_cvss_from_vulnerability_type(self, vulnerability_type):
+        if not self.loaded:
+            self.load_cvss_mapping()
+            self.loaded = True
+        if vulnerability_type in self.cvss_map.keys():
+            return self.cvss_map[vulnerability_type]
+        return None
