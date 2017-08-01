@@ -98,9 +98,7 @@ class SecurityFocusReader:
             if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
                 vuln.reported_type = entry['info_parser'].get_vuln_class()
             if vuln.cvss is None and len(entry["info_parser"].get_cve_id()) == 0:
-                cvss = self.cvss_mapper.get_cvss_from_vulnerability_type(entry['info_parser'].get_vuln_class())
-                if cvss is not None:
-                    vuln.cvss = cvss
+                vuln.cvss = self.cvss_mapper.get_cvss_from_vulnerability_type(entry['info_parser'].get_vuln_class())
 
         if vuln.created_at is not None:
             if vuln.created_at.replace(tzinfo=None) != entry['info_parser'].get_publication_date():
@@ -342,30 +340,27 @@ class CvssMapper:
         self.cvss_map = {}
         self.loaded = False
 
-    def load_cvss_mapping(self):
-        types = {}
+    def list_vulnerabilities(self):
         for meta in self.storage.list_meta():
             for vuln_list in self.storage.list_vulnerabilities(meta.key):
-                for vuln in vuln_list.vulnerabilities:
-                    if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown":
-                        if not vuln.reported_type in types:
-                            types[vuln.reported_type] = {"count": 0, "cvss": []}
-                        types[vuln.reported_type]["count"] += 1
-                        if vuln.cvss is not None:
-                            types[vuln.reported_type]["cvss"].append(vuln.cvss)
+                yield from vuln_list.vulnerabilities
 
-        sorted_types = types.keys()
-        for type in sorted_types:
-            data = types[type]
-            len_cvss = len(data["cvss"])
-            if len_cvss > 5:  # Below 5 cvss, the cvss median is not really significant
-                cvss_median = median(data["cvss"])
+    def load_cvss_mapping(self):
+        types = {}
+        for vuln in self.list_vulnerabilities():
+            if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown" and vuln.cvss is not None:
+                if vuln.reported_type in types:
+                    types[vuln.reported_type].append(vuln.cvss)
+                else:
+                    types[vuln.reported_type] = [vuln.cvss]
+
+        for type, cvss_list in types.items():
+            if len(cvss_list) > 5:  # Below 5 cvss, the cvss median is not really significant
+                cvss_median = median(cvss_list)
                 self.cvss_map[type] = round(cvss_median, 1)
 
     def get_cvss_from_vulnerability_type(self, vulnerability_type):
         if not self.loaded:
             self.load_cvss_mapping()
             self.loaded = True
-        if vulnerability_type in self.cvss_map.keys():
-            return self.cvss_map[vulnerability_type]
-        return None
+        return self.cvss_map.get(vulnerability_type, None)

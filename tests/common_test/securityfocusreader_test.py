@@ -490,4 +490,3 @@ class SecurityFocusReaderTest(unittest.TestCase):
         ref_parser = MagicMock()
         ref_parser.get_references.return_value = references or []
         return {"id": id, "info_parser": info_parser, "references_parser": ref_parser}
-
