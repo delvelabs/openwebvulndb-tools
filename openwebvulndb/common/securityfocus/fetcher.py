@@ -23,42 +23,47 @@ import re
 from openwebvulndb.common.logs import logger
 import os
 from aiohttp import ClientResponseError
+import asyncio
 
 
 class SecurityFocusFetcher:
 
-    def __init__(self, http_session=None):
-        self.http_session = http_session
+    def __init__(self, aiohttp_session=None):
+        self.aiohttp_session = aiohttp_session
 
-    async def get_list_of_vuln_on_first_page(self, file=None):
+    async def get_vulnerabilities(self, vuln_pages_to_fetch=1):
+        vulnerabilities = []
+        vuln_list = await self.get_vulnerability_list(vuln_pages_to_fetch)
+        for vuln_url in vuln_list:
+            vuln_entry = await self.get_vulnerability_entry(url=vuln_url)
+            if vuln_entry is not None:
+                vulnerabilities.append(vuln_entry)
+        return vulnerabilities
+
+    async def get_vulnerability_list(self, vuln_pages_to_fetch=1, file=None):
+        """vuln_pages_to_fetch: Amount of pages to fetch for vulnerabilities (None for all pages).
+        When searching for vulnerabilities on the security focus website, results are displayed accross multiple pages
+        (30 vulnerabilities per page), with the most recent on the first page"""
         if file is not None:
             return self._parse_page_with_vuln_list(file)
         else:
-            async with self.http_session.post("http://www.securityfocus.com/bid",
-                                              data={'op': 'display_list', 'c': 12, 'vendor': 'WordPress'}) as response:
-                assert response.status == 200
-                html_page = await response.text()
-                output_string = StringIO(html_page)
-                vuln_list = self._parse_page_with_vuln_list(output_string)
-                output_string.close()
-                return vuln_list
-
-    async def get_list_of_vuln_on_all_pages(self):
-        complete_vuln_list = []
-        vuln_index = 0  # The number of the first vuln on the next page to fetch. Increment by 30 to change page because there is 30 vuln per page.
-        while True:
-            async with self.http_session.post("http://www.securityfocus.com/bid",
-                                              data={'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}) as response:
-                assert response.status == 200
-                vuln_index += 30
-                html_page = await response.text()
-                output_string = StringIO(html_page)
-                vuln_list = self._parse_page_with_vuln_list(output_string)
-                if len(vuln_list) == 0:  # The last page has been reached, no more vuln to get.
-                    break
-                complete_vuln_list += vuln_list
-                output_string.close()
-        return complete_vuln_list
+            complete_vuln_list = []
+            vulnerabilities_per_page = 30
+            # The number of the first vuln on the next page to fetch. Increment by 30 to change page (30 vuln per page).
+            vuln_index = 0
+            while vuln_pages_to_fetch is None or vuln_index < vuln_pages_to_fetch * vulnerabilities_per_page:
+                post_data = {'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}
+                async with self.aiohttp_session.post("http://www.securityfocus.com/bid", data=post_data) as response:
+                    assert response.status == 200
+                    vuln_index += vulnerabilities_per_page
+                    html_page = await response.text()
+                    output_string = StringIO(html_page)
+                    vuln_list = self._parse_page_with_vuln_list(output_string)
+                    if len(vuln_list) == 0:  # The last page has been reached, no more vuln to get.
+                        break
+                    output_string.close()
+                    complete_vuln_list += vuln_list
+            return complete_vuln_list
 
     async def get_vulnerability_entry(self, bugtraq_id=None, url=None, dest_folder=None):
         """Fetch and return the vulnerability entry with the bugtraq id or the url from the security focus database.
@@ -88,17 +93,18 @@ class SecurityFocusFetcher:
         }
         for page, parser_name in zip(pages_to_fetch, parsers_name):
             try:
-                async with self.http_session.get(url + '/' + page) as html_response:
+                async with self.aiohttp_session.get(url + '/' + page) as html_response:
                     if html_response.status != 200:
-                        logger.info("Error when getting {0}. Skipping to next page.".format(url + '/' + page))
-                        continue
+                        logger.info("Error when getting {0}/{1} (Status code {2}).".format(url, page,
+                                                                                           html_response.status))
+                        return None
                     raw_html_page = await html_response.text()
                     vuln_entry[parser_name].set_html_page(StringIO(raw_html_page))
                     # If the file doesn't already exists, save it in dest_folder.
                     if dest_folder is not None and not os.path.isfile(os.path.join(dest_folder, page + "tab.html")):
                         with open(os.path.join(dest_folder, page + "_tab.html"), 'wt') as file:
                             file.write(raw_html_page)
-            except ClientResponseError:
+            except (ClientResponseError, asyncio.TimeoutError):
                 logger.info("Error when getting vuln {0}, page {1}.".format(bugtraq_id, page))
                 return None
         return vuln_entry

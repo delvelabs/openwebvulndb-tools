@@ -18,12 +18,14 @@
 import json
 import re
 from openwebvulndb.common.logs import logger
-from openwebvulndb.common.models import Reference, VersionRange
+from openwebvulndb.common.models import Reference, VersionRange, VersionNotFound
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
 from statistics import median
+from .fetcher import SecurityFocusFetcher
+from ..cve import CVEReader
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
 match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plugins|themes)/([^/]+)')
@@ -31,7 +33,7 @@ match_website = re.compile(r'https?://(?:www\.)?wordpress\.org(?:/extend)?/(plug
 
 class SecurityFocusReader:
 
-    def __init__(self, storage, vulnerability_manager=None):
+    def __init__(self, storage, vulnerability_manager=None, aiohttp_session=None):
         self.storage = storage
         if vulnerability_manager is None:
             self.vulnerability_manager = VulnerabilityManager(storage=storage)
@@ -41,6 +43,23 @@ class SecurityFocusReader:
         self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()
         self.cvss_mapper = CvssMapper(storage)
+        self.fetcher = SecurityFocusFetcher(aiohttp_session)
+        self.cve_reader = CVEReader(storage=storage, vulnerability_manager=vulnerability_manager,
+                                    aiohttp_session=aiohttp_session)
+        self.cve_reader.groups = ["plugins", "themes"]
+
+    async def read_from_website(self, vuln_pages_to_fetch=1):
+        """vuln_pages_to_fetch: Amount of pages to fetch to get the latest vulnerabilities (30 per page, None for all pages)."""
+        vuln_entries = await self.fetcher.get_vulnerabilities(vuln_pages_to_fetch=vuln_pages_to_fetch)
+        for vuln_entry in vuln_entries:
+            vuln = self.read_one(vuln_entry)
+            if vuln is not None and not vuln.id.startswith("CVE-"):
+                await self.augment_with_cve(vuln)
+
+    async def augment_with_cve(self, vuln_entry):
+        for ref in vuln_entry.references:
+            if ref.type == "cve":
+                await self.cve_reader.read_one_from_api("CVE-" + ref.id)
 
     def read_file(self, file_name):
         with open(file_name, 'r') as file:
@@ -52,7 +71,7 @@ class SecurityFocusReader:
         target = self.identify_target(entry)
         if target is None:
             logger.info("No suitable target found for %s (%s).", entry["id"], entry["info_parser"].get_title())
-            return
+            return None
         v = self._get_existing_vulnerability(entry, target)
         if v is None:
             producer = self.vulnerability_manager.get_producer_list("securityfocus", target)
@@ -107,10 +126,14 @@ class SecurityFocusReader:
             apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
-        from_url = self._identify_from_url(entry['references_parser'])
-        if from_url is not None:
-            return from_url
-        return self._identify_from_title(entry)
+        if self.has_cve(entry):
+            target = self._identify_from_cve(entry)
+            if target is not None:
+                return target
+        target = self._identify_from_url(entry['references_parser'])
+        if target is None:
+            target = self._identify_from_title(entry)
+        return target
 
     def _identify_from_url(self, references_parser):
         for reference in references_parser.get_references():
@@ -119,13 +142,37 @@ class SecurityFocusReader:
             if match:
                 return "{group}/{name}".format(group=match.group(1), name=match.group(2))
 
+    def _identify_from_cve(self, entry):
+        for cve_id in entry["info_parser"].get_cve_id():
+            cve_id = cve_id[4:]  # Remove the "CVE-" before the id.
+            reference = Reference(type="cve", id=cve_id)
+            for key, path, dirs, files in self.storage.walk():
+                if self._find_matching_vulnerability(key, reference) is not None:
+                    return key
+        return None
+
     def _identify_from_title(self, entry):
         if self._is_plugin(entry):
             return self._get_plugin_name(entry)
         if self._is_theme(entry):
             return self._get_theme_name(entry)
         if self._is_wordpress(entry):
-            return "wordpress"
+            # prevent false target identification when titles do not contain plugin/theme keyword for plugin/theme vuln.
+            if self._validate_target("wordpress", entry):
+                return "wordpress"
+
+    def _validate_target(self, target_key, entry):
+        try:
+            version_list = self.storage.read_versions(target_key)
+            for version in entry['info_parser'].get_vulnerable_versions():
+                version_list.get_version(version)
+            for version in entry['info_parser'].get_not_vulnerable_versions():
+                version_list.get_version(version)
+        except FileNotFoundError:
+            pass
+        except VersionNotFound:
+            return False
+        return True
 
     def _is_plugin(self, entry):
         match = re.search("[Ww]ord[Pp]ress [\w\s-]* [Pp]lugin", entry['info_parser'].get_title())
@@ -155,8 +202,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             plugin_name = match.group()
             plugin_name = plugin_name.lower()
-            plugin_name = re.sub("wordpress ", '', plugin_name)
-            plugin_name = re.sub(" plugin", '', plugin_name)
+            plugin_name = re.sub("wordpress\s+", '', plugin_name)
+            plugin_name = re.sub("\s+plugin", '', plugin_name)
             plugin_name = re.sub(" ", '-', plugin_name)  # replace spaces with '-'.
             if plugin_name in self.storage.list_directories("plugins"):
                 return "plugins/" + plugin_name
@@ -169,8 +216,8 @@ class SecurityFocusReader:
         if len(match.group()) != 0:
             theme_name = match.group()
             theme_name = theme_name.lower()
-            theme_name = re.sub("wordpress ", '', theme_name)
-            theme_name = re.sub(" theme", '', theme_name)
+            theme_name = re.sub("wordpress\s+", '', theme_name)
+            theme_name = re.sub("\s+theme", '', theme_name)
             theme_name = re.sub(" ", '-', theme_name)  # replace spaces with '-'.
             if theme_name in self.storage.list_directories("themes"):
                 return "themes/" + theme_name
@@ -208,9 +255,15 @@ class SecurityFocusReader:
             except VulnerabilityNotFound:
                 pass
 
+    def _find_matching_vulnerability(self, key, reference):
+        for vlist in self.storage.list_vulnerabilities(key):
+            for vuln in vlist.vulnerabilities:
+                if vuln.matches(match_reference=reference):
+                    return vuln
+
     def _get_possible_existing_references(self, entry):
         possible_references = []
-        securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["info_parser"].get_bugtraq_id())
+        securityfocus_url = "http://www.securityfocus.com/bid/{0}".format(entry["id"])
         possible_references.append(Reference(type="other", url=securityfocus_url))
         for cve_id in entry["info_parser"].get_cve_id():
             cve_id = cve_id[4:]  # Remove the "CVE-" before the id.
@@ -248,6 +301,9 @@ class SecurityFocusReader:
                     match_website.search(url)):
                 useful_references.append(reference)
         return useful_references
+
+    def has_cve(self, entry):
+        return len(entry["info_parser"].get_cve_id()) > 0
 
 
 class MetaMapper:
