@@ -83,7 +83,11 @@ class SecurityFocusReader:
                 if cvss is not None:
                     vuln.cvss = cvss
 
-        apply_value('created_at', entry['info_parser'].get_publication_date())
+        if vuln.created_at is not None:
+            if vuln.created_at.replace(tzinfo=None) != entry['info_parser'].get_publication_date():
+                apply_value('created_at', entry['info_parser'].get_publication_date())
+        else:
+            apply_value('created_at', entry['info_parser'].get_publication_date())
 
         fixed_in = self._get_fixed_in(entry)
         if fixed_in is not None:
@@ -222,12 +226,13 @@ class SecurityFocusReader:
                 if bugtraq_id == self._get_bugtraq_id_from_url(ref.url):
                     self._replace_existing_securityfocus_reference_with_bugtraq_id(ref, bugtraq_id)
                     return
-        references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+        ref = references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+        if ref.url is None:  # Add url for existing bugtraq ID ref that doesn't have an url.
+            ref.url = "http://www.securityfocus.com/bid/%s" % bugtraq_id
 
     def _replace_existing_securityfocus_reference_with_bugtraq_id(self, reference, bugtraq_id):
         reference.type = "bugtraqid"
         reference.id = bugtraq_id
-        reference.url = None
 
     def _get_bugtraq_id_from_url(self, url):
         match = re.sub(r"http://www.securityfocus.com/bid/", "", url)

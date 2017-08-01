@@ -157,6 +157,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -189,6 +190,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -223,6 +225,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -259,6 +262,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
             references = vuln_entry.references
             self.assertEqual(references[0].type, "bugtraqid")
             self.assertEqual(references[0].id, bugtraq_id)
+            self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
             reference_index = 1
             for cve_id in info_parser.get_cve_id():
                 self.assertEqual(references[reference_index].type, "cve")
@@ -336,6 +340,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(len(references), 2)
         self.assertEqual(references[1].type, "bugtraqid")
         self.assertEqual(references[1].id, bugtraq_id)
+        self.assertEqual(references[1].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
 
     def test_get_lowest_version_when_multiple_fixed_in(self):
         """Test that the fixed_in version put in the vuln file by the reader is the lowest one when there is more than one not vuln version"""
@@ -381,7 +386,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         updated_at = datetime(2017, 1, 11, hour=8)
         bugtraq_id = "12345"
         vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
-        vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id))
+        vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id, url="http://www.securityfocus.com/bid/12345"))
 
         entry = {'id': bugtraq_id, 'info_parser': MagicMock(), 'references_parser': MagicMock()}
         entry['info_parser'].get_title.return_value = "Title"

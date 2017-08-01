@@ -16,7 +16,8 @@
             "references": [
                 {
                     "type": "bugtraqid",
-                    "id": "92572"
+                    "id": "92572",
+                    "url": "http://www.securityfocus.com/bid/92572"
                 },
                 {
                     "type": "cve",
