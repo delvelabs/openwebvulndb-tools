@@ -23,7 +23,6 @@ from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
-from copy import deepcopy
 from statistics import median
 
 match_svn = re.compile(r'https?://(plugins|themes)\.svn\.wordpress\.org/([^/]+)')
@@ -67,8 +66,6 @@ class SecurityFocusReader:
 
     def apply_data(self, vuln, entry, allow_override=False):
 
-        added_new_value = False
-
         def apply_value(field, value):
             if allow_override or getattr(vuln, field) is None:
                 setattr(vuln, field, value)
@@ -77,17 +74,14 @@ class SecurityFocusReader:
         if vuln.title is None or allow_override:
             if vuln.title != entry['info_parser'].get_title():
                 vuln.title = entry['info_parser'].get_title()
-                added_new_value = True
 
         if entry['info_parser'].get_vuln_class() is not None:
             if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
                 vuln.reported_type = entry['info_parser'].get_vuln_class()
-                added_new_value = True
             if vuln.cvss is None and len(entry["info_parser"].get_cve_id()) == 0:
                 cvss = self.cvss_mapper.get_cvss_from_vulnerability_type(entry['info_parser'].get_vuln_class())
                 if cvss is not None:
                     vuln.cvss = cvss
-                    added_new_value = True
 
         apply_value('created_at', entry['info_parser'].get_publication_date())
 
@@ -96,9 +90,7 @@ class SecurityFocusReader:
             version_range = VersionRange(fixed_in=fixed_in)
             if version_range not in vuln.affected_versions:
                 vuln.add_affected_version(version_range)
-                added_new_value = True
 
-        old_references = deepcopy(vuln.references)
         ref_manager = self.reference_manager.for_list(vuln.references)
         self._add_bugtraqid_reference(ref_manager, entry["id"])
         for cve in entry['info_parser'].get_cve_id():
@@ -107,7 +99,7 @@ class SecurityFocusReader:
         for reference in useful_references:
             ref_manager.include_url(reference["url"])
 
-        if added_new_value or old_references != vuln.references:
+        if vuln.dirty:
             apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
@@ -223,7 +215,8 @@ class SecurityFocusReader:
         return possible_references
 
     def _add_bugtraqid_reference(self, references_manager, bugtraq_id):
-        """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references, replace it with the bugtraqid."""
+        """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references,
+        replace it with the bugtraqid."""
         for ref in references_manager.references:
             if ref.type == "other" and ref.url is not None and references_manager.is_bugtraqid_url(ref.url):
                 if bugtraq_id == self._get_bugtraq_id_from_url(ref.url):
@@ -241,11 +234,13 @@ class SecurityFocusReader:
         return re.match("\d+", match).group()
 
     def _remove_useless_references(self, references_list):
-        """Remove the useless references that the references tab of a vuln in the security focuse db usually contains, like a link to wordpress/the plugin homepage."""
+        """Remove the useless references that the references tab of a vuln in the security focus db usually contains,
+        like a link to wordpress/the plugin homepage."""
         useful_references = []
         for reference in references_list:
             url = reference["url"]
-            if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or match_website.search(url)):
+            if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or
+                    match_website.search(url)):
                 useful_references.append(reference)
         return useful_references
 
