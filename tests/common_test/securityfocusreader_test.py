@@ -169,6 +169,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.storage = MagicMock()
         self.vulnerability_manager = MagicMock()
         self.reader = SecurityFocusReader(self.storage, self.vulnerability_manager)
+        self.reader.cvss_mapper = MagicMock()
 
     def test_add_plugin_vuln_to_database(self):
         bugtraq_id = "73931"
@@ -190,6 +191,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -218,6 +220,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -248,6 +251,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         references = vuln_entry.references
         self.assertEqual(references[0].type, "bugtraqid")
         self.assertEqual(references[0].id, bugtraq_id)
+        self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
         self.assertEqual(references[1].type, "other")
         self.assertEqual(references[1].url, "http://seclists.org/oss-sec/2015/q2/51")
 
@@ -280,6 +284,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
             references = vuln_entry.references
             self.assertEqual(references[0].type, "bugtraqid")
             self.assertEqual(references[0].id, bugtraq_id)
+            self.assertEqual(references[0].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
             reference_index = 1
             for cve_id in info_parser.get_cve_id():
                 self.assertEqual(references[reference_index].type, "cve")
@@ -357,6 +362,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         self.assertEqual(len(references), 2)
         self.assertEqual(references[1].type, "bugtraqid")
         self.assertEqual(references[1].id, bugtraq_id)
+        self.assertEqual(references[1].url, "http://www.securityfocus.com/bid/%s" % bugtraq_id)
 
     def test_get_lowest_version_when_multiple_fixed_in(self):
         """Test that the fixed_in version put in the vuln file by the reader is the lowest one when there is more than one not vuln version"""
@@ -389,7 +395,7 @@ class SecurityFocusReaderTest(unittest.TestCase):
         updated_at = datetime(2017, 1, 11, hour=8)
         bugtraq_id = "12345"
         vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=created_at, created_at=created_at)
-        vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id))
+        vuln.references.append(Reference(type="bugtraqid", id=bugtraq_id, url="http://www.securityfocus.com/bid/12345"))
         entry = self.create_securityfocus_entry(id=bugtraq_id, title="Title", update_date=updated_at,
                                                 creation_date=created_at)
         reader = SecurityFocusReader(None)
@@ -412,6 +418,30 @@ class SecurityFocusReaderTest(unittest.TestCase):
         reader.apply_data(vuln, entry, allow_override=True)
 
         self.assertEqual(vuln.updated_at, updated_at)
+
+    def test_apply_data_set_calculated_cvss_if_reported_type_in_cvss_mapping_but_no_cvss_and_no_cve(self):
+        self.reader.cvss_mapper.get_cvss_from_vulnerability_type.return_value = 4.3
+        date = datetime(2017, 1, 10)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=date, created_at=date)
+        entry = self.create_securityfocus_entry(id=bugtraq_id, title="Title", vuln_class="SQLI", update_date=date,
+                                                creation_date=date)
+
+        self.reader.apply_data(vuln, entry)
+
+        self.assertEqual(vuln.cvss, 4.3)
+
+    def test_apply_data_dont_set_calculated_cvss_if_cve_for_entry(self):
+        self.reader.cvss_mapper.get_cvss_from_vulnerability_type.return_value = 4.3
+        date = datetime(2017, 1, 10)
+        bugtraq_id = "12345"
+        vuln = Vulnerability(id=bugtraq_id, title="Title", updated_at=date, created_at=date)
+        entry = self.create_securityfocus_entry(id=bugtraq_id, title="Title", vuln_class="SQLI", update_date=date,
+                                                creation_date=date, cve_ids=["CVE-1234-1234"])
+
+        self.reader.apply_data(vuln, entry)
+
+        self.assertIsNone(vuln.cvss)
 
     @async_test()
     async def test_read_cve_entry_if_entry_has_cve_but_producer_is_not_cvereader(self):

@@ -17,13 +17,14 @@
 
 import json
 import re
+from collections import defaultdict
 from openwebvulndb.common.logs import logger
 from openwebvulndb.common.models import Reference, VersionRange, VersionNotFound
 from openwebvulndb.common.errors import VulnerabilityNotFound
 from openwebvulndb.common.cve import CPEMapper
 from openwebvulndb.common.manager import VulnerabilityManager, ReferenceManager
 from openwebvulndb.common.version import parse
-from copy import deepcopy
+from statistics import median
 from .fetcher import SecurityFocusFetcher
 from ..cve import CVEReader
 
@@ -42,6 +43,7 @@ class SecurityFocusReader:
         self.cpe_mapper = CPEMapper(storage=storage)
         self.meta_mapper = MetaMapper(storage)
         self.reference_manager = ReferenceManager()
+        self.cvss_mapper = CvssMapper(storage)
         self.fetcher = SecurityFocusFetcher(aiohttp_session)
         self.cve_reader = CVEReader(storage=storage, vulnerability_manager=vulnerability_manager,
                                     aiohttp_session=aiohttp_session)
@@ -84,8 +86,6 @@ class SecurityFocusReader:
 
     def apply_data(self, vuln, entry, allow_override=False):
 
-        added_new_value = False
-
         def apply_value(field, value):
             if allow_override or getattr(vuln, field) is None:
                 setattr(vuln, field, value)
@@ -94,23 +94,25 @@ class SecurityFocusReader:
         if vuln.title is None or allow_override:
             if vuln.title != entry['info_parser'].get_title():
                 vuln.title = entry['info_parser'].get_title()
-                added_new_value = True
 
-        if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
-            if entry['info_parser'].get_vuln_class() is not None:
+        if entry['info_parser'].get_vuln_class() is not None:
+            if vuln.reported_type is None or vuln.reported_type.lower() == "unknown":
                 vuln.reported_type = entry['info_parser'].get_vuln_class()
-                added_new_value = True
+            if vuln.cvss is None and len(entry["info_parser"].get_cve_id()) == 0:
+                vuln.cvss = self.cvss_mapper.get_cvss_from_vulnerability_type(entry['info_parser'].get_vuln_class())
 
-        apply_value('created_at', entry['info_parser'].get_publication_date())
+        if vuln.created_at is not None:
+            if vuln.created_at.replace(tzinfo=None) != entry['info_parser'].get_publication_date():
+                apply_value('created_at', entry['info_parser'].get_publication_date())
+        else:
+            apply_value('created_at', entry['info_parser'].get_publication_date())
 
         fixed_in = self._get_fixed_in(entry)
         if fixed_in is not None:
             version_range = VersionRange(fixed_in=fixed_in)
             if version_range not in vuln.affected_versions:
                 vuln.add_affected_version(version_range)
-                added_new_value = True
 
-        old_references = deepcopy(vuln.references)
         ref_manager = self.reference_manager.for_list(vuln.references)
         self._add_bugtraqid_reference(ref_manager, entry["id"])
         for cve in entry['info_parser'].get_cve_id():
@@ -119,7 +121,7 @@ class SecurityFocusReader:
         for reference in useful_references:
             ref_manager.include_url(reference["url"])
 
-        if added_new_value or old_references != vuln.references:
+        if vuln.dirty:
             apply_value('updated_at', self._get_last_modified(entry))
 
     def identify_target(self, entry):
@@ -269,29 +271,33 @@ class SecurityFocusReader:
         return possible_references
 
     def _add_bugtraqid_reference(self, references_manager, bugtraq_id):
-        """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references, replace it with the bugtraqid."""
+        """Add the bugtraq id to the references of a vuln. If a security focus url is already in the references,
+        replace it with the bugtraqid."""
         for ref in references_manager.references:
             if ref.type == "other" and ref.url is not None and references_manager.is_bugtraqid_url(ref.url):
                 if bugtraq_id == self._get_bugtraq_id_from_url(ref.url):
                     self._replace_existing_securityfocus_reference_with_bugtraq_id(ref, bugtraq_id)
                     return
-        references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+        ref = references_manager.include_normalized(type="bugtraqid", id=bugtraq_id)
+        if ref.url is None:  # Add url for existing bugtraq ID ref that doesn't have an url.
+            ref.url = "http://www.securityfocus.com/bid/%s" % bugtraq_id
 
     def _replace_existing_securityfocus_reference_with_bugtraq_id(self, reference, bugtraq_id):
         reference.type = "bugtraqid"
         reference.id = bugtraq_id
-        reference.url = None
 
     def _get_bugtraq_id_from_url(self, url):
         match = re.sub(r"http://www.securityfocus.com/bid/", "", url)
         return re.match("\d+", match).group()
 
     def _remove_useless_references(self, references_list):
-        """Remove the useless references that the references tab of a vuln in the security focuse db usually contains, like a link to wordpress/the plugin homepage."""
+        """Remove the useless references that the references tab of a vuln in the security focus db usually contains,
+        like a link to wordpress/the plugin homepage."""
         useful_references = []
         for reference in references_list:
             url = reference["url"]
-            if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or match_website.search(url)):
+            if not (re.search(r"https?://((www|downloads)\.)?wordpress\.(com|org)/(?!(news|support))", url) or
+                    match_website.search(url)):
                 useful_references.append(reference)
         return useful_references
 
@@ -326,3 +332,34 @@ class MetaMapper:
         for meta in self.storage.list_meta():
             self.load_meta(meta)
         logger.info("Meta Mapping loaded.")
+
+
+class CvssMapper:
+
+    def __init__(self, storage):
+        self.storage = storage
+        self.cvss_map = {}
+        self.loaded = False
+
+    def list_vulnerabilities(self):
+        for meta in self.storage.list_meta():
+            for vuln_list in self.storage.list_vulnerabilities(meta.key):
+                yield from vuln_list.vulnerabilities
+
+    def load_cvss_mapping(self):
+        types = defaultdict(list)
+        for vuln in self.list_vulnerabilities():
+            if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown":
+                if vuln.cvss is not None:
+                    types[vuln.reported_type].append(vuln.cvss)
+
+        for type, cvss_list in types.items():
+            if len(cvss_list) > 5:  # Below 5 cvss, the cvss median is not really significant
+                cvss_median = median(cvss_list)
+                self.cvss_map[type] = round(cvss_median, 1)
+
+    def get_cvss_from_vulnerability_type(self, vulnerability_type):
+        if not self.loaded:
+            self.load_cvss_mapping()
+            self.loaded = True
+        return self.cvss_map.get(vulnerability_type, None)

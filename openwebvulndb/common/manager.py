@@ -94,6 +94,8 @@ class ReferenceManager:
             ref.id = id
             if type == "cve":
                 ref.url = "https://web.nvd.nist.gov/view/vuln/detail?vulnId=CVE-%s" % id
+            elif type == "bugtraqid":
+                ref.url = "http://www.securityfocus.com/bid/%s" % id
 
             self.references.append(ref)
             return ref

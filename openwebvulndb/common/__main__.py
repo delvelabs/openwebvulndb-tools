@@ -18,6 +18,7 @@
 from argparse import ArgumentParser
 
 from openwebvulndb import app
+from .securityfocus.reader import CvssMapper
 
 
 def find_identity_files(storage, input_key):
@@ -47,8 +48,22 @@ def find_unclosed_vulnerabilities(storage, input_filter):
                 if not v.affected_versions or any(r.fixed_in is None for r in v.affected_versions):
                     print("{l.key: <60} {l.producer: <15} {v.id: <20} {v.title}".format(l=vlist, v=v))
 
+
+def set_cvss_based_on_reported_type(storage):
+    cvss_mapper = CvssMapper(storage)
+    for meta in storage.list_meta():
+        for vuln_list in storage.list_vulnerabilities(meta.key):
+            for vuln in vuln_list.vulnerabilities:
+                if vuln.cvss is None:
+                    vuln.cvss = cvss_mapper.get_cvss_from_vulnerability_type(vuln.reported_type)
+            if vuln_list.dirty:
+                storage.write_vulnerabilities(vuln_list)
+                vuln_list.clean()
+
+
 operations = dict(find_identity_files=find_identity_files,
-                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities)
+                  find_unclosed_vulnerabilities=find_unclosed_vulnerabilities,
+                  set_cvss_based_on_reported_type=set_cvss_based_on_reported_type)
 
 
 parser = ArgumentParser(description="OpenWebVulnDb Data Collector")
