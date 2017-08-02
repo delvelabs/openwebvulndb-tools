@@ -61,6 +61,7 @@ def vane_export(vane_importer, storage, input_path):
 
 def vane2_export(storage, aiohttp_session, loop, create_release=False, target_commitish=None, release_version=None):
     export_path = EXPORT_PATH
+    os.makedirs(export_path, exist_ok=True)
     exporter = Exporter(storage)
 
     environment_variables = ["VANE2_REPO_OWNER", "VANE2_REPO_NAME", "VANE2_REPO_PASSWORD"]
