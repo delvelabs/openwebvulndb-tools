@@ -17,6 +17,7 @@
 
 import json
 import re
+from collections import defaultdict
 from openwebvulndb.common.logs import logger
 from openwebvulndb.common.models import Reference, VersionRange, VersionNotFound
 from openwebvulndb.common.errors import VulnerabilityNotFound
@@ -346,13 +347,11 @@ class CvssMapper:
                 yield from vuln_list.vulnerabilities
 
     def load_cvss_mapping(self):
-        types = {}
+        types = defaultdict(list)
         for vuln in self.list_vulnerabilities():
-            if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown" and vuln.cvss is not None:
-                if vuln.reported_type in types:
+            if vuln.reported_type is not None and vuln.reported_type.lower() != "unknown":
+                if vuln.cvss is not None:
                     types[vuln.reported_type].append(vuln.cvss)
-                else:
-                    types[vuln.reported_type] = [vuln.cvss]
 
         for type, cvss_list in types.items():
             if len(cvss_list) > 5:  # Below 5 cvss, the cvss median is not really significant
