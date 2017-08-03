@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import asyncio
+import async_timeout
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -41,11 +42,15 @@ class ParallelWorker:
             try:
                 logger.debug("{} {} picked up a task.".format(self.name, n))
                 if self.timeout_per_job is not None:
-                    await asyncio.wait_for(coroutine(*args, **kwargs), self.timeout_per_job, loop=self.loop)
+                    task = self.loop.create_task(coroutine(*args, **kwargs))
+                    try:
+                        with async_timeout.timeout(timeout=self.timeout_per_job):
+                            await task
+                    except asyncio.TimeoutError:
+                        logger.warn("Job timed out in %s: %s, %s", self.name, args, kwargs)
+                        self._handle_task_timeout(task)
                 else:
                     await coroutine(*args, **kwargs)
-            except asyncio.TimeoutError:
-                logger.warn("Job timed out in %s: %s, %s", self.name, args, kwargs)
             finally:
                 self.queue.task_done()
 
@@ -58,6 +63,12 @@ class ParallelWorker:
                     task.cancel()
                 except:
                     pass
+
+    def _handle_task_timeout(self, task):
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
 
 
 class BackgroundRunner:

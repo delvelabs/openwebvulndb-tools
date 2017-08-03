@@ -65,11 +65,19 @@ class RepositoryChecker:
     def is_classic_structure(self, content):
         return "tags/" in content
 
+    async def has_recursive_externals(self, repository, workdir):
+        externals = await self.subversion.list_externals(repository, workdir=workdir)
+        for external in externals:
+            if external["url"] in repository:
+                return True
+        return False
+
 
 class Subversion:
     def __init__(self, *, loop, svn_base_dir="/tmp"):
         self.loop = loop
         self.svn_base_dir = svn_base_dir
+        self.repository_checker = RepositoryChecker(self)
 
     @staticmethod
     def build_ls(url):
@@ -105,10 +113,31 @@ class Subversion:
         raise ExecutionFailure("Listing failure")
 
     async def checkout(self, path, *, workdir):
-        await self._process(["svn", "checkout", path, "."], workdir=workdir)
+        if await self.repository_checker.has_recursive_externals(path, workdir):
+            logger.info("%s has recursive externals. Ignoring all externals" % path)
+            await self._process(["svn", "checkout", "--ignore-externals", path, "."], workdir=workdir)
+        else:
+            await self._process(["svn", "checkout", path, "."], workdir=workdir)
 
     async def switch(self, path, *, workdir):
-        await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+        if await self.repository_checker.has_recursive_externals(path, workdir):
+            logger.info("%s has recursive externals. Ignoring all externals" % path)
+            await self._process(["svn", "switch", "--ignore-ancestry", "--ignore-externals", path], workdir=workdir)
+        else:
+            await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+
+    async def list_externals(self, path, *, workdir):
+        out = await self._process(["svn", "propget", "-R", "svn:externals", path], workdir=workdir)
+        if len(out) == 0:
+            return []
+        out = out.decode()
+        externals = []
+        for line in out.split("\n\n"):
+            if len(line) > 0:
+                line = line[line.index(" - ") + 3:]
+                external_url, external_name = line.split(" ")
+                externals.append({"name": external_name, "url": external_url})
+        return externals
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(
@@ -119,15 +148,18 @@ class Subversion:
             stderr=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.PIPE
         )
-        out, err = await process.communicate()
+        try:
+            out, err = await process.communicate()
+            if err.startswith(b"svn: E200007"):
+                raise DirectoryExpected(err)
 
-        if err.startswith(b"svn: E200007"):
-            raise DirectoryExpected(err)
+            if process.returncode != 0:
+                raise ExecutionFailure(err)
 
-        if process.returncode != 0:
-            raise ExecutionFailure(err)
-
-        return out
+            return out
+        finally:
+            if process.returncode is None:  # return code is None if process is still running
+                process.kill()
 
     @contextmanager
     def workspace(self, *, repository):

@@ -22,7 +22,7 @@ from fixtures import async_test, fake_future, file_path
 
 from openwebvulndb.common import RepositoryChecker, Repository
 from openwebvulndb.common.vcs import Subversion, SubversionWorkspace
-from openwebvulndb.common.errors import ExecutionFailure, DirectoryExpected
+from openwebvulndb.common.errors import ExecutionFailure
 
 
 class VersionControlTest(TestCase):
@@ -87,6 +87,17 @@ class VersionControlTest(TestCase):
             call("http://example.com/"),
         ])
 
+    @async_test()
+    async def test_has_recursive_externals(self, loop):
+        checker = RepositoryChecker(subversion=MagicMock())
+        checker.subversion.list_externals.side_effect = [
+            fake_future([{"name": "plugin", "url": "https://plugins.svn.wordpress.org/plugin"}], loop),
+            fake_future([{"name": "valid-external", "url": "https://plugins.svn.wordpress.org/external"}], loop)
+        ]
+
+        self.assertTrue(await checker.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", None))
+        self.assertFalse(await checker.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", None))
+
 
 class SubversionTest(TestCase):
 
@@ -113,8 +124,9 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
-
             svn = Subversion(loop=loop)
+            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+
             await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
             cse.assert_called_with("svn", "checkout", "https://svn.example.com/tags/1.2.3", ".",
@@ -133,8 +145,9 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 1
             cse.return_value = fake_future(proc, loop=loop)
-
             svn = Subversion(loop=loop)
+            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+
             with self.assertRaises(ExecutionFailure):
                 await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
@@ -154,8 +167,9 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
-
             svn = Subversion(loop=loop)
+            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+
             await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
             cse.assert_called_with("svn", "switch", "--ignore-ancestry", "https://svn.example.com/tags/1.2.3",
@@ -168,16 +182,83 @@ class SubversionTest(TestCase):
             proc.communicate.assert_called_with()
 
     @async_test()
-    async def test_execute_switch(self, loop):
+    async def test_checkout_ignore_externals_if_any_recursive_external(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            proc.communicate.return_value = fake_future(("out", b"svn: E200007: some file refers to a file, not a directory\n"), loop=loop)
-            proc.returncode = 1
+            proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
+            proc.returncode = 0
+            cse.return_value = fake_future(proc, loop=loop)
+            repository_checker = MagicMock()
+            repository_checker.has_recursive_externals.return_value = fake_future(True, loop)
+            svn = Subversion(loop=loop)
+            svn.repository_checker = repository_checker
+
+            await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
+
+            cse.assert_called_with("svn", "checkout", "--ignore-externals", "https://svn.example.com/tags/1.2.3", ".",
+                                   cwd="/tmp/foobar", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                   stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            proc.communicate.assert_called_with()
+
+    @async_test()
+    async def test_switch_ignore_externals_if_any_recursive_external(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
+            proc.returncode = 0
+            cse.return_value = fake_future(proc, loop=loop)
+            repository_checker = MagicMock()
+            repository_checker.has_recursive_externals.return_value = fake_future(True, loop)
+            svn = Subversion(loop=loop)
+            svn.repository_checker = repository_checker
+
+            await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
+
+            cse.assert_called_with("svn", "switch", "--ignore-ancestry", "--ignore-externals",
+                                   "https://svn.example.com/tags/1.2.3", cwd="/tmp/foobar", loop=loop,
+                                   stdout=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE,
+                                   stderr=asyncio.subprocess.PIPE)
+            proc.communicate.assert_called_with()
+
+    @async_test()
+    async def test_list_externals(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.return_value = fake_future(
+                (b"https://plugins.svn.wordpress.org/plugin/tags/1.0 - https://www.some-external.example external\n\n"
+                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/class - https://www.some-external.example external\n\n"
+                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - https://www.some-external.example external\n\n"
+                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - https://www.some-external.example external\n\n", b""), loop=loop)
+            proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
             svn = Subversion(loop=loop)
-            with self.assertRaises(DirectoryExpected):
-                await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
+            externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir="/tmp/plugin")
+
+            cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
+                                          "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
+                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
+            self.assertEqual(externals, [{"name": "external", "url": "https://www.some-external.example"}]*4)
+
+    @async_test()
+    async def test_list_externals_no_external(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.return_value = fake_future(
+                (b"", b""), loop=loop)
+            proc.returncode = 0
+            cse.return_value = fake_future(proc, loop=loop)
+            svn = Subversion(loop=loop)
+
+            externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0",
+                                                 workdir="/tmp/plugin")
+
+            cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
+                                          "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
+                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
+            self.assertEqual(externals, [])
 
 
 class SubversionWorkspaceTest(TestCase):
