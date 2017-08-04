@@ -227,7 +227,7 @@ class SubversionTest(TestCase):
                   b"https://plugins.svn.wordpress.org/plugin/tags/1.0/class - https://www.some-external.example external\n\n" \
                   b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - https://www.some-external.example external\n\n" \
                   b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - https://www.some-external.example external\n\n"
-            proc.communicate.return_value = fake_future(out, b"", loop=loop)
+            proc.communicate.return_value = fake_future((out, b""), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 

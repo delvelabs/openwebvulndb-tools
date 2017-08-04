@@ -131,8 +131,8 @@ class Subversion:
             return []
         out = out.decode()
         externals = []
-        for line in out.split("\n\n"):
-            if len(line) > 0:
+        for line in out.split("\n"):
+            if len(line) > 0 and " - " in line:
                 line = line[line.index(" - ") + 3:]
                 external_url, external_name = line.split(" ")
                 externals.append({"name": external_name, "url": external_url})
