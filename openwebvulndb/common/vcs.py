@@ -65,19 +65,11 @@ class RepositoryChecker:
     def is_classic_structure(self, content):
         return "tags/" in content
 
-    async def has_recursive_externals(self, repository, workdir):
-        externals = await self.subversion.list_externals(repository, workdir=workdir)
-        for external in externals:
-            if external["url"] in repository:
-                return True
-        return False
-
 
 class Subversion:
     def __init__(self, *, loop, svn_base_dir="/tmp"):
         self.loop = loop
         self.svn_base_dir = svn_base_dir
-        self.repository_checker = RepositoryChecker(self)
 
     @staticmethod
     def build_ls(url):
@@ -113,18 +105,25 @@ class Subversion:
         raise ExecutionFailure("Listing failure")
 
     async def checkout(self, path, *, workdir):
-        if await self.repository_checker.has_recursive_externals(path, workdir):
+        if await self.has_recursive_externals(path, workdir=workdir):
             logger.info("%s has recursive externals. Ignoring all externals" % path)
             await self._process(["svn", "checkout", "--ignore-externals", path, "."], workdir=workdir)
         else:
             await self._process(["svn", "checkout", path, "."], workdir=workdir)
 
     async def switch(self, path, *, workdir):
-        if await self.repository_checker.has_recursive_externals(path, workdir):
+        if await self.has_recursive_externals(path, workdir=workdir):
             logger.info("%s has recursive externals. Ignoring all externals" % path)
             await self._process(["svn", "switch", "--ignore-ancestry", "--ignore-externals", path], workdir=workdir)
         else:
             await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+
+    async def has_recursive_externals(self, path, *, workdir):
+        externals = await self.list_externals(path, workdir=workdir)
+        for external in externals:
+            if external["url"] in path:
+                return True
+        return False
 
     async def list_externals(self, path, *, workdir):
         out = await self._process(["svn", "propget", "-R", "svn:externals", path], workdir=workdir)

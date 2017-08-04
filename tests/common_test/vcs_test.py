@@ -87,17 +87,6 @@ class VersionControlTest(TestCase):
             call("http://example.com/"),
         ])
 
-    @async_test()
-    async def test_has_recursive_externals(self, loop):
-        checker = RepositoryChecker(subversion=MagicMock())
-        checker.subversion.list_externals.side_effect = [
-            fake_future([{"name": "plugin", "url": "https://plugins.svn.wordpress.org/plugin"}], loop),
-            fake_future([{"name": "valid-external", "url": "https://plugins.svn.wordpress.org/external"}], loop)
-        ]
-
-        self.assertTrue(await checker.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", None))
-        self.assertFalse(await checker.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", None))
-
 
 class SubversionTest(TestCase):
 
@@ -125,7 +114,7 @@ class SubversionTest(TestCase):
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
             svn = Subversion(loop=loop)
-            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+            svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
             await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
@@ -146,7 +135,7 @@ class SubversionTest(TestCase):
             proc.returncode = 1
             cse.return_value = fake_future(proc, loop=loop)
             svn = Subversion(loop=loop)
-            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+            svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
             with self.assertRaises(ExecutionFailure):
                 await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
@@ -168,7 +157,7 @@ class SubversionTest(TestCase):
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
             svn = Subversion(loop=loop)
-            svn.repository_checker.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
+            svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
             await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
@@ -188,10 +177,8 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
-            repository_checker = MagicMock()
-            repository_checker.has_recursive_externals.return_value = fake_future(True, loop)
             svn = Subversion(loop=loop)
-            svn.repository_checker = repository_checker
+            svn.has_recursive_externals = MagicMock(return_value=fake_future(True, loop))
 
             await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
@@ -207,10 +194,8 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
-            repository_checker = MagicMock()
-            repository_checker.has_recursive_externals.return_value = fake_future(True, loop)
             svn = Subversion(loop=loop)
-            svn.repository_checker = repository_checker
+            svn.has_recursive_externals = MagicMock(return_value=fake_future(True, loop))
 
             await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
@@ -221,19 +206,34 @@ class SubversionTest(TestCase):
             proc.communicate.assert_called_with()
 
     @async_test()
+    async def test_has_recursive_externals(self, loop):
+        svn = Subversion(loop=loop)
+        svn.list_externals = MagicMock(side_effect=[
+            fake_future([{"name": "plugin", "url": "https://plugins.svn.wordpress.org/plugin"}], loop),
+            fake_future([{"name": "valid-external", "url": "https://plugins.svn.wordpress.org/external"}], loop)
+        ])
+
+        self.assertTrue(await svn.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir=None))
+        self.assertFalse(await svn.has_recursive_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir=None))
+
+        svn.list_externals.assert_has_calls([call("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir=None),
+                                             call("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir=None)])
+
+    @async_test()
     async def test_list_externals(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            proc.communicate.return_value = fake_future(
-                (b"https://plugins.svn.wordpress.org/plugin/tags/1.0 - https://www.some-external.example external\n\n"
-                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/class - https://www.some-external.example external\n\n"
-                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - https://www.some-external.example external\n\n"
-                 b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - https://www.some-external.example external\n\n", b""), loop=loop)
+            out = b"https://plugins.svn.wordpress.org/plugin/tags/1.0 - https://www.some-external.example external\n\n" \
+                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/class - https://www.some-external.example external\n\n" \
+                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - https://www.some-external.example external\n\n" \
+                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - https://www.some-external.example external\n\n"
+            proc.communicate.return_value = fake_future(out, b"", loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
 
             svn = Subversion(loop=loop)
-            externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir="/tmp/plugin")
+            externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0",
+                                                 workdir="/tmp/plugin")
 
             cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
                                           "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
