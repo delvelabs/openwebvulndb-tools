@@ -24,6 +24,7 @@ from contextlib import contextmanager
 
 from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
+from urllib.parse import urljoin, urlparse, urlunparse
 
 
 class Workspace:
@@ -136,7 +137,45 @@ class Subversion:
                 line = line[line.index(" - ") + 3:]
                 external_url, external_name = line.split(" ")
                 externals.append({"name": external_name, "url": external_url})
+        repo_info = await self.info(path, workdir=workdir)
+        for external in externals:
+            if self.is_relative_external_url(external["url"]):
+                external["url"] = self.to_absolute_url(external["url"], repo_info)
+
         return externals
+
+    def is_relative_external_url(self, url):
+        for prefix in ["/", "^/", "../", "//"]:
+            if url.startswith(prefix):
+                return True
+        return False
+
+    def to_absolute_url(self, url, repo_info):
+        if url.startswith("//"):
+            repo_url = urlparse(repo_info["url"])
+            external_url = urlparse(url)
+            return urlunparse((repo_url.scheme, external_url.netloc, external_url.path, external_url.params,
+                               external_url.query, external_url.fragment))
+        if url.startswith("/"):
+            parsed_url = urlparse(repo_info["root"])
+            server_url = urlunparse((parsed_url.scheme, parsed_url.netloc, "", "", "", ""))
+            return urljoin(server_url, url)
+        if url.startswith("^/"):
+            url = url[len("^/"):]
+            return "/".join((repo_info["root"], url))
+        if url.startswith("../"):
+            url = url[len("../"):]
+            return "/".join((repo_info["url"], url))
+        return url
+
+    async def info(self, path, *, workdir):
+        out = await self._process(["svn", "info", "--show-item", "url", path], workdir=workdir)
+        out = out.decode()
+        url = out.rstrip("\n")
+        out = await self._process(["svn", "info", "--show-item", "repos-root-url", path], workdir=workdir)
+        out = out.decode()
+        root = out.rstrip("\n")
+        return {"url": url, "root": root}
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(

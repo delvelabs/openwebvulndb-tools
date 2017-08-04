@@ -232,6 +232,9 @@ class SubversionTest(TestCase):
             cse.return_value = fake_future(proc, loop=loop)
 
             svn = Subversion(loop=loop)
+            svn.info = MagicMock(return_value=fake_future({"url": "https://plugins.svn.wordpress.org/plugin/tags/1.0",
+                                                           "root": "https://plugins.svn.wordpress.org/"}, loop=loop))
+
             externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0",
                                                  workdir="/tmp/plugin")
 
@@ -240,6 +243,37 @@ class SubversionTest(TestCase):
                                         cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
             self.assertEqual(externals, [{"name": "external", "url": "https://www.some-external.example"}]*4)
+
+    @async_test()
+    async def test_list_externals_with_relative_path(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            out = b"https://svn.example.com/plugins/plugin/tags/1.0 - https://svn.example.com/plugins/external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir0 - //svn.example.com/plugins/external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir1 - /plugins/external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir2 - ^/external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir3 - ../inner-external external\n\n"
+            proc.communicate.return_value = fake_future((out, b""), loop=loop)
+            proc.returncode = 0
+            cse.return_value = fake_future(proc, loop=loop)
+
+            svn = Subversion(loop=loop)
+            svn.info = MagicMock(return_value=fake_future({"url": "https://svn.example.com/plugins/plugin/tags/1.0",
+                                                           "root": "https://svn.example.com/plugins"}, loop=loop))
+
+            externals = await svn.list_externals("https://svn.example.com/plugins/plugin/tags/1.0",
+                                                 workdir="/tmp/plugin")
+
+            cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
+                                          "https://svn.example.com/plugins/plugin/tags/1.0"),
+                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
+            self.assertEqual(externals, [{"name": "external", "url": "https://svn.example.com/plugins/external"},
+                                         {"name": "external", "url": "https://svn.example.com/plugins/external"},
+                                         {"name": "external", "url": "https://svn.example.com/plugins/external"},
+                                         {"name": "external", "url": "https://svn.example.com/plugins/external"},
+                                         {"name": "external",
+                                          "url": "https://svn.example.com/plugins/plugin/tags/1.0/inner-external"}])
 
     @async_test()
     async def test_list_externals_no_external(self, loop):
@@ -259,6 +293,30 @@ class SubversionTest(TestCase):
                                         cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
             self.assertEqual(externals, [])
+
+    @async_test()
+    async def test_svn_info(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.communicate.side_effect = [fake_future((b"https://plugins.svn.wordpress.org/plugin/tags/1.0\n", b""),
+                                                        loop=loop),
+                                            fake_future((b"https://plugins.svn.wordpress.org\n", b""), loop=loop)]
+            proc.returncode = 0
+            cse.return_value = fake_future(proc, loop=loop)
+            svn = Subversion(loop=loop)
+
+            info = await svn.info("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir="/tmp/plugin")
+
+            cse.assert_has_calls(
+                [call(*("svn", "info", "--show-item", "url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
+                      cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                      stdin=asyncio.subprocess.PIPE),
+                 call(*("svn", "info", "--show-item", "repos-root-url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
+                      cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                      stdin=asyncio.subprocess.PIPE)])
+
+            self.assertEqual(info, {"url": "https://plugins.svn.wordpress.org/plugin/tags/1.0",
+                                    "root": "https://plugins.svn.wordpress.org"})
 
 
 class SubversionWorkspaceTest(TestCase):
