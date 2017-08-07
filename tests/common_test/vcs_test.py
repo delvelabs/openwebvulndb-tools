@@ -225,8 +225,8 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             out = b"https://plugins.svn.wordpress.org/plugin/tags/1.0 - https://www.some-external.example external\n\n" \
                   b"https://plugins.svn.wordpress.org/plugin/tags/1.0/class - https://www.some-external.example external\n\n" \
-                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - https://www.some-external.example external\n\n" \
-                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - https://www.some-external.example external\n\n"
+                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/css - external https://www.some-external.example\n\n" \
+                  b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - external https://www.some-external.example\n\n"
             proc.communicate.return_value = fake_future((out, b""), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
@@ -248,11 +248,14 @@ class SubversionTest(TestCase):
     async def test_list_externals_with_relative_path(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
-            out = b"https://svn.example.com/plugins/plugin/tags/1.0 - https://svn.example.com/plugins/external external\n\n" \
-                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir0 - //svn.example.com/plugins/external external\n\n" \
-                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir1 - /plugins/external external\n\n" \
+            out = b"https://svn.example.com/plugins/plugin/tags/1.0/subdir0 - //svn.example.com/external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir1 - /external external\n\n" \
                   b"https://svn.example.com/plugins/plugin/tags/1.0/subdir2 - ^/external external\n\n" \
-                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir3 - ../inner-external external\n\n"
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir3 - external ../external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir3 - external ../../external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir3 - ../../../../../external external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir4 - external ^/../repo/external\n\n" \
+                  b"https://svn.example.com/plugins/plugin/tags/1.0/subdir4 - external ^/../../../repo/external\n\n"
             proc.communicate.return_value = fake_future((out, b""), loop=loop)
             proc.returncode = 0
             cse.return_value = fake_future(proc, loop=loop)
@@ -268,12 +271,16 @@ class SubversionTest(TestCase):
                                           "https://svn.example.com/plugins/plugin/tags/1.0"),
                                         cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
-            self.assertEqual(externals, [{"name": "external", "url": "https://svn.example.com/plugins/external"},
-                                         {"name": "external", "url": "https://svn.example.com/plugins/external"},
-                                         {"name": "external", "url": "https://svn.example.com/plugins/external"},
+            self.assertEqual(externals, [{"name": "external", "url": "https://svn.example.com/external"},
+                                         {"name": "external", "url": "https://svn.example.com/external"},
                                          {"name": "external", "url": "https://svn.example.com/plugins/external"},
                                          {"name": "external",
-                                          "url": "https://svn.example.com/plugins/plugin/tags/1.0/inner-external"}])
+                                          "url": "https://svn.example.com/plugins/plugin/tags/external"},
+                                         {"name": "external",
+                                          "url": "https://svn.example.com/plugins/plugin/external"},
+                                         {"name": "external", "url": "https://svn.example.com/external"},
+                                         {"name": "external", "url": "https://svn.example.com/repo/external"},
+                                         {"name": "external", "url": "https://svn.example.com/repo/external"}])
 
     @async_test()
     async def test_list_externals_no_external(self, loop):

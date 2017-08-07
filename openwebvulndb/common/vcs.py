@@ -135,13 +135,19 @@ class Subversion:
         for line in out.split("\n"):
             if len(line) > 0 and " - " in line:
                 line = line[line.index(" - ") + 3:]
-                external_url, external_name = line.split(" ")
-                externals.append({"name": external_name, "url": external_url})
+                part0, part1 = line.split(" ")
+                if part0.startswith("http") or self.is_relative_external_url(part0):
+                    externals.append({"name": part1, "url": part0})
+                elif part1.startswith("http") or self.is_relative_external_url(part1):
+                    externals.append({"name": part0, "url": part1})
+                else:
+                    logger.warn("invalid external definition: %s" % line)
         repo_info = await self.info(path, workdir=workdir)
         for external in externals:
             if self.is_relative_external_url(external["url"]):
+                logger.info("relative url: %s" % external["url"])
                 external["url"] = self.to_absolute_url(external["url"], repo_info)
-
+                logger.info("absolute url: %s" % external["url"])
         return externals
 
     def is_relative_external_url(self, url):
@@ -162,11 +168,28 @@ class Subversion:
             return urljoin(server_url, url)
         if url.startswith("^/"):
             url = url[len("^/"):]
-            return "/".join((repo_info["root"], url))
+            if "../" in url:
+                parsed_url = urlparse(repo_info["root"])
+                url_path = self._backtrack_path(url, parsed_url.path)
+                return urlunparse((parsed_url.scheme, parsed_url.netloc, url_path, "", "", ""))
+            else:
+                return "/".join((repo_info["root"], url))
         if url.startswith("../"):
-            url = url[len("../"):]
-            return "/".join((repo_info["url"], url))
+            parsed_url = urlparse(repo_info["url"])
+            path = self._backtrack_path(url, parsed_url.path)
+            return urlunparse((parsed_url.scheme, parsed_url.netloc, path, "", "", ""))
         return url
+
+    def _backtrack_path(self, relative_path, base_url_path):
+        rel_path_parts = relative_path.split("/")
+        backtrack = len([part for part in rel_path_parts if part == ".."])
+        base_path_parts = base_url_path.split("/")
+        if backtrack < len(base_path_parts):
+            base_path_parts = base_path_parts[:-backtrack]
+            path = "/".join(base_path_parts)
+        else:
+            path = ""
+        return "/".join([path] + rel_path_parts[backtrack:])
 
     async def info(self, path, *, workdir):
         out = await self._process(["svn", "info", "--show-item", "url", path], workdir=workdir)
