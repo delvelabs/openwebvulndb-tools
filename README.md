@@ -17,6 +17,12 @@ pip install -r requirements-dev.txt
 nosetests
 ```
 
+External requirements set-up:
+
+```
+sudo apt-get install subversion
+```
+
 ## Usage
 
 Tools share a common set of libraries when possible, but the entry point is

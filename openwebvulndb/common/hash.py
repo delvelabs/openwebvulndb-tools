@@ -44,7 +44,6 @@ class RepositoryHasher:
 
     async def collect_for_workspace(self, key, workspace, *, prefix=""):
         version_list = await self.background_runner.run(self.get_version_list, key)
-        update_required = False
         try:
             repository_versions = set(await workspace.list_versions())
             stored_versions = {v.version for v in version_list.versions}
@@ -56,12 +55,11 @@ class RepositoryHasher:
                     if len(signatures) > 0:
                         desc = version_list.get_version(v, create_missing=True)
                         desc.signatures = signatures
-                        update_required = True
                 except DirectoryExpected:
                     pass  # Bad version, skip
         except ExecutionFailure as e:
             logger.warn("A command failed to execute: %s", e)
-        if update_required:
+        if version_list.dirty:
             await self.background_runner.run(self.storage.write_versions, version_list)
 
     async def collect_from_meta(self, meta, prefix_pattern=""):

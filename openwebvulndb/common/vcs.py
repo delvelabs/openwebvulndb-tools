@@ -24,6 +24,7 @@ from contextlib import contextmanager
 
 from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
+from urllib.parse import urljoin, urlparse, urlunparse
 
 
 class Workspace:
@@ -105,10 +106,99 @@ class Subversion:
         raise ExecutionFailure("Listing failure")
 
     async def checkout(self, path, *, workdir):
-        await self._process(["svn", "checkout", path, "."], workdir=workdir)
+        if await self.has_recursive_externals(path, workdir=workdir):
+            logger.info("%s has recursive externals. Ignoring all externals" % path)
+            await self._process(["svn", "checkout", "--ignore-externals", path, "."], workdir=workdir)
+        else:
+            await self._process(["svn", "checkout", path, "."], workdir=workdir)
 
     async def switch(self, path, *, workdir):
-        await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+        if await self.has_recursive_externals(path, workdir=workdir):
+            logger.info("%s has recursive externals. Ignoring all externals" % path)
+            await self._process(["svn", "switch", "--ignore-ancestry", "--ignore-externals", path], workdir=workdir)
+        else:
+            await self._process(["svn", "switch", "--ignore-ancestry", path], workdir=workdir)
+
+    async def has_recursive_externals(self, path, *, workdir):
+        externals = await self.list_externals(path, workdir=workdir)
+        for external in externals:
+            if external["url"] in path:
+                return True
+        return False
+
+    async def list_externals(self, path, *, workdir):
+        out = await self._process(["svn", "propget", "-R", "svn:externals", path], workdir=workdir)
+        if len(out) == 0:
+            return []
+        out = out.decode()
+        externals = []
+        for line in out.split("\n"):
+            if len(line) > 0 and " - " in line:
+                line = line[line.index(" - ") + 3:]
+                part0, part1 = line.split(" ")
+                if part0.startswith("http") or self.is_relative_external_url(part0):
+                    externals.append({"name": part1, "url": part0})
+                elif part1.startswith("http") or self.is_relative_external_url(part1):
+                    externals.append({"name": part0, "url": part1})
+                else:
+                    logger.warn("invalid external definition: %s" % line)
+        repo_info = await self.info(path, workdir=workdir)
+        for external in externals:
+            if self.is_relative_external_url(external["url"]):
+                logger.info("relative url: %s" % external["url"])
+                external["url"] = self.to_absolute_url(external["url"], repo_info)
+                logger.info("absolute url: %s" % external["url"])
+        return externals
+
+    def is_relative_external_url(self, url):
+        for prefix in ["/", "^/", "../", "//"]:
+            if url.startswith(prefix):
+                return True
+        return False
+
+    def to_absolute_url(self, url, repo_info):
+        if url.startswith("//"):
+            repo_url = urlparse(repo_info["url"])
+            external_url = urlparse(url)
+            return urlunparse((repo_url.scheme, external_url.netloc, external_url.path, external_url.params,
+                               external_url.query, external_url.fragment))
+        if url.startswith("/"):
+            parsed_url = urlparse(repo_info["root"])
+            server_url = urlunparse((parsed_url.scheme, parsed_url.netloc, "", "", "", ""))
+            return urljoin(server_url, url)
+        if url.startswith("^/"):
+            url = url[len("^/"):]
+            if "../" in url:
+                parsed_url = urlparse(repo_info["root"])
+                url_path = self._backtrack_path(url, parsed_url.path)
+                return urlunparse((parsed_url.scheme, parsed_url.netloc, url_path, "", "", ""))
+            else:
+                return "/".join((repo_info["root"], url))
+        if url.startswith("../"):
+            parsed_url = urlparse(repo_info["url"])
+            path = self._backtrack_path(url, parsed_url.path)
+            return urlunparse((parsed_url.scheme, parsed_url.netloc, path, "", "", ""))
+        return url
+
+    def _backtrack_path(self, relative_path, base_url_path):
+        rel_path_parts = relative_path.split("/")
+        backtrack = len([part for part in rel_path_parts if part == ".."])
+        base_path_parts = base_url_path.split("/")
+        if backtrack < len(base_path_parts):
+            base_path_parts = base_path_parts[:-backtrack]
+            path = "/".join(base_path_parts)
+        else:
+            path = ""
+        return "/".join([path] + rel_path_parts[backtrack:])
+
+    async def info(self, path, *, workdir):
+        out = await self._process(["svn", "info", "--show-item", "url", path], workdir=workdir)
+        out = out.decode()
+        url = out.rstrip("\n")
+        out = await self._process(["svn", "info", "--show-item", "repos-root-url", path], workdir=workdir)
+        out = out.decode()
+        root = out.rstrip("\n")
+        return {"url": url, "root": root}
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(
@@ -119,15 +209,18 @@ class Subversion:
             stderr=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.PIPE
         )
-        out, err = await process.communicate()
+        try:
+            out, err = await process.communicate()
+            if err.startswith(b"svn: E200007"):
+                raise DirectoryExpected(err)
 
-        if err.startswith(b"svn: E200007"):
-            raise DirectoryExpected(err)
+            if process.returncode != 0:
+                raise ExecutionFailure(err)
 
-        if process.returncode != 0:
-            raise ExecutionFailure(err)
-
-        return out
+            return out
+        finally:
+            if process.returncode is None:  # return code is None if process is still running
+                process.kill()
 
     @contextmanager
     def workspace(self, *, repository):
