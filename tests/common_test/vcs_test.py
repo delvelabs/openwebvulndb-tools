@@ -422,3 +422,14 @@ class SubversionWorkspaceTest(TestCase):
         await workspace.to_version("1.1")
 
         svn.switch.assert_called_with("https://svn.example.com/1.1", workdir="/tmp/foo")
+
+    @async_test()
+    async def test_list_versions_skip_versions_without_digit(self, fake_future):
+        svn = MagicMock()
+        svn.ls.return_value = fake_future(["1.0/", "1.1/", "trunk/"])
+
+        workspace = SubversionWorkspace(workdir="/tmp/foo", subversion=svn, repository="https://svn.test.com/")
+
+        versions = await workspace.list_versions()
+
+        self.assertEqual(versions, ["1.0", "1.1"])
