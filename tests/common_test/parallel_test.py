@@ -48,12 +48,12 @@ class ParallelTest(TestCase):
 
     @async_test()
     async def test_consume_do_not_block_on_exception(self, loop):
-        async def coro0():
+        async def coro_with_exception():
             raise Exception()
 
         coro = make_mocked_coro()
         worker = ParallelWorker(1, loop=loop)
-        await worker.request(coro0)
+        await worker.request(coro_with_exception)
         await worker.request(coro)
         with async_timeout.timeout(timeout=0.01, loop=loop):
             await worker.wait()
