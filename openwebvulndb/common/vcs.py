@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
 from urllib.parse import urljoin, urlparse, urlunparse
+import re
 
 
 class Workspace:
@@ -264,7 +265,7 @@ class SubversionWorkspace(Workspace):
 
     async def list_versions(self):
         versions = await self.subversion.ls(self.repository)
-        return [v.strip("/") for v in versions]
+        return [v.strip("/") for v in versions if re.search("\d", v)]
 
     def destroy(self):
         for path, dirs, files in walk(self.workdir, topdown=False):
