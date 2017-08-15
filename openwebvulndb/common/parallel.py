@@ -51,6 +51,8 @@ class ParallelWorker:
                         self._handle_task_timeout(task)
                 else:
                     await coroutine(*args, **kwargs)
+            except Exception as e:
+                logger.warn("Unexpected exception in {} {}: {}".format(self.name, n, repr(e)))
             finally:
                 self.queue.task_done()
 

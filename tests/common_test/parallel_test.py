@@ -17,8 +17,10 @@
 
 from unittest import TestCase
 from fixtures import async_test
+import async_timeout
+from aiohttp.test_utils import make_mocked_coro
 
-from openwebvulndb.common.parallel import BackgroundRunner
+from openwebvulndb.common.parallel import BackgroundRunner, ParallelWorker
 
 
 class ParallelTest(TestCase):
@@ -43,3 +45,17 @@ class ParallelTest(TestCase):
     def test_no_loop_uses_default(self):
         runner = BackgroundRunner(None)
         self.assertIs(runner.run, BackgroundRunner.default)
+
+    @async_test()
+    async def test_consume_do_not_block_on_exception(self, loop):
+        async def coro0():
+            raise Exception()
+
+        coro = make_mocked_coro()
+        worker = ParallelWorker(1, loop=loop)
+        await worker.request(coro0)
+        await worker.request(coro)
+        with async_timeout.timeout(timeout=0.01, loop=loop):
+            await worker.wait()
+
+        coro.assert_called_once_with()

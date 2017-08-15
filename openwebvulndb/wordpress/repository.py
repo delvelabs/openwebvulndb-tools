@@ -60,7 +60,6 @@ class WordPressRepository:
         try:
             async with self.session.get(url) as response:
                 data = await response.text()
-                response.close()
                 return parser.parse(data)
         except SoftwareNotFound:
             raise
