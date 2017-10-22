@@ -18,7 +18,8 @@
 import asyncio
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
-from fixtures import async_test, fake_future, file_path
+from fixtures import async_test, fake_future, file_path, freeze_time
+from datetime import date
 
 from openwebvulndb.common import RepositoryChecker, Repository
 from openwebvulndb.common.vcs import Subversion, SubversionWorkspace
@@ -324,6 +325,56 @@ class SubversionTest(TestCase):
 
             self.assertEqual(info, {"url": "https://plugins.svn.wordpress.org/plugin/tags/1.0",
                                     "root": "https://plugins.svn.wordpress.org"})
+
+    @async_test()
+    async def test_svn_get_plugins_update_date_return_last_modification_date_of_tags_folder_for_plugins(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.stdout.readline.side_effect = [
+                fake_future(b"svn: warning: W160013: URL 'http://themes.svn.wordpress.org/tags' non-existent in revision 83065", loop=loop),
+                fake_future(b"1749964 user1               Oct 20 11:15 ./\n", loop=loop),
+                fake_future(b"1077807 user 2              Jan 28  2015 plugin-1/\n", loop=loop),
+                fake_future(b"1385952 user.3              Apr 04  2016 plugin-2/", loop=loop),
+                fake_future(b"svn: E200009: Could not list all targets because some targets don't exist", loop=loop)]
+            proc.stdout.at_eof.side_effect = [False, False, False, False, False, True]
+            proc.wait.return_value = fake_future(0, loop=loop)
+            cse.return_value = fake_future(proc, loop=loop)
+            svn = Subversion(loop=loop)
+
+            plugins = await svn.get_plugins_update_date()
+
+            cse.assert_has_calls([call(*("svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"), loop=loop,
+                                       stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                                       stdin=asyncio.subprocess.DEVNULL)])
+            self.assertEqual(plugins, {"plugin-1": date(year=2015, month=1, day=28),
+                                       "plugin-2": date(year=2016, month=4, day=4)})
+
+    @async_test()
+    async def test_svn_get_plugins_update_date_replace_hours_with_current_year(self, loop):
+        with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
+            proc = MagicMock()
+            proc.stdout.readline.return_value = \
+                fake_future(b"1749964 user1               Oct 20 11:15 plugin-1/\n", loop=loop)
+            proc.stdout.at_eof.side_effect = [False, True]
+            proc.wait.return_value = fake_future(0, loop=loop)
+            cse.return_value = fake_future(proc, loop=loop)
+            svn = Subversion(loop=loop)
+
+            plugins = await svn.get_plugins_update_date()
+
+            self.assertEqual(plugins, {"plugin-1": date(year=date.today().year, month=10, day=20)})
+
+    @freeze_time(date(year=2017, day=22, month=10))
+    @async_test()
+    async def test_svn_get_plugins_updated_since(self, loop):
+        plugins = {"plugin-0": date(year=2017, month=10, day=20), "plugin-1": date(year=2016, month=4, day=4),
+                   "plugin-2": date(year=2015, month=10, day=21), "plugin-3": date(year=2017, month=10, day=6)}
+        svn = Subversion(loop=None)
+        svn.get_plugins_update_date = MagicMock(return_value=fake_future(plugins, loop=loop))
+
+        recently_updated = await svn.get_plugins_updated_since(date(year=2017, day=6, month=10))
+
+        self.assertEqual(recently_updated, {"plugin-0", "plugin-3"})
 
 
 class SubversionWorkspaceTest(TestCase):

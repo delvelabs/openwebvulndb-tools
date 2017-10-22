@@ -21,11 +21,12 @@ from uuid import uuid4
 from os.path import join
 from os import mkdir, walk, rmdir, remove
 from contextlib import contextmanager
+from urllib.parse import urljoin, urlparse, urlunparse
+import re
+from datetime import datetime
 
 from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
-from urllib.parse import urljoin, urlparse, urlunparse
-import re
 
 
 class Workspace:
@@ -84,7 +85,7 @@ class Subversion:
         except asyncio.TimeoutError:
             raise ExecutionFailure('Timeout reached')
 
-    async def read_lines(self, command):
+    async def read_lines(self, command, *, ignore_errors=False):
         process = await create_subprocess_exec(
             *command,
             loop=self.loop,
@@ -101,7 +102,7 @@ class Subversion:
 
         # No need to wait for a long time, we're at EOF
         code = await process.wait()
-        if code == 0:
+        if code == 0 or ignore_errors:
             return out
 
         raise ExecutionFailure("Listing failure")
@@ -200,6 +201,28 @@ class Subversion:
         out = out.decode()
         root = out.rstrip("\n")
         return {"url": url, "root": root}
+
+    async def get_plugins_update_date(self):
+        out = await self.read_lines(["svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"], ignore_errors=True)
+        line_pattern = re.compile("(?P<revision>\d+)\s+(?P<username>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+(?P<day>\d{2})\s+(?:(?P<year>\d{4})|(?P<time>\d\d:\d\d))\s+(?P<plugin>\S+)/$")
+        update_dates = {}
+        for line in out:
+            match = line_pattern.match(line)
+            if match:
+                plugin_key, day, month, year = match.group("plugin", "day", "month", "year")
+                if plugin_key is not ".":
+                    year = datetime.today().year if year is None else year
+                    date = datetime.strptime("%s %s %s" % (day, month, year), "%d %b %Y")
+                    update_dates[plugin_key] = date.date()
+        return update_dates
+
+    async def get_plugins_updated_since(self, date):
+        plugins_update_date = await self.get_plugins_update_date()
+        _plugins = set()
+        for key, update_date in plugins_update_date.items():
+            if update_date >= date:
+                _plugins.add(key)
+        return _plugins
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(
