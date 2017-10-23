@@ -29,7 +29,7 @@ from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
 
 
-line_pattern = re.compile("(?P<revision>\d+)\s+(?P<username>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+"
+line_pattern = re.compile("(?P<revision>\d+)\s+(?P<author>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+"
                           "(?P<day>\d{2})\s+(?:(?P<year>\d{4})|(?P<time>\d\d:\d\d))\s+(?P<component>\S+)/$")
 
 
