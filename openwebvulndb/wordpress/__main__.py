@@ -168,7 +168,7 @@ parser.add_argument('--target-commitish', dest='target_commitish', help='Branch 
                                                                         'for the new release')
 parser.add_argument('--release-version', dest='release_version', help='print version of the new release')
 parser.add_argument('--interval', dest='interval', help='The interval in days since the last update of plugins and '
-                                                        'themes versions. 7 days by default', default=7, type=int)
+                                                        'themes versions. 30 days by default', default=30, type=int)
 
 args = parser.parse_args()
 
