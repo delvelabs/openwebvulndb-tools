@@ -327,7 +327,7 @@ class SubversionTest(TestCase):
                                     "root": "https://plugins.svn.wordpress.org"})
 
     @async_test()
-    async def test_svn_get_plugins_update_date_return_last_modification_date_of_tags_folder_for_plugins(self, loop):
+    async def test_svn_get_last_release_date_of_components_return_last_modification_date_of_tags_folder(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
             proc.stdout.readline.side_effect = [
@@ -341,16 +341,16 @@ class SubversionTest(TestCase):
             cse.return_value = fake_future(proc, loop=loop)
             svn = Subversion(loop=loop)
 
-            plugins = await svn.get_plugins_update_date()
+            plugins = await svn._get_last_release_date_of_components("plugins", "http://plugins.svn.wordpress.org/")
 
             cse.assert_has_calls([call(*("svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"), loop=loop,
                                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
                                        stdin=asyncio.subprocess.DEVNULL)])
-            self.assertEqual(plugins, {"plugin-1": date(year=2015, month=1, day=28),
-                                       "plugin-2": date(year=2016, month=4, day=4)})
+            self.assertEqual(plugins, {"plugins/plugin-1": date(year=2015, month=1, day=28),
+                                       "plugins/plugin-2": date(year=2016, month=4, day=4)})
 
     @async_test()
-    async def test_svn_get_plugins_update_date_replace_hours_with_current_year(self, loop):
+    async def test_svn_get_last_release_date_of_components_replace_hours_with_current_year(self, loop):
         with patch('openwebvulndb.common.vcs.create_subprocess_exec') as cse:
             proc = MagicMock()
             proc.stdout.readline.return_value = \
@@ -360,21 +360,25 @@ class SubversionTest(TestCase):
             cse.return_value = fake_future(proc, loop=loop)
             svn = Subversion(loop=loop)
 
-            plugins = await svn.get_plugins_update_date()
+            plugins = await svn._get_last_release_date_of_components("plugins", "http://plugins.svn.wordpress.org/")
 
-            self.assertEqual(plugins, {"plugin-1": date(year=date.today().year, month=10, day=20)})
+            self.assertEqual(plugins, {"plugins/plugin-1": date(year=date.today().year, month=10, day=20)})
 
     @freeze_time(date(year=2017, day=22, month=10))
     @async_test()
-    async def test_svn_get_plugins_updated_since(self, loop):
-        plugins = {"plugin-0": date(year=2017, month=10, day=20), "plugin-1": date(year=2016, month=4, day=4),
-                   "plugin-2": date(year=2015, month=10, day=21), "plugin-3": date(year=2017, month=10, day=6)}
+    async def test_svn_get_components_with_new_release(self, loop):
+        themes = {"themes/theme-0": date(year=2017, month=10, day=20),
+                   "themes/theme-1": date(year=2016, month=4, day=4),
+                   "themes/theme-2": date(year=2015, month=10, day=21),
+                   "themes/theme-3": date(year=2017, month=10, day=6)}
         svn = Subversion(loop=None)
-        svn.get_plugins_update_date = MagicMock(return_value=fake_future(plugins, loop=loop))
+        svn._get_last_release_date_of_components = MagicMock(return_value=fake_future(themes, loop=loop))
 
-        recently_updated = await svn.get_plugins_updated_since(date(year=2017, day=6, month=10))
+        recently_updated = await svn.get_components_with_new_release("themes",
+                                                                              "http://themes.svn.wordpress.org/",
+                                                                              date(year=2017, day=6, month=10))
 
-        self.assertEqual(recently_updated, {"plugin-0", "plugin-3"})
+        self.assertEqual(recently_updated, {"themes/theme-0", "themes/theme-3"})
 
 
 class SubversionWorkspaceTest(TestCase):

@@ -202,27 +202,36 @@ class Subversion:
         root = out.rstrip("\n")
         return {"url": url, "root": root}
 
-    async def get_plugins_update_date(self):
-        out = await self.read_lines(["svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"], ignore_errors=True)
-        line_pattern = re.compile("(?P<revision>\d+)\s+(?P<username>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+(?P<day>\d{2})\s+(?:(?P<year>\d{4})|(?P<time>\d\d:\d\d))\s+(?P<plugin>\S+)/$")
+    async def get_plugins_with_new_release(self, date):
+        return await self.get_components_with_new_release("plugins", "http://plugins.svn.wordpress.org/", date)
+
+    async def get_themes_with_new_release(self, date):
+        return await self.get_components_with_new_release("themes", "http://themes.svn.wordpress.org/", date)
+
+    async def get_components_with_new_release(self, key, repository_url, date):
+        components_update_date = await self._get_last_release_date_of_components(key, repository_url)
+        components = set()
+        for key, update_date in components_update_date.items():
+            if update_date >= date:
+                components.add(key)
+        return components
+
+    async def _get_last_release_date_of_components(self, key, repository_url):
+        out = await self.read_lines(["svn", "ls", "-v", "^/tags", repository_url], ignore_errors=True)
+        line_pattern = re.compile("(?P<revision>\d+)\s+(?P<username>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+"
+                                  "(?P<day>\d{2})\s+(?:(?P<year>\d{4})|(?P<time>\d\d:\d\d))\s+(?P<component>\S+)/$")
         update_dates = {}
         for line in out:
+            line = line.lstrip()  # Themes are listed with whitespace at beginning because revision has less digits.
             match = line_pattern.match(line)
             if match:
-                plugin_key, day, month, year = match.group("plugin", "day", "month", "year")
-                if plugin_key is not ".":
+                component_key, day, month, year = match.group("component", "day", "month", "year")
+                if component_key is not ".":
+                    component_key = "%s/%s" % (key, component_key)
                     year = datetime.today().year if year is None else year
                     date = datetime.strptime("%s %s %s" % (day, month, year), "%d %b %Y")
-                    update_dates[plugin_key] = date.date()
+                    update_dates[component_key] = date.date()
         return update_dates
-
-    async def get_plugins_updated_since(self, date):
-        plugins_update_date = await self.get_plugins_update_date()
-        _plugins = set()
-        for key, update_date in plugins_update_date.items():
-            if update_date >= date:
-                _plugins.add(key)
-        return _plugins
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(
