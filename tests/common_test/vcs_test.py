@@ -374,11 +374,21 @@ class SubversionTest(TestCase):
         svn = Subversion(loop=None)
         svn._get_last_release_date_of_components = MagicMock(return_value=fake_future(themes, loop=loop))
 
-        recently_updated = await svn.get_components_with_new_release("themes",
-                                                                              "http://themes.svn.wordpress.org/",
-                                                                              date(year=2017, day=6, month=10))
+        recently_updated = await svn.get_components_with_new_release("themes", "http://themes.svn.wordpress.org/",
+                                                                     date(year=2017, day=6, month=10))
 
         self.assertEqual(recently_updated, {"themes/theme-0", "themes/theme-3"})
+
+    @async_test()
+    async def test_svn_get_components_with_new_release_return_empty_set_if_command_timeout(self, loop):
+        svn = Subversion(loop=None)
+        fut = asyncio.Future(loop=loop)
+        fut.set_exception(ExecutionFailure("Timeout reached"))
+        svn._get_last_release_date_of_components = MagicMock(return_value=fut)
+
+        result = await svn.get_components_with_new_release("plugins", "http://plugins.svn.example.com/", date.today())
+
+        self.assertEqual(result, set())
 
 
 class SubversionWorkspaceTest(TestCase):
