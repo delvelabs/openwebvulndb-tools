@@ -227,7 +227,7 @@ class Subversion:
     async def _get_last_release_date_of_components(self, key, repository_url):
 
         def parse_line(line):
-            line = line.lstrip()  # Whitespace at beginning of line when revision has less digits.
+            line = line.lstrip()  # Remove whitespace added at beginning of line when revision has less digits.
             match = line_pattern.match(line)
             if match:
                 component_key, day, month, year = match.group("component", "day", "month", "year")
