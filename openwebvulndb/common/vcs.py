@@ -21,11 +21,16 @@ from uuid import uuid4
 from os.path import join
 from os import mkdir, walk, rmdir, remove
 from contextlib import contextmanager
+from urllib.parse import urljoin, urlparse, urlunparse
+import re
+from datetime import datetime
 
 from .errors import ExecutionFailure, DirectoryExpected
 from .logs import logger
-from urllib.parse import urljoin, urlparse, urlunparse
-import re
+
+
+line_pattern = re.compile("(?P<revision>\d+)\s+(?P<author>[\w\s\.-]+)\s+(?P<month>[A-Z][a-z]{2})\s+"
+                          "(?P<day>\d{2})\s+(?:(?P<year>\d{4})|(?P<time>\d\d:\d\d))\s+(?P<component>\S+)/$")
 
 
 class Workspace:
@@ -84,7 +89,7 @@ class Subversion:
         except asyncio.TimeoutError:
             raise ExecutionFailure('Timeout reached')
 
-    async def read_lines(self, command):
+    async def read_lines(self, command, *, ignore_errors=False):
         process = await create_subprocess_exec(
             *command,
             loop=self.loop,
@@ -101,7 +106,7 @@ class Subversion:
 
         # No need to wait for a long time, we're at EOF
         code = await process.wait()
-        if code == 0:
+        if code == 0 or ignore_errors:
             return out
 
         raise ExecutionFailure("Listing failure")
@@ -200,6 +205,50 @@ class Subversion:
         out = out.decode()
         root = out.rstrip("\n")
         return {"url": url, "root": root}
+
+    async def get_plugins_with_new_release(self, date):
+        return await self.get_components_with_new_release("plugins", "http://plugins.svn.wordpress.org/", date)
+
+    async def get_themes_with_new_release(self, date):
+        return await self.get_components_with_new_release("themes", "http://themes.svn.wordpress.org/", date)
+
+    async def get_components_with_new_release(self, key, repository_url, date):
+        try:
+            components_update_date = await self._get_last_release_date_of_components(key, repository_url)
+            components = set()
+            for key, update_date in components_update_date.items():
+                if update_date >= date:
+                    components.add(key)
+            return components
+        except ExecutionFailure as e:
+            logger.warn("A command failed to execute: %s", e)
+            return set()
+
+    async def _get_last_release_date_of_components(self, key, repository_url):
+
+        def parse_line(line):
+            line = line.lstrip()  # Remove whitespace added at beginning of line when revision has less digits.
+            match = line_pattern.match(line)
+            if match:
+                component_key, day, month, year = match.group("component", "day", "month", "year")
+                if component_key is not ".":
+                    component_key = "%s/%s" % (key, component_key)
+                    year = datetime.today().year if year is None else year
+                    date = datetime.strptime("%s %s %s" % (day, month, year), "%d %b %Y")
+                    return component_key, date
+            return None, None
+
+        try:
+            command = ["svn", "ls", "-v", "^/tags", repository_url]
+            out = await asyncio.wait_for(self.read_lines(command, ignore_errors=True), timeout=60, loop=self.loop)
+            update_dates = {}
+            for line in out:
+                component_key, date = parse_line(line)
+                if component_key is not None:
+                    update_dates[component_key] = date.date()
+            return update_dates
+        except asyncio.TimeoutError:
+            raise ExecutionFailure('Timeout reached')
 
     async def _process(self, command, workdir):
         process = await create_subprocess_exec(

@@ -18,7 +18,7 @@
 import os
 from argparse import ArgumentParser
 from os.path import join
-from random import shuffle
+from datetime import date, timedelta
 
 from openwebvulndb import app
 from openwebvulndb.common.release import GitHubRelease
@@ -97,7 +97,7 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
     aiohttp_session.close()
 
 
-def populate_versions(loop, repository_hasher, storage):
+def populate_versions(loop, repository_hasher, storage, subversion, interval):
     async def load_input():
         worker = ParallelWorker(8, loop=loop, timeout_per_job=1800)  # Half an hour at most
         meta = storage.read_meta("wordpress")
@@ -106,13 +106,16 @@ def populate_versions(loop, repository_hasher, storage):
         meta = storage.read_meta("mu")
         await worker.request(repository_hasher.collect_from_meta, meta)
 
-        # When restarting the job, shuffle so that we don't spend so much time doing those already done
-        task_list = list(storage.list_meta("plugins")) + list(storage.list_meta("themes"))
-        shuffle(task_list)
+        plugins = await subversion.get_plugins_with_new_release(date.today() - timedelta(days=interval))
+        themes = await subversion.get_themes_with_new_release(date.today() - timedelta(days=interval))
+        task_list = plugins | themes
+        metas = list(storage.list_meta("themes")) + list(storage.list_meta("themes"))
+        existing_keys = {meta.key for meta in metas}
+        task_list &= existing_keys
 
-        for meta in task_list:
+        for key in task_list:
+            meta = storage.read_meta(key)
             await worker.request(repository_hasher.collect_from_meta, meta, prefix_pattern="wp-content/{meta.key}")
-
         await worker.wait()
 
     loop.run_until_complete(load_input())
@@ -164,6 +167,8 @@ parser.add_argument('--create-release', dest='create_release', action='store_tru
 parser.add_argument('--target-commitish', dest='target_commitish', help='Branch name or SHA number of the commit used '
                                                                         'for the new release')
 parser.add_argument('--release-version', dest='release_version', help='print version of the new release')
+parser.add_argument('--interval', dest='interval', help='The interval in days since the last update of plugins and '
+                                                        'themes versions. 30 days by default', default=30, type=int)
 
 args = parser.parse_args()
 
@@ -177,7 +182,8 @@ try:
                     dest_folder=args.dest_folder,
                     create_release=args.create_release,
                     target_commitish=args.target_commitish,
-                    release_version=args.release_version)
+                    release_version=args.release_version,
+                    interval=args.interval)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
