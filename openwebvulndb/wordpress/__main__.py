@@ -109,7 +109,7 @@ def populate_versions(loop, repository_hasher, storage, subversion, interval):
         plugins = await subversion.get_plugins_with_new_release(date.today() - timedelta(days=interval))
         themes = await subversion.get_themes_with_new_release(date.today() - timedelta(days=interval))
         task_list = plugins | themes
-        metas = list(storage.list_meta("themes")) + list(storage.list_meta("themes"))
+        metas = list(storage.list_meta("plugins")) + list(storage.list_meta("themes"))
         existing_keys = {meta.key for meta in metas}
         task_list &= existing_keys
 
