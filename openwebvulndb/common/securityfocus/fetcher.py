@@ -53,7 +53,7 @@ class SecurityFocusFetcher:
             vuln_index = 0
             while vuln_pages_to_fetch is None or vuln_index < vuln_pages_to_fetch * vulnerabilities_per_page:
                 post_data = {'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}
-                async with self.aiohttp_session.post("http://www.securityfocus.com/bid", data=post_data) as response:
+                async with self.aiohttp_session.post("https://www.securityfocus.com/bid", data=post_data) as response:
                     assert response.status == 200
                     vuln_index += vulnerabilities_per_page
                     html_page = await response.text()
@@ -78,7 +78,7 @@ class SecurityFocusFetcher:
             solution_parser: A SolutionTabParser object containing the info tab html page of the vulnerability.
         """
         if url is None:
-            url = "http://www.securityfocus.com/bid/" + bugtraq_id
+            url = "https://www.securityfocus.com/bid/" + bugtraq_id
         if bugtraq_id is None:
             bugtraq_id = re.search("\d+", url).group()
         pages_to_fetch = ["info", "references", "discuss", "solution", "exploit"]
