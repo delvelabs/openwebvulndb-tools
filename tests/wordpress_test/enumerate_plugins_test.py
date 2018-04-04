@@ -200,7 +200,7 @@ class EnumeratePluginsTest(TestCase):
         handler.storage.read_meta.assert_has_calls([
             call("plugins/woocommerce"),
             call("plugins/google-sitemap-generator"),
-        ])
+        ], any_order=True)
         self.assertTrue(meta_1.is_popular)
         self.assertTrue(meta_2.is_popular)
         self.assertIsNone(meta_3.is_popular)

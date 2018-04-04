@@ -95,7 +95,8 @@ class WordPressRepository:
                                           '?action=query_{group}&request[browse]=popular&request[per_page]={count}'.
                                           format(group=group, count=count)) as response:
             data = await response.json()
-            for entry in data[group]:
+            entries = data[group].values() if type(data[group]) == dict else data[group]
+            for entry in entries:
                 slug = "{group}/{partial}".format(group=group, partial=entry["slug"])
                 try:
                     meta = self.storage.read_meta(slug)
