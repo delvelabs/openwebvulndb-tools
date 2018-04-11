@@ -97,25 +97,25 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
     aiohttp_session.close()
 
 
-def populate_versions(loop, repository_hasher, storage, subversion, interval):
+def populate_versions(loop, repository_hasher, storage, subversion, interval, wp_only):
     async def load_input():
         worker = ParallelWorker(8, loop=loop, timeout_per_job=1800)  # Half an hour at most
         meta = storage.read_meta("wordpress")
         await worker.request(repository_hasher.collect_from_meta, meta)
+        if not wp_only:
+            meta = storage.read_meta("mu")
+            await worker.request(repository_hasher.collect_from_meta, meta)
 
-        meta = storage.read_meta("mu")
-        await worker.request(repository_hasher.collect_from_meta, meta)
+            plugins = await subversion.get_plugins_with_new_release(date.today() - timedelta(days=interval))
+            themes = await subversion.get_themes_with_new_release(date.today() - timedelta(days=interval))
+            task_list = plugins | themes
+            metas = list(storage.list_meta("plugins")) + list(storage.list_meta("themes"))
+            existing_keys = {meta.key for meta in metas}
+            task_list &= existing_keys
 
-        plugins = await subversion.get_plugins_with_new_release(date.today() - timedelta(days=interval))
-        themes = await subversion.get_themes_with_new_release(date.today() - timedelta(days=interval))
-        task_list = plugins | themes
-        metas = list(storage.list_meta("plugins")) + list(storage.list_meta("themes"))
-        existing_keys = {meta.key for meta in metas}
-        task_list &= existing_keys
-
-        for key in task_list:
-            meta = storage.read_meta(key)
-            await worker.request(repository_hasher.collect_from_meta, meta, prefix_pattern="wp-content/{meta.key}")
+            for key in task_list:
+                meta = storage.read_meta(key)
+                await worker.request(repository_hasher.collect_from_meta, meta, prefix_pattern="wp-content/{meta.key}")
         await worker.wait()
 
     loop.run_until_complete(load_input())
@@ -159,16 +159,18 @@ parser.add_argument("--id", dest="bugtraq_id", help="The bugtraq id of the vulne
 parser.add_argument("--pages-to-fetch", dest="vulnerabilities_pages_to_fetch",
                     help="Amount of pages of latest vulnerabilities on security focus website to fetch to update "
                          "the database (1 by default, -1 for all pages).", default=1, type=int)
-parser.add_argument('-i', '--input-path', dest='input_path',
-                    help='Data source path (vane import)')
-parser.add_argument('-f', '--input-file', dest='input_file',
-                    help='Cached input file')
-parser.add_argument('--create-release', dest='create_release', action='store_true', help='Create a new GitHub release')
-parser.add_argument('--target-commitish', dest='target_commitish', help='Branch name or SHA number of the commit used '
-                                                                        'for the new release')
-parser.add_argument('--release-version', dest='release_version', help='print version of the new release')
-parser.add_argument('--interval', dest='interval', help='The interval in days since the last update of plugins and '
-                                                        'themes versions. 30 days by default', default=30, type=int)
+parser.add_argument("-i", "--input-path", dest="input_path",
+                    help="Data source path (vane import)")
+parser.add_argument("-f", "--input-file", dest="input_file",
+                    help="Cached input file")
+parser.add_argument("--create-release", dest="create_release", action="store_true", help="Create a new GitHub release")
+parser.add_argument("--target-commitish", dest="target_commitish", help="Branch name or SHA number of the commit used "
+                                                                        "for the new release")
+parser.add_argument("--release-version", dest="release_version", help="print version of the new release")
+parser.add_argument("--interval", dest="interval", help="The interval in days since the last update of plugins and "
+                                                        "themes versions. 30 days by default", default=30, type=int)
+parser.add_argument("-w", "--wp-only", dest="wp_only", help="Only populate versions for WordPress core, skip plugins "
+                                                            "and themes", action="store_true")
 
 args = parser.parse_args()
 
@@ -183,7 +185,8 @@ try:
                     create_release=args.create_release,
                     target_commitish=args.target_commitish,
                     release_version=args.release_version,
-                    interval=args.interval)
+                    interval=args.interval,
+                    wp_only=args.wp_only)
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
