@@ -165,7 +165,7 @@ parser.add_argument("-f", "--input-file", dest="input_file",
                     help="Cached input file")
 parser.add_argument("--create-release", dest="create_release", action="store_true", help="Create a new GitHub release")
 parser.add_argument("--target-commitish", dest="target_commitish", help="Branch name or SHA number of the commit used "
-                                                                        "for the new release")
+                                                                        "for the new release", default="master")
 parser.add_argument("--release-version", dest="release_version", help="print version of the new release")
 parser.add_argument("--interval", dest="interval", help="The interval in days since the last update of plugins and "
                                                         "themes versions. 30 days by default", default=30, type=int)
