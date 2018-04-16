@@ -59,7 +59,7 @@ def vane_export(vane_importer, storage, input_path):
     rebuild.write()
 
 
-def vane2_export(storage, aiohttp_session, loop, create_release=False, target_commitish=None):
+def vane2_export(storage, aiohttp_session, loop, create_release=False, target_commitish=None, release_version=None):
     export_path = EXPORT_PATH
     os.makedirs(export_path, exist_ok=True)
     exporter = Exporter(storage)
@@ -90,7 +90,7 @@ def vane2_export(storage, aiohttp_session, loop, create_release=False, target_co
                                            os.environ["VANE2_REPO_NAME"])
     try:
         loop.run_until_complete(github_release.release_data(export_path, "vane2_data_", create_release,
-                                                            target_commitish, str(date.today())))
+                                                            target_commitish, release_version or str(date.today())))
         logger.info("Vane data successfully released.")
     except (Exception, RuntimeError, ValueError) as e:
         logger.exception(e)
@@ -166,6 +166,8 @@ parser.add_argument("-f", "--input-file", dest="input_file",
 parser.add_argument("--create-release", dest="create_release", action="store_true", help="Create a new GitHub release")
 parser.add_argument("--target-commitish", dest="target_commitish", help="Branch name or SHA number of the commit used "
                                                                         "for the new release", default="master")
+parser.add_argument("--release-version", dest="release_version", help="Version number for the new release. The "
+                                                                      "current is used by default.")
 parser.add_argument("--interval", dest="interval", help="The interval in days since the last update of plugins and "
                                                         "themes versions. 30 days by default", default=30, type=int)
 parser.add_argument("-w", "--wp-only", dest="wp_only", help="Only populate versions for WordPress core, skip plugins "
@@ -183,8 +185,10 @@ try:
                     dest_folder=args.dest_folder,
                     create_release=args.create_release,
                     target_commitish=args.target_commitish,
+                    release_version=args.release_version,
                     interval=args.interval,
-                    wp_only=args.wp_only)
+                    wp_only=args.wp_only,
+                    )
     local.call(operations[args.action])
 except KeyboardInterrupt:
     pass
