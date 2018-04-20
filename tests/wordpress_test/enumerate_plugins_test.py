@@ -16,12 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from yarl import URL
-from aiohttp import ClientResponse
 from asyncio import TimeoutError
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file, async_test, fake_future, ClientSessionMock
+from fixtures import read_file, async_test, fake_future, ClientSessionMock, ClientResponse
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
 from openwebvulndb.common import Meta, Repository
@@ -153,7 +152,7 @@ class EnumeratePluginsTest(TestCase):
         my_response = ClientResponse('GET', URL('https://api.wordpress.org/plugins/info/1.0/better-wp-security.json'))
         my_response.status = 200
         my_response.headers = {'Content-Type': 'application/json'}
-        my_response._content = read_file(__file__, 'better-wp-security.json').encode('utf8')
+        my_response._body = read_file(__file__, 'better-wp-security.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)
         handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session)
@@ -183,7 +182,7 @@ class EnumeratePluginsTest(TestCase):
                                                 '&request[browse]=popular&request[per_page]=200'))
         my_response.status = 200
         my_response.headers = {'Content-Type': 'application/json'}
-        my_response._content = read_file(__file__, 'popular-plugins.json').encode('utf8')
+        my_response._body = read_file(__file__, 'popular-plugins.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)
         handler = WordPressRepository(loop=loop, aiohttp_session=aiohttp_session, storage=MagicMock())

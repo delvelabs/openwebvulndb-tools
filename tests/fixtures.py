@@ -16,11 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 import asyncio
 from functools import wraps
 from os.path import join, dirname
 from aiohttp.test_utils import loop_context
+from aiohttp import ClientResponse as BaseClientResponse
+from aiohttp.helpers import TimerNoop
 
 from easyinject import Injector
 
@@ -32,6 +34,20 @@ except ImportError:
             return unittest.skip("freezegun is required")(f)
 
         return setup
+
+
+def ClientResponse(method, url, *,
+                   writer=None, continue100=None, timer=None, request_info=None, auto_decompress=True,
+                   traces=None, loop=None, session=None):
+    return BaseClientResponse(method, url,
+                              writer=writer or Mock(),
+                              continue100=continue100,
+                              timer=timer or TimerNoop(),
+                              request_info=request_info or Mock(),
+                              auto_decompress=auto_decompress,
+                              traces=traces or [],
+                              loop=loop or asyncio.get_event_loop(),
+                              session=session or None)
 
 
 def file_path(relative, file):
