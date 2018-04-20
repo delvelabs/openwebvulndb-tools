@@ -16,10 +16,14 @@ data/
 bin/
 include/
 lib/
+lib64
 man/
 share/
 pip-selfcheck.json
 dist/
+
+openwebvulndb_tools.egg-info/
+pyvenv.cfg
 
 # cookies
 cookies*
