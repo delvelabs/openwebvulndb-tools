@@ -610,6 +610,7 @@ class RangeGuesserTest(TestCase):
         self.guesser.known_versions = ["2.4.3", "2.4.4"]
         self.assertNotIn(VersionRange(fixed_in="3.5"), self.guess("XSS - critical", [
             "cpe:2.3:a:wordpress:wordpress:-",
+            "cpe:2.3:o:debian:debian_linux:9.0",
         ]))
 
     def test_versions_not_found(self):

@@ -347,9 +347,11 @@ class RangeGuesser:
         if len(matches) > 0:
             return
 
-        versions = [match_cpe.search(v) for v in configurations]
+        def filter_bad_versions(versions):
+            return [p.group('version') for p in versions if p is not None and p.group('version') is not None]
 
-        versions = VersionCompare.sorted(p.group('version') for p in versions if p.group('version') is not None)
+        versions = filter_bad_versions([match_cpe.search(v) for v in configurations])
+        versions = VersionCompare.sorted(versions)
 
         if len(versions) == 0:
             return
