@@ -31,16 +31,16 @@ class SecurityFocusFetcher:
     def __init__(self, aiohttp_session=None):
         self.aiohttp_session = aiohttp_session
 
-    async def get_vulnerabilities(self, vuln_pages_to_fetch=1):
+    async def get_vulnerabilities(self, vuln_pages_to_fetch=1, vendor_name="WordPress"):
         vulnerabilities = []
-        vuln_list = await self.get_vulnerability_list(vuln_pages_to_fetch)
+        vuln_list = await self.get_vulnerability_list(vuln_pages_to_fetch, vendor_name=vendor_name)
         for vuln_url in vuln_list:
             vuln_entry = await self.get_vulnerability_entry(url=vuln_url)
             if vuln_entry is not None:
                 vulnerabilities.append(vuln_entry)
         return vulnerabilities
 
-    async def get_vulnerability_list(self, vuln_pages_to_fetch=1, file=None):
+    async def get_vulnerability_list(self, vuln_pages_to_fetch=1, file=None, vendor_name='WordPress'):
         """vuln_pages_to_fetch: Amount of pages to fetch for vulnerabilities (None for all pages).
         When searching for vulnerabilities on the security focus website, results are displayed accross multiple pages
         (30 vulnerabilities per page), with the most recent on the first page"""
@@ -52,7 +52,7 @@ class SecurityFocusFetcher:
             # The number of the first vuln on the next page to fetch. Increment by 30 to change page (30 vuln per page).
             vuln_index = 0
             while vuln_pages_to_fetch is None or vuln_index < vuln_pages_to_fetch * vulnerabilities_per_page:
-                post_data = {'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': 'WordPress'}
+                post_data = {'op': 'display_list', 'o': vuln_index, 'c': 12, 'vendor': vendor_name}
                 async with self.aiohttp_session.post("https://www.securityfocus.com/bid", data=post_data) as response:
                     assert response.status == 200
                     vuln_index += vulnerabilities_per_page

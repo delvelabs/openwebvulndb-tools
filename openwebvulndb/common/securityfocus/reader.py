@@ -57,6 +57,14 @@ class SecurityFocusReader:
             if vuln is not None and not vuln.id.startswith("CVE-"):
                 await self.augment_with_cve(vuln)
 
+        # Also fetch the global ones, but filter based on description
+        vuln_entries = await self.fetcher.get_vulnerabilities(vuln_pages_to_fetch=vuln_pages_to_fetch*5, vendor_name="")
+        for vuln_entry in vuln_entries:
+            if self._is_wordpress(vuln_entry):
+                vuln = self.read_one(vuln_entry)
+                if vuln is not None and not vuln.id.startswith("CVE-"):
+                    await self.augment_with_cve(vuln)
+
     async def augment_with_cve(self, vuln_entry):
         for ref in vuln_entry.references:
             if ref.type == "cve":

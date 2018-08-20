@@ -73,14 +73,17 @@ class CVEReader:
                 self.read_one(entry)
 
     async def read_one_from_api(self, cve_id):
-        url = "https://cve.circl.lu/api/cve/" + cve_id
-        async with self.session.get(url) as response:
-            entry = await response.json()
-            if entry is None:
-                logger.info("No entry found for %s" % cve_id)
-                return
-            self._convert_vulnerable_configuration(entry)
-            self.read_one(entry)
+        try:
+            url = "https://cve.circl.lu/api/cve/" + cve_id
+            async with self.session.get(url) as response:
+                entry = await response.json()
+                if entry is None:
+                    logger.info("No entry found for %s" % cve_id)
+                    return
+                self._convert_vulnerable_configuration(entry)
+                self.read_one(entry)
+        except Exception as e:
+            logger.warn("Error fetching %s: %s", cve_id, e)
 
     def read_one(self, entry):
         target = self.identify_target(entry)
