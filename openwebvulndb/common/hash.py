@@ -114,9 +114,12 @@ class HashCollector:
 
                     sig = Signature(path=target_path, algo=self.hasher.algo)
 
-                    sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
-                    sig.contains_version = self.version_checker.contains_version
-                    yield sig
+                    try:
+                        sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
+                        sig.contains_version = self.version_checker.contains_version
+                        yield sig
+                    except ValueError as e:
+                        logger.warn("Error while hashing %s: %s, skipping", target_path, e)
                 except OSError as e:
                     logger.warn("Error while hashing %s: %s, skipping", target_path, e)
 
@@ -128,9 +131,15 @@ class Hasher:
     def hash(self, file_path, chunk_cb=lambda c: None):
         hash = hashlib.new(self.algo)
         with open(file_path, "rb") as fp:
+            empty = True
             for chunk in iter(lambda: fp.read(4096), b""):
+                if empty and len(chunk) > 0:
+                    empty = False
                 hash.update(chunk)
                 chunk_cb(chunk)
+
+            if empty:
+                raise ValueError("File is empty")
 
             return hash.hexdigest()
 
