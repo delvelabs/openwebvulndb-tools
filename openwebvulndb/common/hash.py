@@ -116,13 +116,10 @@ class HashCollector:
 
                     sig = Signature(path=target_path, algo=self.hasher.algo)
 
-                    try:
-                        sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
-                        sig.contains_version = self.version_checker.contains_version
-                        yield sig
-                    except ValueError as e:
-                        logger.warn("Error while hashing %s: %s, skipping", target_path, e)
-                except OSError as e:
+                    sig.hash = self.hasher.hash(full_path, chunk_cb=self.version_checker)
+                    sig.contains_version = self.version_checker.contains_version
+                    yield sig
+                except (OSError, ValueError) as e:
                     logger.warn("Error while hashing %s: %s, skipping", target_path, e)
 
 
