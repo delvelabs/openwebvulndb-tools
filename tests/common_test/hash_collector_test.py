@@ -166,6 +166,47 @@ class HashCollectorTest(TestCase):
             self.assertIn(Signature(path="wp-content/plugins/my-plugin/license.txt", hash="12345", algo="CUST"),
                           signatures)
 
+    def test_exclude_empty_files(self):
+        class FakeHasher:
+
+            algo = "sha256"
+
+            def hash(hasher, file_path, chunk_cb):
+                if file_path == "/path/empty":
+                    raise ValueError("File is empty")
+                return "12345"
+
+        with patch('openwebvulndb.common.hash.walk') as walk:
+            walk.return_value = [
+                ("/path", [], ["readme.txt", "empty", "license.txt"]),
+            ]
+            collector = HashCollector(path="/path", hasher=FakeHasher(),
+                                      prefix="wp-content/plugins/my-plugin", lookup_version="1.2.3")
+
+            signatures = list(collector.collect())
+
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/readme.txt", hash="12345", algo="sha256"),
+                          signatures)
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/license.txt", hash="12345", algo="sha256"),
+                          signatures)
+
+    def test_strip_filenames(self):
+        with patch('openwebvulndb.common.hash.walk') as walk:
+            walk.return_value = [("/some/path/random1234", [], ["readme.txt ", "license.txt "])]
+            collector = HashCollector(path="/some/path/random1234", hasher=MagicMock(),
+                                      prefix="wp-content/plugins/my-plugin")
+            collector.hasher.algo = "sha256"
+            collector.hasher.hash.return_value = "12345"
+
+            signatures = list(collector.collect())
+
+            walk.assert_called_with("/some/path/random1234")
+
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/readme.txt", hash="12345", algo="sha256"),
+                          signatures)
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/license.txt", hash="12345", algo="sha256"),
+                          signatures)
+
 
 class HasherTest(TestCase):
 
@@ -194,6 +235,14 @@ class HasherTest(TestCase):
             hasher.hash("/some/file.txt", chunk_cb=check_chunk)
 
             check_chunk.assert_called_with(b"hello world")
+
+    def test_raise_value_error_if_file_is_empty(self):
+        m = mock_open(read_data=b"")
+
+        with patch('openwebvulndb.common.hash.open', m, create=True):
+            hasher = Hasher('SHA256')
+            with self.assertRaises(ValueError):
+                hasher.hash("/some/file.txt")
 
 
 class VersionCheckerTest(TestCase):
