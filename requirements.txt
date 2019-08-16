@@ -1,4 +1,4 @@
-aiohttp>3.1,<3.5
+aiohttp>3.1,<3.3
 easyinject==0.3
 marshmallow==2.15.6
 packaging==16.7
