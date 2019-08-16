@@ -110,6 +110,8 @@ class HashCollector:
 
                     target_path = join(self.prefix, relative)
 
+                    target_path = target_path.strip()
+
                     self.version_checker.reset()
 
                     sig = Signature(path=target_path, algo=self.hasher.algo)

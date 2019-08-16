@@ -190,6 +190,23 @@ class HashCollectorTest(TestCase):
             self.assertIn(Signature(path="wp-content/plugins/my-plugin/license.txt", hash="12345", algo="sha256"),
                           signatures)
 
+    def test_strip_filenames(self):
+        with patch('openwebvulndb.common.hash.walk') as walk:
+            walk.return_value = [("/some/path/random1234", [], ["readme.txt ", "license.txt "])]
+            collector = HashCollector(path="/some/path/random1234", hasher=MagicMock(),
+                                      prefix="wp-content/plugins/my-plugin")
+            collector.hasher.algo = "sha256"
+            collector.hasher.hash.return_value = "12345"
+
+            signatures = list(collector.collect())
+
+            walk.assert_called_with("/some/path/random1234")
+
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/readme.txt", hash="12345", algo="sha256"),
+                          signatures)
+            self.assertIn(Signature(path="wp-content/plugins/my-plugin/license.txt", hash="12345", algo="sha256"),
+                          signatures)
+
 
 class HasherTest(TestCase):
 
