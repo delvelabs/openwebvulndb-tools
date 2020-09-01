@@ -3,3 +3,4 @@ easyinject==0.3
 marshmallow==2.15.6
 packaging==16.7
 lxml>=3.6.4,<5
+yarl>1.4,<1.5
