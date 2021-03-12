@@ -151,7 +151,7 @@ class EnumeratePluginsTest(TestCase):
     async def test_fetch_plugin_data(self, loop):
         my_response = ClientResponse('GET', URL('https://api.wordpress.org/plugins/info/1.0/better-wp-security.json'))
         my_response.status = 200
-        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._headers = {'Content-Type': 'application/json'}
         my_response._body = read_file(__file__, 'better-wp-security.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)
@@ -181,7 +181,7 @@ class EnumeratePluginsTest(TestCase):
         my_response = ClientResponse('GET', URL('http://api.wordpress.org/plugins/info/1.1/?action=query_plugins'
                                                 '&request[browse]=popular&request[per_page]=200'))
         my_response.status = 200
-        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._headers = {'Content-Type': 'application/json'}
         my_response._body = read_file(__file__, 'popular-plugins.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)

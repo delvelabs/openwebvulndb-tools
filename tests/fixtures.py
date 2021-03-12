@@ -37,14 +37,13 @@ except ImportError:
 
 
 def ClientResponse(method, url, *,
-                   writer=None, continue100=None, timer=None, request_info=None, auto_decompress=True,
+                   writer=None, continue100=None, timer=None, request_info=None,
                    traces=None, loop=None, session=None):
     return BaseClientResponse(method, url,
                               writer=writer or Mock(),
                               continue100=continue100,
                               timer=timer or TimerNoop(),
                               request_info=request_info or Mock(),
-                              auto_decompress=auto_decompress,
                               traces=traces or [],
                               loop=loop or asyncio.get_event_loop(),
                               session=session or None)
@@ -95,7 +94,7 @@ class ClientSessionMock:
         super().__setattr__(name, value)
 
 
-class AsyncContextManagerMock(MagicMock):
+class AsyncContextManagerMock:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

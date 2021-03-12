@@ -153,7 +153,7 @@ class EnumeratePluginsTest(TestCase):
     async def test_fetch_theme_data(self, loop):
         my_response = ClientResponse('GET', URL('https://api.wordpress.org/themes/info/1.1/?action=theme_information&request[slug]=twentyeleven'))  # noqa
         my_response.status = 200
-        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._headers = {'Content-Type': 'application/json'}
         my_response._body = read_file(__file__, 'twentyeleven.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)
@@ -184,7 +184,7 @@ class EnumeratePluginsTest(TestCase):
         my_response = ClientResponse('GET', URL('http://api.wordpress.org/themes/info/1.1/?action=query_plugins'
                                                 '&request[browse]=popular&request[per_page]=100'))
         my_response.status = 100
-        my_response.headers = {'Content-Type': 'application/json'}
+        my_response._headers = {'Content-Type': 'application/json'}
         my_response._body = read_file(__file__, 'popular-themes.json').encode('utf8')
 
         aiohttp_session = ClientSessionMock(get_response=my_response)
