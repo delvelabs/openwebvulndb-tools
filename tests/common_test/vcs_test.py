@@ -113,7 +113,7 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
             svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
@@ -134,7 +134,7 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 1
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
             svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
@@ -156,7 +156,7 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
             svn.has_recursive_externals = MagicMock(return_value=fake_future(False, loop))
 
@@ -177,7 +177,7 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
             svn.has_recursive_externals = MagicMock(return_value=fake_future(True, loop))
 
@@ -194,7 +194,7 @@ class SubversionTest(TestCase):
             proc = MagicMock()
             proc.communicate.return_value = fake_future((b"out", b"err"), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
             svn.has_recursive_externals = MagicMock(return_value=fake_future(True, loop))
 
@@ -230,7 +230,7 @@ class SubversionTest(TestCase):
                   b"https://plugins.svn.wordpress.org/plugin/tags/1.0/languages - external https://www.some-external.example\n\n"
             proc.communicate.return_value = fake_future((out, b""), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
 
             svn = Subversion(loop=loop)
             svn.info = MagicMock(return_value=fake_future({"url": "https://plugins.svn.wordpress.org/plugin/tags/1.0",
@@ -259,7 +259,7 @@ class SubversionTest(TestCase):
                   b"https://svn.example.com/plugins/plugin/tags/1.0/subdir4 - external ^/../../../repo/external\n\n"
             proc.communicate.return_value = fake_future((out, b""), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
 
             svn = Subversion(loop=loop)
             svn.info = MagicMock(return_value=fake_future({"url": "https://svn.example.com/plugins/plugin/tags/1.0",
@@ -290,7 +290,7 @@ class SubversionTest(TestCase):
             proc.communicate.return_value = fake_future(
                 (b"", b""), loop=loop)
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
 
             externals = await svn.list_externals("https://plugins.svn.wordpress.org/plugin/tags/1.0",
@@ -310,7 +310,7 @@ class SubversionTest(TestCase):
                                                         loop=loop),
                                             fake_future((b"https://plugins.svn.wordpress.org\n", b""), loop=loop)]
             proc.returncode = 0
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
 
             info = await svn.info("https://plugins.svn.wordpress.org/plugin/tags/1.0", workdir="/tmp/plugin")
@@ -319,6 +319,7 @@ class SubversionTest(TestCase):
                 [call(*("svn", "info", "--show-item", "url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
                       cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                       stdin=asyncio.subprocess.PIPE),
+                 call().communicate(),
                  call(*("svn", "info", "--show-item", "repos-root-url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
                       cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                       stdin=asyncio.subprocess.PIPE)])
@@ -338,7 +339,7 @@ class SubversionTest(TestCase):
                 fake_future(b"svn: E200009: Could not list all targets because some targets don't exist", loop=loop)]
             proc.stdout.at_eof.side_effect = [False, False, False, False, False, True]
             proc.wait.return_value = fake_future(0, loop=loop)
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
 
             plugins = await svn._get_last_release_date_of_components("plugins", "http://plugins.svn.wordpress.org/")
@@ -357,7 +358,7 @@ class SubversionTest(TestCase):
                 fake_future(b"1749964 user1               Oct 20 11:15 plugin-1/\n", loop=loop)
             proc.stdout.at_eof.side_effect = [False, True]
             proc.wait.return_value = fake_future(0, loop=loop)
-            cse.return_value = fake_future(proc, loop=loop)
+            cse.return_value = proc
             svn = Subversion(loop=loop)
 
             plugins = await svn._get_last_release_date_of_components("plugins", "http://plugins.svn.wordpress.org/")

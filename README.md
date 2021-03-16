@@ -9,7 +9,7 @@ databases.
 General python set-up:
 
 ```
-virtualenv -ppython3.5 .
+virtualenv -ppython3.8 .
 source bin/activate
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
