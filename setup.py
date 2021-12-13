@@ -21,6 +21,6 @@ setup(name='openwebvulndb-tools',
           "easyinject==0.3",
           "marshmallow>=2.21.0,<3",
           "packaging==20.9",
-          "lxml==4.6.2",
+          "lxml==4.6.5",
           "yarl==1.6.3"
       ])
