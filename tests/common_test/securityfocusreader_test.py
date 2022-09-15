@@ -18,7 +18,7 @@
 import unittest
 from unittest.mock import MagicMock
 from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser
-from fixtures import file_path, ClientSessionMock, async_test
+from tests.fixtures import file_path, ClientSessionMock, async_test
 from openwebvulndb.common.securityfocus.reader import SecurityFocusReader
 from openwebvulndb.common.storage import Storage
 from openwebvulndb.common.manager import VulnerabilityManager

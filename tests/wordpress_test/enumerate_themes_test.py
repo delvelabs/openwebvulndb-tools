@@ -20,7 +20,7 @@ from asyncio import TimeoutError
 
 from unittest import TestCase
 from unittest.mock import MagicMock, call
-from fixtures import read_file, async_test, fake_future, ClientSessionMock, ClientResponse
+from tests.fixtures import read_file, async_test, fake_future, ClientSessionMock, ClientResponse
 from openwebvulndb.wordpress.repository import WordPressRepository, RepositoryUnreachable
 from openwebvulndb.wordpress.errors import PluginNotFound
 from openwebvulndb.common import Meta, Repository

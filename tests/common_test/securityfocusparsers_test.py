@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 from datetime import datetime
 from openwebvulndb.common.securityfocus.parsers import InfoTabParser, ReferenceTabParser, \
     DiscussionTabParser, ExploitTabParser, SolutionTabParser
-from fixtures import file_path
+from tests.fixtures import file_path
 from lxml import etree
 
 

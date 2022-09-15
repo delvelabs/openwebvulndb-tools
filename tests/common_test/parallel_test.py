@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from fixtures import async_test
+from tests.fixtures import async_test
 import async_timeout
 from aiohttp.test_utils import make_mocked_coro
 

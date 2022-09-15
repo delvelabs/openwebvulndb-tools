@@ -18,7 +18,7 @@
 import asyncio
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
-from fixtures import async_test, fake_future, file_path, freeze_time
+from tests.fixtures import async_test, fake_future, file_path, freeze_time
 from datetime import date
 
 from openwebvulndb.common import RepositoryChecker, Repository

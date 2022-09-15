@@ -19,7 +19,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch, mock_open
 from contextlib import contextmanager
 
-from fixtures import async_test
+from tests.fixtures import async_test
 from aiohttp.test_utils import make_mocked_coro
 
 from openwebvulndb.common.errors import ExecutionFailure, DirectoryExpected

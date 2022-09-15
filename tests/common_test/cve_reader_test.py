@@ -18,7 +18,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call
 from datetime import datetime
-from fixtures import freeze_time, async_test, ClientSessionMock
+from tests.fixtures import freeze_time, async_test, ClientSessionMock
 from aiohttp.test_utils import make_mocked_coro
 
 from openwebvulndb.common.errors import VulnerabilityNotFound
