@@ -55,7 +55,7 @@ class ParallelTest(TestCase):
         worker = ParallelWorker(1, loop=loop)
         await worker.request(coro_with_exception)
         await worker.request(coro)
-        with async_timeout.timeout(timeout=0.01, loop=loop):
+        with async_timeout.timeout(0.01):
             await worker.wait()
 
         coro.assert_called_once_with()

@@ -28,7 +28,7 @@ class ParallelWorker:
     def __init__(self, worker_count, *, loop, name="Worker", timeout_per_job=None):
         self.loop = loop
         self.name = name
-        self.queue = asyncio.Queue(loop=loop)
+        self.queue = asyncio.Queue()
         self.workers = [loop.create_task(self.consume(i)) for i in range(worker_count)]
         self.timeout_per_job = timeout_per_job
 
