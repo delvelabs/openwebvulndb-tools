@@ -121,7 +121,6 @@ class SubversionTest(TestCase):
 
             cse.assert_called_with("svn", "checkout", "https://svn.example.com/tags/1.2.3", ".",
                                    cwd="/tmp/foobar",
-                                   loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
                                    stdin=asyncio.subprocess.PIPE,
                                    stderr=asyncio.subprocess.PIPE)
@@ -143,7 +142,6 @@ class SubversionTest(TestCase):
 
             cse.assert_called_with("svn", "checkout", "https://svn.example.com/tags/1.2.3", ".",
                                    cwd="/tmp/foobar",
-                                   loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
                                    stdin=asyncio.subprocess.PIPE,
                                    stderr=asyncio.subprocess.PIPE)
@@ -164,7 +162,6 @@ class SubversionTest(TestCase):
 
             cse.assert_called_with("svn", "switch", "--ignore-ancestry", "https://svn.example.com/tags/1.2.3",
                                    cwd="/tmp/foobar",
-                                   loop=loop,
                                    stdout=asyncio.subprocess.PIPE,
                                    stdin=asyncio.subprocess.PIPE,
                                    stderr=asyncio.subprocess.PIPE)
@@ -184,7 +181,7 @@ class SubversionTest(TestCase):
             await svn.checkout("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
             cse.assert_called_with("svn", "checkout", "--ignore-externals", "https://svn.example.com/tags/1.2.3", ".",
-                                   cwd="/tmp/foobar", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                   cwd="/tmp/foobar", stdout=asyncio.subprocess.PIPE,
                                    stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             proc.communicate.assert_called_with()
 
@@ -201,7 +198,7 @@ class SubversionTest(TestCase):
             await svn.switch("https://svn.example.com/tags/1.2.3", workdir="/tmp/foobar")
 
             cse.assert_called_with("svn", "switch", "--ignore-ancestry", "--ignore-externals",
-                                   "https://svn.example.com/tags/1.2.3", cwd="/tmp/foobar", loop=loop,
+                                   "https://svn.example.com/tags/1.2.3", cwd="/tmp/foobar",
                                    stdout=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE,
                                    stderr=asyncio.subprocess.PIPE)
             proc.communicate.assert_called_with()
@@ -241,7 +238,7 @@ class SubversionTest(TestCase):
 
             cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
                                           "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
-                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        cwd="/tmp/plugin", stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
             self.assertEqual(externals, [{"name": "external", "url": "https://www.some-external.example"}]*4)
 
@@ -270,7 +267,7 @@ class SubversionTest(TestCase):
 
             cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
                                           "https://svn.example.com/plugins/plugin/tags/1.0"),
-                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        cwd="/tmp/plugin", stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
             self.assertEqual(externals, [{"name": "external", "url": "https://svn.example.com/external"},
                                          {"name": "external", "url": "https://svn.example.com/external"},
@@ -298,7 +295,7 @@ class SubversionTest(TestCase):
 
             cse.assert_called_once_with(*("svn", "propget", "-R", "svn:externals",
                                           "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
-                                        cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE,
+                                        cwd="/tmp/plugin", stdout=asyncio.subprocess.PIPE,
                                         stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
             self.assertEqual(externals, [])
 
@@ -317,11 +314,11 @@ class SubversionTest(TestCase):
 
             cse.assert_has_calls(
                 [call(*("svn", "info", "--show-item", "url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
-                      cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                      cwd="/tmp/plugin", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                       stdin=asyncio.subprocess.PIPE),
                  call().communicate(),
                  call(*("svn", "info", "--show-item", "repos-root-url", "https://plugins.svn.wordpress.org/plugin/tags/1.0"),
-                      cwd="/tmp/plugin", loop=loop, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                      cwd="/tmp/plugin", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                       stdin=asyncio.subprocess.PIPE)])
 
             self.assertEqual(info, {"url": "https://plugins.svn.wordpress.org/plugin/tags/1.0",
@@ -344,7 +341,7 @@ class SubversionTest(TestCase):
 
             plugins = await svn._get_last_release_date_of_components("plugins", "http://plugins.svn.wordpress.org/")
 
-            cse.assert_has_calls([call(*("svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"), loop=loop,
+            cse.assert_has_calls([call(*("svn", "ls", "-v", "^/tags", "http://plugins.svn.wordpress.org/"),
                                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
                                        stdin=asyncio.subprocess.DEVNULL)])
             self.assertEqual(plugins, {"plugins/plugin-1": date(year=2015, month=1, day=28),

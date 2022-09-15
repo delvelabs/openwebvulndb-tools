@@ -85,14 +85,13 @@ class Subversion:
     async def ls(self, url):
         try:
             command = self.build_ls(url)
-            return await asyncio.wait_for(self.read_lines(command), 30.0, loop=self.loop)
+            return await asyncio.wait_for(self.read_lines(command), 30.0)
         except asyncio.TimeoutError:
             raise ExecutionFailure('Timeout reached')
 
     async def read_lines(self, command, *, ignore_errors=False):
         process = await create_subprocess_exec(
             *command,
-            loop=self.loop,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
             stdin=asyncio.subprocess.DEVNULL
@@ -231,7 +230,7 @@ class Subversion:
             match = line_pattern.match(line)
             if match:
                 component_key, day, month, year = match.group("component", "day", "month", "year")
-                if component_key is not ".":
+                if component_key != ".":
                     component_key = "%s/%s" % (key, component_key)
                     year = datetime.today().year if year is None else year
                     date = datetime.strptime("%s %s %s" % (day, month, year), "%d %b %Y")
@@ -240,7 +239,7 @@ class Subversion:
 
         try:
             command = ["svn", "ls", "-v", "^/tags", repository_url]
-            out = await asyncio.wait_for(self.read_lines(command, ignore_errors=True), timeout=60, loop=self.loop)
+            out = await asyncio.wait_for(self.read_lines(command, ignore_errors=True), timeout=60)
             update_dates = {}
             for line in out:
                 component_key, date = parse_line(line)
@@ -254,7 +253,6 @@ class Subversion:
         process = await create_subprocess_exec(
             *command,
             cwd=workdir,
-            loop=self.loop,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.PIPE
