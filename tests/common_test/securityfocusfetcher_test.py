@@ -17,7 +17,7 @@
 
 import unittest
 from unittest.mock import MagicMock
-from fixtures import file_path, async_test, ClientSessionMock
+from tests.fixtures import file_path, async_test, ClientSessionMock
 from aiohttp.test_utils import make_mocked_coro
 from openwebvulndb.common.securityfocus.fetcher import SecurityFocusFetcher
 import asyncio

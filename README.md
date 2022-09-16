@@ -14,7 +14,7 @@ source bin/activate
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
-nosetests
+python -m pytest
 ```
 
 External requirements set-up:

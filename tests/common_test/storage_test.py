@@ -18,7 +18,7 @@
 from unittest import TestCase
 from unittest.mock import mock_open, patch, call, MagicMock, ANY
 
-from fixtures import file_path
+from tests.fixtures import file_path
 
 from openwebvulndb.common import Storage, Meta, VulnerabilityList, VersionList
 from openwebvulndb.common.schemas import VersionListSchema

@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch, ANY, call
 
 from aiohttp import BasicAuth
 from aiohttp.test_utils import make_mocked_coro
-from fixtures import async_test, ClientSessionMock
+from tests.fixtures import async_test, ClientSessionMock
 
 from openwebvulndb.common.release import GitHubRelease
 

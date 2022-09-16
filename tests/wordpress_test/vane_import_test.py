@@ -17,7 +17,7 @@
 
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch, call
-from fixtures import file_path, freeze_time
+from tests.fixtures import file_path, freeze_time
 from datetime import datetime, timedelta
 
 from openwebvulndb.common import VulnerabilityManager

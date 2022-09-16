@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 from unittest import TestCase
-from fixtures import file_path
+from tests.fixtures import file_path
 
 from openwebvulndb.common.models import VersionList
 from openwebvulndb.wordpress.vane import VaneVersionRebuild

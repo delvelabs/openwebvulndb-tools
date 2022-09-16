@@ -20,7 +20,7 @@ from openwebvulndb.wordpress.parser import PluginParser, ThemeParser
 from openwebvulndb.wordpress.errors import PluginNotFound, ThemeNotFound
 from openwebvulndb.common import Meta, Repository
 
-from fixtures import read_file
+from tests.fixtures import read_file
 
 
 class PluginApiParseTest(TestCase):
