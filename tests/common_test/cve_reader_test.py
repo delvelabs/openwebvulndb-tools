@@ -536,7 +536,7 @@ class LookupVulnerabilityTest(TestCase):
 
         await self.reader.read_one_from_api(entry.id)
 
-        self.reader.session.get.assert_called_once_with("https://cve.circl.lu/api/cve/" + entry.id)
+        self.reader.session.get.assert_called_once_with("https://cvepremium.circl.lu/api/cve/" + entry.id)
         # Make sure the cve entry has been converted to the usual format for the vulnerable configuration.
         self.reader.read_one.assert_called_once_with(
             {"id": "CVE-2017-1234", "cvss": 4.3,
