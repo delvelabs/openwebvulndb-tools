@@ -69,7 +69,7 @@ class CVEReader:
     async def read_api(self, url):
         async with self.session.get(url) as response:
             data = await response.json()
-            for entry in data:
+            for entry in data.get('results'):
                 self.read_one(entry)
 
     async def read_one_from_api(self, cve_id):
