@@ -44,7 +44,7 @@ class ParallelWorker:
                 if self.timeout_per_job is not None:
                     task = self.loop.create_task(coroutine(*args, **kwargs))
                     try:
-                        with async_timeout.timeout(timeout=self.timeout_per_job):
+                        with async_timeout.timeout(self.timeout_per_job):
                             await task
                     except asyncio.TimeoutError:
                         logger.warn("Job timed out in %s: %s, %s", self.name, args, kwargs)

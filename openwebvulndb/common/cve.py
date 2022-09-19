@@ -63,7 +63,7 @@ class CVEReader:
     def read_file(self, file_name):
         with open(file_name, "r") as fp:
             data = json.load(fp)
-            for entry in data:
+            for entry in data.get('results'):
                 self.read_one(entry)
 
     async def read_api(self, url):
@@ -74,7 +74,7 @@ class CVEReader:
 
     async def read_one_from_api(self, cve_id):
         try:
-            url = "https://cve.circl.lu/api/cve/" + cve_id
+            url = "https://cvepremium.circl.lu/api/cve/" + cve_id
             async with self.session.get(url) as response:
                 entry = await response.json()
                 if entry is None:

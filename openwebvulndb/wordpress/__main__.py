@@ -126,7 +126,7 @@ def load_cve(loop, cve_reader, input_file):
     if input_file:
         cve_reader.read_file(input_file)
     else:
-        loop.run_until_complete(cve_reader.read_api("http://cve.circl.lu/api/search/wordpress/wordpress"))
+        loop.run_until_complete(cve_reader.read_api("http://cvepremium.circl.lu/api/search/wordpress/wordpress"))
 
 
 def change_version_format(storage):
